@@ -1,0 +1,89 @@
+# Verible lint config - lowRISC-aligned SystemVerilog RTL house style.
+# Verified against verible-verilog-lint v0.0-3946-g851d3ff4.
+# NOTE: this file is a DELTA on --ruleset (default "default"), not a replacement.
+# All 61 rules of this build are listed explicitly so the result is hermetic.
+
+# --- combinational / sequential logic ---
+always-comb
+always-comb-blocking
+always-ff-non-blocking=catch_modifying_assignments:false;waive_for_locals:true
+case-missing-default
+
+# --- naming: ports, signals, flops, types, params, macros ---
+port-name-suffix
+signal-name-style=style_regex:[a-z_0-9]+
+dff-name-style=input:d;output:q
+enum-name-style=style_regex:[a-z_0-9]+(_e|_t)
+interface-name-style=style_regex:[a-z_0-9]+(_if)
+struct-union-name-style
+parameter-name-style=localparam_style:CamelCase;parameter_style:CamelCase
+parameter-type-name-style
+macro-name-style=style_regex:[A-Z_0-9]+
+positive-meaning-parameter-name
+
+# --- structure / layout ---
+explicit-begin=if_enable:true;else_enable:true;always_enable:true;always_comb_enable:true;always_latch_enable:true;always_ff_enable:true;for_enable:true;forever_enable:true;foreach_enable:true;while_enable:true;initial_enable:true
+line-length=length:100
+no-tabs
+no-trailing-spaces
+posix-eof
+one-module-per-file
+module-filename
+package-filename
+module-begin-block
+mismatched-labels
+endif-comment
+
+# --- instantiation / parameters ---
+module-port
+module-parameter
+forbid-defparam
+explicit-parameter-storage-type
+proper-parameter-declaration=package_allow_parameter:false;package_allow_localparam:true
+
+# --- generate ---
+generate-label
+generate-label-prefix
+legacy-generate-region
+legacy-genvar-declaration
+v2001-generate-begin
+
+# --- types ---
+typedef-enums
+typedef-structs-unions
+packed-dimensions-range-ordering
+unpacked-dimensions-range-ordering
+
+# --- literals / expressions ---
+truncated-numeric-literal
+undersized-binary-literal
+suggest-parentheses
+forbid-negative-array-dim
+numeric-format-string-style
+forbid-consecutive-null-statements
+forbid-line-continuations
+suspicious-semicolon
+macro-string-concatenation
+
+# --- functions / tasks in packages ---
+explicit-function-lifetime
+explicit-task-lifetime
+explicit-function-task-parameter-type
+invalid-system-task-function
+
+# --- explicitly off: broken in this build ---
+# instance-shadowing false-positives on every typedef'd type used as a
+# declaration type and on every `.port` named connection. Unusable.
+-instance-shadowing
+
+# --- explicitly off: DV-only, not our scope ---
+-constraint-name-style
+-create-object-name-match
+-disable-statement
+-forbidden-macro
+-plusarg-assignment
+-uvm-macro-semicolon
+-void-cast
+
+# --- explicitly off: no observable effect in this build ---
+-banned-declared-name-patterns

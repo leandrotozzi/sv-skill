@@ -55,14 +55,15 @@ def _check(rules: list) -> int:
     if CHECKS_PY.exists():
         impl = CHECKS_PY.read_text(encoding="utf-8")
         for r in own:
-            if f'rule="{r.tool_rule}"' not in impl and f"rule='{r.tool_rule}'" not in impl:
-                problems.append(f"{r.id}: no implementation of rule={r.tool_rule!r} in checks.py")
+            for name in r.tool_rules:
+                if f'rule="{name}"' not in impl and f"rule='{name}'" not in impl:
+                    problems.append(f"{r.id}: no implementation of rule={name!r} in checks.py")
     elif own:
         skipped.append(f"checks.py absent: {len(own)} svstyle rule(s) unverified (Phase 2)")
 
     # 2. Every verible-lint rule we cite must be enabled in the shipped config, and
     #    every rule the config enables must be claimed by a rule (both directions).
-    cited = {r.tool_rule: r.id for r in rules if r.tool == "verible-lint"}
+    cited = {n: r.id for r in rules if r.tool == "verible-lint" for n in r.tool_rules}
     if VERIBLE_LINT_CONFIG.exists():
         enabled = set()
         for line in VERIBLE_LINT_CONFIG.read_text(encoding="utf-8").splitlines():

@@ -1,0 +1,37 @@
+# Verible formatter flags - lowRISC-aligned SystemVerilog RTL house style.
+# Verified against verible-verilog-format v0.0-3946-g851d3ff4.
+
+# --- base geometry ---
+--indentation_spaces=2
+--wrap_spaces=4
+--column_limit=100
+
+# --- aligned contexts ---
+--port_declarations_alignment=align
+--formal_parameters_alignment=align
+--named_port_alignment=align
+--named_parameter_alignment=align
+--module_net_variable_alignment=align
+--struct_union_members_alignment=align
+--enum_assignment_statement_alignment=align
+
+# --- inferred contexts (follow the author's existing intent) ---
+--assignment_statement_alignment=infer
+--case_items_alignment=infer
+--class_member_variable_alignment=infer
+--distribution_items_alignment=infer
+
+# --- indent rather than wrap for headers and instantiations ---
+--port_declarations_indentation=indent
+--formal_parameters_indentation=indent
+--named_port_indentation=indent
+--named_parameter_indentation=indent
+
+# --- misc layout ---
+--port_declarations_right_align_packed_dimensions=false
+--port_declarations_right_align_unpacked_dimensions=false
+--compact_indexing_and_selections=true
+--try_wrap_long_lines=true
+--wrap_end_else_clauses=false
+--expand_coverpoints=false
+--verify_convergence=true

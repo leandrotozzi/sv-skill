@@ -52,7 +52,11 @@ class Rule:
     rationale: str
     sources: tuple[str, ...]
     tool: str
-    tool_rule: str  # tool-side rule name / warning code; "" for `review`
+    # Tool-side rule names / warning codes this rule subsumes. Several because one
+    # house rule with one rationale often covers a family of mechanical tool rules
+    # (`no-tabs`, `no-trailing-spaces`, `posix-eof` are all "the formatter owns
+    # whitespace"). Empty for `review`.
+    tool_rules: tuple[str, ...]
     autofix: bool
     good: str = ""
     bad: str = ""
@@ -87,10 +91,17 @@ def _rule_from_toml(raw: dict, index: int) -> Rule:
     tool = enf.get("tool")
     if tool not in TOOLS:
         raise RulesError(f"{rid}: enforcement.tool must be one of {', '.join(TOOLS)}")
-    tool_rule = enf.get("rule", "")
-    if tool == "review" and tool_rule:
+    raw_rule = enf.get("rule", ())
+    if isinstance(raw_rule, str):
+        raw_rule = (raw_rule,) if raw_rule else ()
+    if not all(isinstance(n, str) and n for n in raw_rule):
+        raise RulesError(f"{rid}: enforcement.rule must be a name or a list of names")
+    tool_rules = tuple(raw_rule)
+    if len(set(tool_rules)) != len(tool_rules):
+        raise RulesError(f"{rid}: enforcement.rule repeats a name")
+    if tool == "review" and tool_rules:
         raise RulesError(f"{rid}: enforcement.rule is meaningless for tool='review'")
-    if tool not in ("review", "verible-format") and not tool_rule:
+    if tool not in ("review", "verible-format") and not tool_rules:
         raise RulesError(f"{rid}: enforcement.rule is required for tool={tool!r}")
     autofix = bool(enf.get("autofix", False))
     if autofix and tool == "review":
@@ -105,7 +116,7 @@ def _rule_from_toml(raw: dict, index: int) -> Rule:
         rationale=raw["rationale"].strip(),
         sources=tuple(raw["sources"]),
         tool=tool,
-        tool_rule=tool_rule,
+        tool_rules=tool_rules,
         autofix=autofix,
         good=raw.get("good", "").strip("\n"),
         bad=raw.get("bad", "").strip("\n"),
@@ -130,6 +141,18 @@ def load_rules(path: Path | None = None) -> list[Rule]:
             raise RulesError(f"{rule.id}: duplicate id (also entry #{seen[rule.id] + 1})")
         seen[rule.id] = i
 
+    # Two house rules claiming the same tool rule would make the diagnostic
+    # mapping ambiguous and silently hide one of them.
+    claimed: dict[tuple[str, str], str] = {}
+    for rule in rules:
+        for name in rule.tool_rules:
+            key = (rule.tool, name)
+            if key in claimed:
+                raise RulesError(
+                    f"{rule.id}: {rule.tool} rule {name!r} is already claimed by {claimed[key]}"
+                )
+            claimed[key] = rule.id
+
     order = list(CATEGORIES)
     return sorted(rules, key=lambda r: (order.index(r.category), r.number))
 
@@ -147,4 +170,4 @@ def tool_index(rules: list[Rule], tool: str) -> dict[str, Rule]:
 
     Used to translate Verible and Verilator diagnostics into house rule IDs.
     """
-    return {r.tool_rule: r for r in rules if r.tool == tool and r.tool_rule}
+    return {name: r for r in rules if r.tool == tool for name in r.tool_rules}

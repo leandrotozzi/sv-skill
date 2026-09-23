@@ -74,7 +74,7 @@ def test_indexes(tmp_path):
         ('id        = "PRT-003"', "", "missing or empty id"),
         ('category  = "PRT"', "", "missing or empty category"),
         ('severity  = "MUST"', "", "missing or empty severity"),
-        ("rationale = \"The port list is the module's contract.\"", "", "missing or empty rat"),
+        ('rationale = "The port list is the module\'s contract."', "", "missing or empty rat"),
         ('tool    = "svstyle"', "", "enforcement.tool must be one of"),
         ('rule    = "port_comment"', "", "enforcement.rule is required"),
         ('id        = "PRT-003"', 'id        = "PRT-3"', "must look like"),
@@ -113,7 +113,7 @@ def test_rejects_duplicate_id(tmp_path):
 
 def test_rejects_unknown_key(tmp_path):
     with pytest.raises(RulesError, match="unknown key"):
-        load_rules(write(tmp_path, GOOD.replace('title     =', 'titel     = "x"\ntitle     =', 1)))
+        load_rules(write(tmp_path, GOOD.replace("title     =", 'titel     = "x"\ntitle     =', 1)))
 
 
 def test_rejects_review_rule_with_a_tool_rule_name(tmp_path):
@@ -140,3 +140,57 @@ def test_html_escapes_example_snippets(tmp_path):
     html = render_html(load_rules(write(tmp_path, toml)))
     assert "&amp;" in html and "&lt;" in html
     assert "<script>x</script>" not in html
+
+
+MULTI = """
+[[rule]]
+id        = "FMT-001"
+title     = "The formatter owns whitespace"
+severity  = "MUST"
+category  = "FMT"
+statement = "Indentation, trailing space and the final newline are the formatter's output."
+rationale = "One rationale covers the whole mechanical family; nobody reviews them apart."
+sources   = ["house style"]
+[rule.enforcement]
+tool = "verible-lint"
+rule = ["no-tabs", "no-trailing-spaces", "posix-eof"]
+"""
+
+
+def test_one_rule_may_claim_several_tool_rules(tmp_path):
+    (rule,) = load_rules(write(tmp_path, MULTI))
+    assert rule.tool_rules == ("no-tabs", "no-trailing-spaces", "posix-eof")
+    index = tool_index([rule], "verible-lint")
+    assert set(index) == {"no-tabs", "no-trailing-spaces", "posix-eof"}
+    assert index["posix-eof"].id == "FMT-001"
+    assert "no-tabs" in render_markdown_full([rule])
+
+
+def test_rejects_a_repeated_name_within_one_rule(tmp_path):
+    bad = MULTI.replace('"no-trailing-spaces"', '"no-tabs"')
+    with pytest.raises(RulesError, match="repeats a name"):
+        load_rules(write(tmp_path, bad))
+
+
+def test_rejects_two_rules_claiming_the_same_tool_rule(tmp_path):
+    second = MULTI.replace('id        = "FMT-001"', 'id        = "FMT-002"')
+    second = second.replace(
+        'rule = ["no-tabs", "no-trailing-spaces", "posix-eof"]', 'rule = "no-tabs"'
+    )
+    with pytest.raises(RulesError, match="already claimed by FMT-001"):
+        load_rules(write(tmp_path, MULTI + second))
+
+
+def test_the_shipped_verible_config_parses_to_61_rules():
+    """The config is a delta on Verible's default ruleset, so it lists every rule."""
+    from svstyle.cli import VERIBLE_LINT_CONFIG
+
+    enabled, disabled = set(), set()
+    for line in VERIBLE_LINT_CONFIG.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        (disabled if line.startswith("-") else enabled).add(line.lstrip("+-").split("=", 1)[0])
+    assert len(enabled) == 52
+    assert len(disabled) == 9
+    assert not (enabled & disabled)

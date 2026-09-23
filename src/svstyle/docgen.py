@@ -62,7 +62,8 @@ def render_markdown_full(rules: list[Rule]) -> str:
                 out += ["**Good:**", "", "```systemverilog", r.good, "```", ""]
             if r.bad:
                 out += ["**Bad:**", "", "```systemverilog", r.bad, "```", ""]
-            enforced = TOOL_LABEL[r.tool] + (f" `{r.tool_rule}`" if r.tool_rule else "")
+            names = " ".join(f"`{n}`" for n in r.tool_rules)
+            enforced = TOOL_LABEL[r.tool] + (f" {names}" if names else "")
             if r.autofix:
                 enforced += " · autofixable"
             out += [f"**Enforced by:** {enforced}", "", f"**Sources:** {', '.join(r.sources)}", ""]
@@ -179,7 +180,7 @@ def _esc(text: str) -> str:
 
 
 def _card(r: Rule) -> str:
-    tool = TOOL_LABEL[r.tool] + (f" · {r.tool_rule}" if r.tool_rule else "")
+    tool = TOOL_LABEL[r.tool] + (f" · {' '.join(r.tool_rules)}" if r.tool_rules else "")
     if r.autofix:
         tool += ' · <span class="fix">fix</span>'
     searchable = _esc(" ".join([r.id, r.title, r.statement, r.rationale]).lower())
