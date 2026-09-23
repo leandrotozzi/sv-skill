@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "svstyle"
+version = "0.1.0"
+description = "SystemVerilog RTL style checker/formatter and rules database"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["systemverilog", "rtl", "formatter", "linter", "hdl", "lowrisc"]
+dependencies = [
+    "pyslang>=11",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-xdist>=3",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+svstyle = "svstyle.cli:main"
+
+# rules.toml and data/ live inside the package directory; hatchling ships
+# everything under `packages` that is not a dotfile, so the shipped Verible
+# configs are deliberately named without a leading dot (no force-include).
+[tool.hatch.build.targets.wheel]
+packages = ["src/svstyle"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
