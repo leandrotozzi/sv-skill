@@ -8,3 +8,7 @@ dist/
 .ruff_cache/
 .hypothesis/
 .DS_Store
+
+# Third-party source documents kept for re-checking rationales.
+# Copyrighted; never committed or redistributed.
+docs/sources/

@@ -6,6 +6,7 @@ the files are regenerated with `svstyle rules --gen`.
 """
 
 import html
+import re
 from datetime import date
 
 from .rules import CATEGORIES, Rule, by_category
@@ -87,7 +88,7 @@ CSS = """
  --codebg:#ffffff12;--goodbg:#3FBE8C14;--badbg:#E5786F14}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 var(--display)}
-.wrap{max-width:1080px;margin:0 auto;padding:0 1.5rem 6rem}
+.wrap{max-width:1180px;margin:0 auto;padding:0 1.5rem 6rem}
 .mast{padding:3rem 0 1.4rem}
 h1{margin:0;font-size:1.85rem;letter-spacing:-.01em}
 .mast p{margin:.5rem 0 0;color:var(--dim);max-width:70ch}
@@ -126,6 +127,9 @@ h2{font-size:.76rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim
 .stm{margin:.5rem 0 0}
 .why{margin:.55rem 0 0;color:var(--dim);font-size:.93em}
 .ex{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.8rem}
+/* Realistic SystemVerilog with trailing comments runs past a half-width
+   column; stack those so the line is read, not scrolled. */
+.ex.stack{grid-template-columns:1fr}
 .ex>div{border:1px solid var(--line);border-radius:7px;overflow:hidden}
 .ex .t{font-size:.64rem;letter-spacing:.07em;text-transform:uppercase;padding:.3rem .6rem;
  border-bottom:1px solid var(--line)}
@@ -168,7 +172,10 @@ for(const b of document.querySelectorAll('button[data-k]')){
     apply();
   };
 }
-document.getElementById('q').oninput=e=>{state.q=e.target.value.toLowerCase();apply();};
+// Normalise the query exactly as the index was built, so that punctuation
+// the reader types ("module's", "`always_ff`") still matches.
+const norm=s=>s.toLowerCase().replace(/[^a-z0-9 _-]+/g,' ');
+document.getElementById('q').oninput=e=>{state.q=norm(e.target.value);apply();};
 for(const b of document.querySelectorAll('.rid'))
   b.onclick=()=>navigator.clipboard?.writeText(b.textContent);
 apply();
@@ -183,10 +190,16 @@ def _card(r: Rule) -> str:
     tool = TOOL_LABEL[r.tool] + (f" · {' '.join(r.tool_rules)}" if r.tool_rules else "")
     if r.autofix:
         tool += ' · <span class="fix">fix</span>'
-    searchable = _esc(" ".join([r.id, r.title, r.statement, r.rationale]).lower())
+    # Strip punctuation rather than escaping it: the raw text would put HTML
+    # entities in the attribute, so searching "module's" could never match.
+    searchable = re.sub(
+        r"[^a-z0-9 _-]+", " ", " ".join([r.id, r.title, r.statement, r.rationale]).lower()
+    )
 
     ex = ""
     if r.good or r.bad:
+        widest = max((len(ln) for ln in (r.good + "\n" + r.bad).splitlines()), default=0)
+        stack = " stack" if widest > 56 else ""
         cells = []
         if r.good:
             cells.append(
@@ -194,7 +207,7 @@ def _card(r: Rule) -> str:
             )
         if r.bad:
             cells.append(f'<div class="bad"><div class="t">bad</div><pre>{_esc(r.bad)}</pre></div>')
-        ex = f'<div class="ex">{"".join(cells)}</div>'
+        ex = f'<div class="ex{stack}">{"".join(cells)}</div>'
 
     return (
         f'<div class="rule" data-cat="{r.category}" data-sev="{r.severity}"'
@@ -229,7 +242,9 @@ def render_html(rules: list[Rule], company: str = "") -> str:
     )
     cat_btns = "".join(f'<button data-k="cat" data-v="{c}">{c}</button>' for c in grouped)
     sev_btns = "".join(
-        f'<button data-k="sev" data-v="{s}">{s}</button>' for s in ("MUST", "SHOULD", "MAY")
+        f'<button data-k="sev" data-v="{s}">{s}</button>'
+        for s in ("MUST", "SHOULD", "MAY")
+        if counts[s]
     )
     tool_btns = "".join(
         f'<button data-k="tool" data-v="{t}">{TOOL_LABEL[t]}</button>' for t in tools_used

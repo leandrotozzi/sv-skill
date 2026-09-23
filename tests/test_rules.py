@@ -194,3 +194,35 @@ def test_the_shipped_verible_config_parses_to_61_rules():
     assert len(enabled) == 52
     assert len(disabled) == 9
     assert not (enabled & disabled)
+
+
+# --- the shipped database ---------------------------------------------------
+
+
+def test_shipped_rules_load_and_cover_every_enabled_verible_rule():
+    from svstyle.cli import VERIBLE_LINT_CONFIG
+
+    rules = load_rules()
+    assert len(rules) >= 60, "the guide is meant to be comprehensive"
+
+    enabled = set()
+    for line in VERIBLE_LINT_CONFIG.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith(("#", "-")):
+            enabled.add(line.lstrip("+").split("=", 1)[0])
+    claimed = set(tool_index(rules, "verible-lint"))
+    assert claimed == enabled, f"unclaimed: {enabled - claimed}; phantom: {claimed - enabled}"
+
+
+def test_shipped_rules_have_no_drift(capsys):
+    """This is the CI gate: DB, configs, generated docs and code must agree."""
+    from svstyle.cli import _check
+
+    assert _check(load_rules()) == 0, capsys.readouterr().err
+
+
+def test_every_rule_carries_a_rationale_and_a_source():
+    for r in load_rules():
+        assert len(r.rationale) > 60, f"{r.id}: rationale too thin to review"
+        assert r.sources, f"{r.id}: no source"
+        assert r.good and r.bad, f"{r.id}: needs both a good and a bad example"
