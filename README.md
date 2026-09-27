@@ -15,7 +15,7 @@ Style lineage: lowRISC (`_i/_o`, `clk_i`, `rst_ni`, `_q/_d`, CamelCase params,
 
 ## Status
 
-Phase 1 done: 76 rules approved 2026-09-27. Next: Phase 2 (`svstyle` core). Design spec:
+Phase 2 done: `svstyle check` / `fix` work end to end. Next: Phase 3 (the skill). Design spec:
 [`docs/superpowers/specs/2026-09-22-sv-skill-design.md`](docs/superpowers/specs/2026-09-22-sv-skill-design.md).
 
 ## Development

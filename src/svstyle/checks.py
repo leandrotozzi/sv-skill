@@ -36,6 +36,7 @@ OURS_RE = re.compile(r"\A// Copyright \(c\) \d{4} ")
 MIN_DESCRIPTION_WORDS = 5  # "Gray counter module." is a restatement, not a description
 TODO_TRAILING = "  // TODO: describe"
 TODO_ABOVE = "// TODO: describe\n"
+HOW = {"ordered": "by position", "wildcard": "with .*", "mixed": "partly by position or .*"}
 
 
 def run_checks(text: str, path: str, rules: list[Rule]) -> list[Diag]:
@@ -142,5 +143,5 @@ def check_ports(ctx: _Ctx, src: Source) -> None:
         if a.kind == "instance" and a.detail != "named":
             ctx.emit(
                 rule="named_ports", line=a.line,
-                message=f"instance `{a.name}` connects ports {a.detail}, not by name",
+                message=f"instance `{a.name}` connects ports {HOW[a.detail]}, not by name",
             )  # fmt: skip
