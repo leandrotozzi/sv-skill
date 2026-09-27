@@ -51,10 +51,16 @@ def render_markdown_full(rules: list[Rule]) -> str:
     out = [
         "# SystemVerilog RTL rules — rationale and examples",
         "",
-        "Generated from `rules.toml` — do not edit.",
+        "Generated from `rules.toml` — do not edit. To read one rule, search for its",
+        "heading, e.g. `### DOC-003`, instead of loading the whole file.",
+        "",
+        "## Contents",
         "",
     ]
-    for cat, group in by_category(rules).items():
+    grouped = by_category(rules)
+    out += [f"- {c} — {CATEGORIES[c]}: {g[0].id} … {g[-1].id}" for c, g in grouped.items()]
+    out.append("")
+    for cat, group in grouped.items():
         out += [f"## {cat} — {CATEGORIES[cat]}", ""]
         for r in group:
             out += [f"### {r.id} ({r.severity}) — {r.title}", "", r.statement, ""]

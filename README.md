@@ -15,7 +15,7 @@ Style lineage: lowRISC (`_i/_o`, `clk_i`, `rst_ni`, `_q/_d`, CamelCase params,
 
 ## Status
 
-Phase 2 done: `svstyle check` / `fix` work end to end. Next: Phase 3 (the skill). Design spec:
+Phase 3 done: skill in `skill/systemverilog-rtl/`, installed by symlink. Next: Phase 4 (validation). Design spec:
 [`docs/superpowers/specs/2026-09-22-sv-skill-design.md`](docs/superpowers/specs/2026-09-22-sv-skill-design.md).
 
 ## Development

@@ -226,3 +226,9 @@ def test_every_rule_carries_a_rationale_and_a_source():
         assert len(r.rationale) > 60, f"{r.id}: rationale too thin to review"
         assert r.sources, f"{r.id}: no source"
         assert r.good and r.bad, f"{r.id}: needs both a good and a bad example"
+
+
+def test_full_markdown_opens_with_a_contents_list():
+    text = render_markdown_full(load_rules())
+    contents = text[: text.index("\n## DOC")]
+    assert "- DOC — Comments and file header: DOC-001 … DOC-010" in contents

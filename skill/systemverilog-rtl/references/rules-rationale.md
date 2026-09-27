@@ -1,6 +1,22 @@
 # SystemVerilog RTL rules — rationale and examples
 
-Generated from `rules.toml` — do not edit.
+Generated from `rules.toml` — do not edit. To read one rule, search for its
+heading, e.g. `### DOC-003`, instead of loading the whole file.
+
+## Contents
+
+- DOC — Comments and file header: DOC-001 … DOC-010
+- STR — File structure: STR-001 … STR-005
+- PRT — Ports and connections: PRT-001 … PRT-007
+- NAM — Naming: NAM-001 … NAM-010
+- FMT — Formatting and layout: FMT-001 … FMT-005
+- LNG — Language features: LNG-001 … LNG-014
+- SYN — Synthesis and portability: SYN-001 … SYN-004
+- RST — Reset and clocking: RST-001 … RST-005
+- FSM — State machines: FSM-001 … FSM-004
+- CDC — Clock domain crossing: CDC-001 … CDC-006
+- GEN — Generate and parameterisation: GEN-001 … GEN-003
+- VER — Assertions and verification: VER-001 … VER-003
 
 ## DOC — Comments and file header
 
