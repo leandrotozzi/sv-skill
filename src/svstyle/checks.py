@@ -136,8 +136,9 @@ def check_ports(ctx: _Ctx, src: Source) -> None:
     for name, line in src.non_ansi:
         ctx.emit(rule="ansi_ports", line=line, message=f"module `{name}` uses non-ANSI ports")
     for a in src.anchors:
-        if a.kind == "port" and ", " in a.name:
-            ctx.emit(rule="ansi_ports", line=a.line, message=f"one port per line: {a.name}")
+        if a.kind == "port" and (", " in a.name or a.detail == "continued"):
+            msg = f"one port per declaration, each with its own direction and type: {a.name}"
+            ctx.emit(rule="ansi_ports", line=a.line, message=msg)
         if a.kind == "instance" and a.detail != "named":
             ctx.emit(
                 rule="named_ports", line=a.line,

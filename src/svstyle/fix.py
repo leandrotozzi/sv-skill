@@ -1,7 +1,27 @@
-"""`svstyle fix`: insert-only rewriting, guarded by the token-signature invariant."""
+"""`svstyle fix`: insert-only rewriting, guarded by the token-signature invariant.
+
+    parse (refuse on error) -> Verible -> checks -> apply inserts -> Verible
+    -> assert tokens unchanged and output parses
+
+Never rebuilds the file from the tree: the only edits are Verible's whitespace
+and svstyle's inserted comments and directives, so nothing the author wrote
+can be lost.
+"""
 
 from pyslang import BumpAllocator, Diagnostics, SourceManager
 from pyslang.parsing import Lexer, TokenKind
+
+from .checks import run_checks
+from .external import verible_format
+from .parse import ParseError, parse
+from .rules import Rule
+
+NETTYPE = "`default_nettype none"
+RESETALL = "`resetall"
+
+
+class InvariantError(Exception):
+    """svstyle produced output it cannot vouch for; nothing is written (exit 4)."""
 
 
 def token_signature(text: str) -> list[str]:
@@ -15,4 +35,31 @@ def token_signature(text: str) -> list[str]:
     out = []
     while (tok := lexer.lex()).kind != TokenKind.EndOfFile:
         out.append(tok.rawText)
+    return out
+
+
+def fix_text(text: str, path: str, rules: list[Rule]) -> str:
+    parse(text, path)  # ParseError propagates: refuse before touching anything
+    formatted = verible_format(text)
+    fixes = [d.fix for d in run_checks(formatted, path, rules) if d.fix]
+    out = formatted
+    # Descending offset; at equal offsets the later fix goes in first, so the
+    # earlier one (the header) ends up above it.
+    for _, (off, ins) in sorted(enumerate(fixes), key=lambda f: (f[1][0], f[0]), reverse=True):
+        out = out[:off] + ins + out[off:]
+    out = verible_format(out)
+
+    sig = token_signature(out)
+    inserted = "".join(ins for _, ins in fixes)
+    if NETTYPE in inserted:
+        i = sig.index("`default_nettype")
+        del sig[i : i + 2]
+    if RESETALL in inserted:
+        del sig[len(sig) - 1 - sig[::-1].index(RESETALL)]
+    if sig != token_signature(text):
+        raise InvariantError(f"{path}: fix changed a non-whitespace token")
+    try:
+        parse(out, path)
+    except ParseError as e:
+        raise InvariantError(f"{path}: fixed output no longer parses\n{e}") from e
     return out

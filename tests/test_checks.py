@@ -152,3 +152,11 @@ def test_default_nettype_not_required_in_svh():
     text = _edit("`default_nettype none\n\n", "")
     text = _edit("\n`resetall\n", "", text)
     assert "LNG-014" not in {d.rule for d in _check(text, "reg_byte.svh")}
+
+
+def test_port_continuing_previous_declaration_on_its_own_line():
+    text = _edit(
+        "    input  logic [Width-1:0] d_i,     // Payload in\n",
+        "    input  logic [Width-1:0] d_i,     // Payload in\n    e_i,  // Second payload\n",
+    )
+    assert _found(text) == [("PRT-001", 16)]

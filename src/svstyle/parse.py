@@ -12,7 +12,7 @@ declaration, block and instance on its own line.
 from dataclasses import dataclass
 
 from pyslang import DiagnosticEngine
-from pyslang.parsing import TriviaKind
+from pyslang.parsing import TokenKind, TriviaKind
 from pyslang.syntax import SyntaxKind, SyntaxNode, SyntaxTree
 
 K = SyntaxKind
@@ -45,7 +45,7 @@ class Anchor:
     line: int  # 1-based line that owns the comment
     comment: str | None  # the `//` comment found there, if any
     offset: int  # insertion point: end of line's last token, or start of the line above-anchors use
-    detail: str = ""  # instances: named | ordered | wildcard | mixed
+    detail: str = ""  # instances: named | ordered | wildcard | mixed; ports: continued
     fixable: bool = True  # False inside macro expansions or preprocessor-split port lists
 
 
@@ -83,7 +83,9 @@ class _Walker:
         self.sm = tree.sourceManager
         self.text = text
         self.root = tree.root
-        self.toks = _tokens(self.root)
+        # Zero-width tokens (the implicit type of `b_i` in `a_i, b_i`) carry no
+        # trivia and sit on no line of their own; the lookups below skip them.
+        self.toks = [t for t in _tokens(self.root) if t.rawText or t.kind == TokenKind.EndOfFile]
         # Last token index on each line, for the trailing-comment lookup.
         self.last_on_line = {self.line(t): i for i, t in enumerate(self.toks)}
         self.anchors: list[Anchor] = []
@@ -119,7 +121,9 @@ class _Walker:
             )
         if k in DECLS or k in PARAMS or k in PORTS:
             kind = "port" if k in PORTS else "param" if k in PARAMS else "decl"
-            self.trailing(node, kind, _decl_names(node), split_list)
+            # `input logic a_i,\n b_i` - b_i has a zero-width type: it continues a_i's declaration.
+            detail = "continued" if k in PORTS and not node.getFirstToken().rawText else ""
+            self.trailing(node, kind, _decl_names(node), split_list, detail)
             return
         if k in BLOCKS:
             self.above(node, "block", node.getFirstToken().rawText)
@@ -139,13 +143,15 @@ class _Walker:
             if isinstance(child, SyntaxNode):
                 self.walk(child, split_list)
 
-    def trailing(self, node: SyntaxNode, kind: str, name: str, split_list: bool) -> None:
+    def trailing(
+        self, node: SyntaxNode, kind: str, name: str, split_list: bool, detail: str = ""
+    ) -> None:
         line = self.line(node.getLastToken())
         i = self.last_on_line[line]
         last = self.toks[i]
         comment = None
         if i + 1 < len(self.toks):
-            for tr in self.toks[i + 1].trivia:
+            for tr in _trivia(self.toks[i + 1]):
                 if tr.kind == TriviaKind.LineComment:
                     comment = tr.getRawText()
                 if tr.kind != TriviaKind.Whitespace:
@@ -157,22 +163,35 @@ class _Walker:
             # `input logic a_i, b_i,` is two port nodes but one line, one comment.
             name = f"{prev.name}, {name}"
             fixable = fixable and prev.fixable
+            detail = prev.detail
             self.anchors.pop()
-        self.anchors.append(Anchor(kind, name, line, comment, end, fixable=fixable))
+        self.anchors.append(Anchor(kind, name, line, comment, end, detail, fixable))
 
     def above(self, node: SyntaxNode, kind: str, name: str, detail: str = "") -> None:
         first = node.getFirstToken()
         start = self.offset(first)
         line_start = self.text.rfind("\n", 0, start) + 1
-        comment = _comment_above(
-            list(first.trivia), is_first=first.location == self.toks[0].location
-        )
+        comment = _comment_above(_trivia(first), is_first=first.location == self.toks[0].location)
         self.anchors.append(
             Anchor(
                 kind, name, self.line(first), comment, line_start, detail,
                 fixable=not self.in_macro(node),
             )
         )  # fmt: skip
+
+
+def _trivia(tok) -> list:
+    """A token's leading trivia, with each directive's own leading trivia spliced in.
+
+    pyslang hangs `a;  // c` + `\n`ifdef X` as trivia of the `ifdef, not of the
+    next token, so a comment right before a directive is only visible this way.
+    """
+    out = []
+    for tr in tok.trivia:
+        if tr.kind == TriviaKind.Directive:
+            out += _trivia(tr.syntax().getFirstToken())
+        out.append(tr)
+    return out
 
 
 def _comment_above(trivia: list, is_first: bool) -> str | None:

@@ -91,3 +91,15 @@ def test_directive_in_port_list_makes_ports_unfixable():
         ("a_i", False),
         ("c_o", False),
     ]
+
+
+def test_trailing_comment_before_an_ifdef_is_found():
+    text = (
+        "module m;\n    wire a;  // c\n\n`ifdef X\n    logic d;\n`endif\n    logic b;\nendmodule\n"
+    )
+    assert parse(text).anchors[0].comment == "// c"
+
+
+def test_trailing_comment_before_an_implicit_type_port_is_found():
+    text = "module m (\n    input logic a_i,  // a\n    b_i  // b\n);\nendmodule\n"
+    assert [(a.name, a.comment) for a in parse(text).anchors] == [("a_i", "// a"), ("b_i", "// b")]
