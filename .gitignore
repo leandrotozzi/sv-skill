@@ -12,3 +12,6 @@ dist/
 # Third-party source documents kept for re-checking rationales.
 # Copyrighted; never committed or redistributed.
 docs/sources/
+
+# skill-creator eval runs
+skill/systemverilog-rtl-workspace/

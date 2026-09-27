@@ -1,0 +1,29 @@
+{
+  "skill_name": "systemverilog-rtl",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Design a parameterised synchronous FIFO in SystemVerilog for our block: configurable data width and depth (depth must be a power of two), full and empty flags, and a registered read (no first-word fall-through). Put it in fifo_sync.sv.",
+      "expected_output": "fifo_sync.sv: one module, ANSI ports with comments, power-of-two depth check, _q/_d registers, async active-low reset on control only; passes svstyle check, Verilator -Wall and Yosys synth.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I need a SystemVerilog state machine that talks to a slow slave over a req/ack handshake: raise req when start_i pulses, wait for ack, drop req. The slave can take up to 16 cycles to answer, so add a timeout that aborts the transfer and sets a sticky error flag until clear_i. Registered outputs please.",
+      "expected_output": "An enum-typed FSM (package + module or module alone), state_q/state_d, unique case with default, commented case arms, registered outputs, timeout counter; passes svstyle check, Verilator -Wall and Yosys synth.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "write me a 2-flop synchronizer module and a toggle-based pulse synchronizer that uses it, to move single-cycle pulses from a fast clock domain to a slow one. sv please, each module in its own file",
+      "expected_output": "Two files (sync_2ff-like and pulse sync), toggle in source domain registered before crossing, two flops in destination, edge detect; passes svstyle check, Verilator -Wall and Yosys synth.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Can you code a round-robin arbiter in SystemVerilog? N requesters as a parameter (default 4), one-hot grant, the grant is registered and lasts one cycle, and priority rotates past the last winner.",
+      "expected_output": "rr_arbiter-like module, parameterised N with check, one-hot registered grant, rotating priority; passes svstyle check, Verilator -Wall and Yosys synth.",
+      "files": []
+    }
+  ]
+}
