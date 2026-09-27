@@ -133,3 +133,28 @@ def test_verilator_reports_only_the_files_asked_for(tmp_path, monkeypatch):
         "    sub u_sub (\n        .a_i(a_i),\n        .b_o(b_o)\n    );\nendmodule\n"
     )
     assert [d.path for d in ext.verilator_lint(["top.sv"], RULES)] == []
+
+
+@needs_verible
+@pytest.mark.parametrize(
+    "block",
+    [
+        # Memory write: an indexed array element is not a _q/_d pair.
+        "always_ff @(posedge clk_i) begin\n        if (we_i) begin\n"
+        "            regs_q[waddr_i] <= wdata_i;\n        end\n    end",
+        # Per-domain reset in a CDC module (lowRISC prim_pulse_sync naming).
+        "always_ff @(posedge clk_i or negedge rst_src_ni) begin\n"
+        "        if (!rst_src_ni) begin\n            tog_q <= 1'b0;\n"
+        "        end else begin\n            tog_q <= tog_d;\n        end\n    end",
+    ],
+    ids=["memory-write", "domain-reset"],
+)
+def test_nam004_accepts_memories_and_domain_resets(tmp_path, block):
+    f = tmp_path / "m.sv"
+    f.write_text(
+        "module m (\n    input logic clk_i,\n    input logic rst_src_ni,\n    input logic we_i,\n"
+        "    input logic [1:0] waddr_i,\n    input logic [7:0] wdata_i\n);\n"
+        "    logic [7:0] regs_q[4];\n    logic tog_q, tog_d;\n    assign tog_d = ~tog_q;\n"
+        f"    {block}\nendmodule\n"
+    )
+    assert [d for d in ext.verible_lint([str(f)], RULES) if d.rule == "NAM-004"] == []

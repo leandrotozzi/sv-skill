@@ -12,7 +12,9 @@ case-missing-default
 # --- naming: ports, signals, flops, types, params, macros ---
 port-name-suffix
 signal-name-style=style_regex:[a-z_0-9]+
-dff-name-style=input:d;output:q
+# Indexed writes are memories, not _q/_d pairs; per-domain resets follow the
+# lowRISC CDC naming (rst_src_ni / rst_dst_ni).
+dff-name-style=input:d;output:q;waive_lhs_regex:(?i)(mem.*|.*\[.*);waive_ifs_with_conditions:!rst_ni,!rst_src_ni,!rst_dst_ni,flush_i,!rst_ni || flush_i,flush_i || !rst_ni
 enum-name-style=style_regex:[a-z_0-9]+(_e|_t)
 interface-name-style=style_regex:[a-z_0-9]+(_if)
 struct-union-name-style
