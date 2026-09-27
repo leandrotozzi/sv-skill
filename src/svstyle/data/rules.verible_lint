@@ -16,7 +16,7 @@ dff-name-style=input:d;output:q
 enum-name-style=style_regex:[a-z_0-9]+(_e|_t)
 interface-name-style=style_regex:[a-z_0-9]+(_if)
 struct-union-name-style
-parameter-name-style=localparam_style:CamelCase;parameter_style:CamelCase
+parameter-name-style=localparam_style:CamelCase|ALL_CAPS;parameter_style:CamelCase
 parameter-type-name-style
 macro-name-style=style_regex:[A-Z_0-9]+
 positive-meaning-parameter-name

@@ -105,3 +105,16 @@ def test_missing_tool_raises(monkeypatch):
 @needs_verible
 def test_installed_verible_matches_pin():
     assert ext.verible_version() == ext.KNOWN_GOOD_VERIBLE_VERSION
+
+
+@needs_verible
+def test_nam006_allows_all_caps_only_for_localparams(tmp_path):
+    f = tmp_path / "m.sv"
+    f.write_text(
+        "module m #(\n    parameter int unsigned Depth = 4,  // Tunable\n"
+        "    parameter int unsigned MAX_DEPTH = 8  // Tunable, wrongly ALL_CAPS\n) ();\n"
+        "    localparam int unsigned DepthW = $clog2(Depth);  // Derived\n"
+        "    localparam logic [7:0] SOF_BYTE = 8'h7E;  // Protocol constant\nendmodule\n"
+    )
+    lines = {d.line for d in ext.verible_lint([str(f)], RULES) if d.rule == "NAM-006"}
+    assert lines == {3}
