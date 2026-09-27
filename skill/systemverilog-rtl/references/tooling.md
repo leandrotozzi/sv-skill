@@ -103,11 +103,14 @@ do not copy a whole array through `always_comb` to satisfy the rule.
 A deliberate departure carries a comment saying why, and the tool's pragma:
 
 ```systemverilog
-// Bus width is fixed by the external PHY, not by this module.
-// verilog_lint: waive parameter-name-style
-localparam int unsigned PHY_WIDTH = 10;  // PHY data width
-
-/* verilator lint_off UNUSED */
-logic [7:0] spare_q;  // Reserved for the next revision
-/* verilator lint_on UNUSED */
+module phy_if #(
+    // Name fixed by the PHY vendor's integration guide.
+    // verilog_lint: waive parameter-name-style
+    parameter int unsigned PHY_WIDTH = 10  // PHY data width
+) (
+    ...
+);
+    /* verilator lint_off UNUSED */
+    logic [7:0] spare_q;  // Reserved for the next revision
+    /* verilator lint_on UNUSED */
 ```
