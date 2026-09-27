@@ -66,6 +66,19 @@ class Rule:
         return int(self.id[4:])
 
 
+@dataclass(frozen=True)
+class Diag:
+    """One finding, from svstyle's own checks or translated from an external tool."""
+
+    path: str
+    line: int
+    col: int
+    rule: str  # house rule ID, or EXT-VL-<name> / EXT-VLTR-<CODE> when unmapped
+    severity: str
+    message: str
+    fixable: bool = False
+
+
 def _rule_from_toml(raw: dict, index: int) -> Rule:
     where = raw.get("id") or f"rule #{index + 1}"
     missing = [k for k in _REQUIRED if not raw.get(k)]
