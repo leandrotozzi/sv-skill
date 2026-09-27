@@ -57,7 +57,9 @@ def verible_format(text: str) -> str:
     res = _run("verible-verilog-format", [f"--flagfile={FORMAT_FLAGS}", "-"], stdin=text)
     # Verible exits 0 on a syntax error and echoes the input; stderr is the tell.
     if res.returncode != 0 or res.stderr.strip():
-        raise ToolFailed(res.stderr.strip() or f"verible-verilog-format exit {res.returncode}")
+        # On non-convergence Verible dumps the whole file twice; the first line says why.
+        first = res.stderr.strip().splitlines()[0][:200] if res.stderr.strip() else ""
+        raise ToolFailed(first or f"verible-verilog-format exit {res.returncode}")
     return res.stdout
 
 
@@ -67,7 +69,11 @@ def verible_verify(paths: list[str], rules: list[Rule]) -> list[Diag]:
     out = []
     for p in paths:
         res = _run("verible-verilog-format", [f"--flagfile={FORMAT_FLAGS}", "--verify", p])
-        if res.returncode != 0:
+        if "failed to converge" in res.stderr:
+            # --verify exits 0 here, so a naive check would call the file formatted.
+            msg = "Verible cannot format this file (does not converge); lay it out by hand"
+            out.append(Diag(p, 1, 1, "FMT-002", sev, msg))
+        elif res.returncode != 0:
             out.append(Diag(p, 1, 1, "FMT-002", sev, "file needs formatting", fixable=True))
     return out
 

@@ -158,3 +158,24 @@ def test_nam004_accepts_memories_and_domain_resets(tmp_path, block):
         f"    {block}\nendmodule\n"
     )
     assert [d for d in ext.verible_lint([str(f)], RULES) if d.rule == "NAM-004"] == []
+
+
+def _fake_run(returncode, stderr):
+    import subprocess
+
+    return lambda *a, **k: subprocess.CompletedProcess([], returncode, "", stderr)
+
+
+def test_verify_reports_non_convergent_formatting(monkeypatch):
+    monkeypatch.setattr(ext, "_run", _fake_run(0, "x.sv: formatting failed to converge! ..."))
+    (d,) = ext.verible_verify(["x.sv"], RULES)
+    assert (d.rule, d.fixable) == ("FMT-002", False)
+    assert "converge" in d.message
+
+
+def test_format_failure_message_is_short(monkeypatch):
+    dump = "x.sv: formatting failed to converge! Please file a bug.\n" + "code line\n" * 4000
+    monkeypatch.setattr(ext, "_run", _fake_run(0, dump))
+    with pytest.raises(ext.ToolFailed) as exc:
+        ext.verible_format("module m; endmodule\n")
+    assert len(str(exc.value)) < 300 and "converge" in str(exc.value)

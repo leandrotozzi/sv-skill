@@ -262,7 +262,10 @@ def _cmd_fix(args, rules: list) -> int:
             if args.diff:
                 sys.stdout.writelines(
                     difflib.unified_diff(
-                        text.splitlines(True), out.splitlines(True), f"a/{path}", f"b/{path}"
+                        text.splitlines(True),
+                        out.splitlines(True),
+                        f"a/{path.lstrip('/')}",
+                        f"b/{path.lstrip('/')}",
                     )
                 )
             else:
