@@ -190,7 +190,7 @@ Each state alternative inside an FSM case statement is preceded by a comment des
 ```systemverilog
 // IDLE: wait for a request; nothing is in flight.
 IDLE: begin
-  if (req_i) state_d = BUSY;
+    if (req_i) state_d = BUSY;
 end
 ```
 
@@ -198,8 +198,8 @@ end
 
 ```systemverilog
 typedef enum logic [1:0] {
-  IDLE,  // wait for a request
-  BUSY   // transfer in flight
+    IDLE,  // wait for a request
+    BUSY   // transfer in flight
 } state_e;
 ```
 
@@ -239,7 +239,7 @@ A `` `endif`` far from its `` `ifdef`` carries a comment naming the condition it
 
 ```systemverilog
 `ifdef SYNTHESIS
-  // ...
+    // ...
 `endif  // SYNTHESIS
 ```
 
@@ -247,7 +247,7 @@ A `` `endif`` far from its `` `ifdef`` carries a comment naming the condition it
 
 ```systemverilog
 `ifdef SYNTHESIS
-  // ...
+    // ...
 `endif
 ```
 
@@ -340,7 +340,7 @@ Package dependencies form a directed acyclic graph; two packages never import ea
 
 ```systemverilog
 package top_pkg;
-  import common_pkg::*;  // common_pkg imports nothing from top_pkg
+    import common_pkg::*;  // common_pkg imports nothing from top_pkg
 ```
 
 **Bad:**
@@ -364,7 +364,7 @@ package b_pkg; import a_pkg::*; endpackage
 
 ```systemverilog
 module hmac_core
-  import hmac_pkg::*;
+    import hmac_pkg::*;
 #(
 ```
 
@@ -391,10 +391,10 @@ Module ports use the Verilog-2001 combined port-and-direction style, one port pe
 
 ```systemverilog
 module fifo_sync #(
-  parameter int unsigned Depth = 8  // Entries; must be a power of two
+    parameter int unsigned Depth = 8  // Entries; must be a power of two
 ) (
-  input  logic clk_i,   // System clock
-  input  logic rst_ni   // Asynchronous reset, active-low
+    input  logic clk_i,   // System clock
+    input  logic rst_ni   // Asynchronous reset, active-low
 );
 ```
 
@@ -402,8 +402,8 @@ module fifo_sync #(
 
 ```systemverilog
 module fifo_sync (clk, rst_n);
-  input clk;
-  input rst_n;
+    input clk;
+    input rst_n;
 ```
 
 **Enforced by:** svstyle `ansi_ports`
@@ -446,9 +446,9 @@ Every instantiation connects ports by name. Positional connection and `.*` are n
 
 ```systemverilog
 fifo_sync u_fifo (
-  .clk_i  (clk_i),
-  .rst_ni (rst_ni),
-  .data_i (data_i)
+    .clk_i  (clk_i),
+    .rst_ni (rst_ni),
+    .data_i (data_i)
 );
 ```
 
@@ -496,7 +496,7 @@ Instance parameters are specified by name in the `#(...)` list. `defparam` is no
 
 ```systemverilog
 fifo_sync #(
-  .Depth (16)
+    .Depth (16)
 ) u_fifo (
 ```
 
@@ -793,15 +793,15 @@ logic type;  // `type` is a SystemVerilog keyword
 
 ### FMT-001 (MUST) — The formatter owns whitespace
 
-Indentation is two spaces, never tabs; lines carry no trailing whitespace; the file ends with exactly one newline; lines are at most 100 columns.
+Indentation is four spaces, never tabs; lines carry no trailing whitespace; the file ends with exactly one newline; lines are at most 100 columns.
 
-**Why:** Bundled into one rule because none of them is a judgement call -- the formatter produces all four and a reviewer never has to discuss any of them. Two spaces and 100 columns follow the RISC-V open-source ecosystem this style descends from; 80 is too narrow once names carry direction and register suffixes.
+**Why:** Bundled into one rule because none of them is a judgement call -- the formatter produces all four and a reviewer never has to discuss any of them. Four spaces match Python and make nesting depth readable at a glance; 100 columns follows the RISC-V open-source ecosystem this style descends from; 80 is too narrow once names carry direction and register suffixes.
 
 **Good:**
 
 ```systemverilog
 always_comb begin
-  data_d = data_i;
+    data_d = data_i;
 end
 ```
 
@@ -815,7 +815,7 @@ end
 
 **Enforced by:** verible lint `no-tabs` `no-trailing-spaces` `posix-eof` `line-length` `forbid-line-continuations`
 
-**Sources:** lowRISC §Basics, Verible defaults
+**Sources:** lowRISC §Basics (column limit), house style (four-space indent), Verible defaults
 
 ### FMT-002 (MUST) — Port lists, parameters and named connections are tabular
 
@@ -853,9 +853,9 @@ Every `if`, `else`, `for`, `while` and `always` body is wrapped in `begin`/`end`
 
 ```systemverilog
 if (clear_i) begin
-  count_d = '0;
+    count_d = '0;
 end else begin
-  count_d = count_q + 1'b1;
+    count_d = count_q + 1'b1;
 end
 ```
 
@@ -953,11 +953,11 @@ Clocked logic is written in `always_ff` and assigns only with `<=`.
 
 ```systemverilog
 always_ff @(posedge clk_i or negedge rst_ni) begin
-  if (!rst_ni) begin
-    b_q <= '0;
-  end else begin
-    b_q <= a_q;   // Reads the OLD a_q, as the hardware does
-  end
+    if (!rst_ni) begin
+        b_q <= '0;
+    end else begin
+        b_q <= a_q;   // Reads the OLD a_q, as the hardware does
+    end
 end
 ```
 
@@ -965,8 +965,8 @@ end
 
 ```systemverilog
 always_ff @(posedge clk_i) begin
-  a_q = data_i;
-  b_q = a_q;      // Reads the NEW a_q: one flop in sim, two in gates
+    a_q = data_i;
+    b_q = a_q;      // Reads the NEW a_q: one flop in sim, two in gates
 end
 ```
 
@@ -984,8 +984,8 @@ Combinational logic is written in `always_comb` and assigns only with `=`. `alwa
 
 ```systemverilog
 always_comb begin
-  sum = a_i + b_i;
-  carry = sum[8];     // Sees the value just assigned
+    sum = a_i + b_i;
+    carry = sum[8];     // Sees the value just assigned
 end
 ```
 
@@ -993,7 +993,7 @@ end
 
 ```systemverilog
 always @(a_i) begin   // b_i missing: latch
-  sum <= a_i + b_i;
+    sum <= a_i + b_i;
 end
 ```
 
@@ -1011,8 +1011,8 @@ A single `always` block uses either `=` or `<=` throughout, never both.
 
 ```systemverilog
 always_ff @(posedge clk_i) begin
-  a_q <= a_d;
-  b_q <= b_d;
+    a_q <= a_d;
+    b_q <= b_d;
 end
 ```
 
@@ -1020,8 +1020,8 @@ end
 
 ```systemverilog
 always_ff @(posedge clk_i) begin
-  temp = a_d;
-  b_q <= temp;
+    temp = a_d;
+    b_q <= temp;
 end
 ```
 
@@ -1039,7 +1039,7 @@ No variable is assigned from more than one `always` block or continuous assignme
 
 ```systemverilog
 always_comb begin
-  data_d = load_i ? data_i : data_q;
+    data_d = load_i ? data_i : data_q;
 end
 ```
 
@@ -1064,12 +1064,12 @@ A combinational block assigns a default value to every signal it drives, immedia
 
 ```systemverilog
 always_comb begin
-  valid_o = 1'b0;         // Default
-  data_o  = '0;           // Default
-  if (hit_i) begin
-    valid_o = 1'b1;
-    data_o  = payload_i;
-  end
+    valid_o = 1'b0;         // Default
+    data_o  = '0;           // Default
+    if (hit_i) begin
+        valid_o = 1'b1;
+        data_o  = payload_i;
+    end
 end
 ```
 
@@ -1077,10 +1077,10 @@ end
 
 ```systemverilog
 always_comb begin
-  if (hit_i) begin
-    valid_o = 1'b1;       // valid_o latches when hit_i is low
-    data_o  = payload_i;
-  end
+    if (hit_i) begin
+        valid_o = 1'b1;       // valid_o latches when hit_i is low
+        data_o  = payload_i;
+    end
 end
 ```
 
@@ -1098,9 +1098,9 @@ Every `case`, `casez` and `unique case` statement has a `default` arm, even when
 
 ```systemverilog
 unique case (state_q)
-  IDLE: state_d = req_i ? BUSY : IDLE;
-  BUSY: state_d = done_i ? IDLE : BUSY;
-  default: state_d = IDLE;   // Unreachable; recovers from an upset state
+    IDLE: state_d = req_i ? BUSY : IDLE;
+    BUSY: state_d = done_i ? IDLE : BUSY;
+    default: state_d = IDLE;   // Unreachable; recovers from an upset state
 endcase
 ```
 
@@ -1108,8 +1108,8 @@ endcase
 
 ```systemverilog
 unique case (state_q)
-  IDLE: state_d = req_i ? BUSY : IDLE;
-  BUSY: state_d = done_i ? IDLE : BUSY;
+    IDLE: state_d = req_i ? BUSY : IDLE;
+    BUSY: state_d = done_i ? IDLE : BUSY;
 endcase
 ```
 
@@ -1152,9 +1152,9 @@ assign byte_q = 9'h1FF;    // Truncated to 8'hFF, silently
 
 ```systemverilog
 casez (opcode_i)
-  8'b0000_????: op_d = OP_ALU;
-  8'b0001_????: op_d = OP_LOAD;
-  default:      op_d = OP_ILLEGAL;
+    8'b0000_????: op_d = OP_ALU;
+    8'b0001_????: op_d = OP_LOAD;
+    default:      op_d = OP_ILLEGAL;
 endcase
 ```
 
@@ -1162,7 +1162,7 @@ endcase
 
 ```systemverilog
 casex (opcode_i)
-  8'b0000_xxxx: op_d = OP_ALU;   // Matches when opcode_i is itself unknown
+    8'b0000_xxxx: op_d = OP_ALU;   // Matches when opcode_i is itself unknown
 endcase
 ```
 
@@ -1180,7 +1180,7 @@ Every function and task declares an explicit `automatic` lifetime, an explicit r
 
 ```systemverilog
 function automatic logic [7:0] parity_byte(input logic [7:0] data);
-  return {^data, data[6:0]};
+    return {^data, data[6:0]};
 endfunction
 ```
 
@@ -1188,7 +1188,7 @@ endfunction
 
 ```systemverilog
 function parity_byte(data);
-  parity_byte = {^data, data[6:0]};
+    parity_byte = {^data, data[6:0]};
 endfunction
 ```
 
@@ -1206,16 +1206,16 @@ endfunction
 
 ```systemverilog
 module fifo #(
-  parameter int unsigned Depth = 8       // Interface: tunable
+    parameter int unsigned Depth = 8       // Interface: tunable
 ) ();
-  localparam int unsigned PtrW = $clog2(Depth);  // Body: derived
+    localparam int unsigned PtrW = $clog2(Depth);  // Body: derived
 ```
 
 **Bad:**
 
 ```systemverilog
 module fifo ();
-  parameter Depth = 8;
+    parameter Depth = 8;
 ```
 
 **Enforced by:** verible lint `explicit-parameter-storage-type` `proper-parameter-declaration` `module-parameter`
@@ -1286,7 +1286,7 @@ endmodule
 
 ```systemverilog
 module fifo_sync ( ... );
-  assign data_ou = data_q;   // typo: creates a 1-bit implicit net
+    assign data_ou = data_q;   // typo: creates a 1-bit implicit net
 ```
 
 **Enforced by:** svstyle `default_nettype` · autofixable
@@ -1305,9 +1305,9 @@ No case statement carries a `full_case` or `parallel_case` synthesis directive.
 
 ```systemverilog
 unique case (sel_i)
-  2'b00: y_o = a_i;
-  2'b01: y_o = b_i;
-  default: y_o = '0;
+    2'b00: y_o = a_i;
+    2'b01: y_o = b_i;
+    default: y_o = '0;
 endcase
 ```
 
@@ -1315,8 +1315,8 @@ endcase
 
 ```systemverilog
 case (sel_i)  // synopsys full_case parallel_case
-  2'b00: y_o = a_i;
-  2'b01: y_o = b_i;
+    2'b00: y_o = a_i;
+    2'b01: y_o = b_i;
 endcase
 ```
 
@@ -1334,9 +1334,9 @@ Use `unique case` with a `default` as the normal form. `priority case` states in
 
 ```systemverilog
 unique case (state_q)
-  IDLE: state_d = BUSY;
-  BUSY: state_d = IDLE;
-  default: state_d = IDLE;
+    IDLE: state_d = BUSY;
+    BUSY: state_d = IDLE;
+    default: state_d = IDLE;
 endcase
 ```
 
@@ -1344,8 +1344,8 @@ endcase
 
 ```systemverilog
 priority case (state_q)
-  IDLE: state_d = BUSY;
-  default: state_d = IDLE;   // `default` makes `priority` mean nothing here
+    IDLE: state_d = BUSY;
+    default: state_d = IDLE;   // `default` makes `priority` mean nothing here
 endcase
 ```
 
@@ -1363,9 +1363,9 @@ Intentional priority is written as an `if`/`else if` chain; a `case` statement i
 
 ```systemverilog
 if (err_i) begin
-  resp_d = RESP_ERR;
+    resp_d = RESP_ERR;
 end else if (valid_i) begin
-  resp_d = RESP_OK;
+    resp_d = RESP_OK;
 end
 ```
 
@@ -1373,8 +1373,8 @@ end
 
 ```systemverilog
 case (1'b1)
-  err_i:   resp_d = RESP_ERR;   // Overlapping arms in a `case`
-  valid_i: resp_d = RESP_OK;
+    err_i:   resp_d = RESP_ERR;   // Overlapping arms in a `case`
+    valid_i: resp_d = RESP_OK;
 endcase
 ```
 
@@ -1398,7 +1398,7 @@ A module does not instantiate itself, directly or through a cycle.
 
 ```systemverilog
 module tree #(parameter int N = 8) ();
-  tree #(.N(N/2)) u_left ();
+    tree #(.N(N/2)) u_left ();
 ```
 
 **Enforced by:** review only
@@ -1417,11 +1417,11 @@ Flip-flops are reset asynchronously by an active-low reset named `rst_ni`, writt
 
 ```systemverilog
 always_ff @(posedge clk_i or negedge rst_ni) begin
-  if (!rst_ni) begin
-    count_q <= '0;
-  end else begin
-    count_q <= count_d;
-  end
+    if (!rst_ni) begin
+        count_q <= '0;
+    end else begin
+        count_q <= count_d;
+    end
 end
 ```
 
@@ -1429,8 +1429,8 @@ end
 
 ```systemverilog
 always_ff @(posedge clk_i) begin
-  if (rst) begin      // synchronous, active-high
-    count_q <= '0;
+    if (rst) begin      // synchronous, active-high
+        count_q <= '0;
 ```
 
 **Enforced by:** review only
@@ -1448,11 +1448,11 @@ An asynchronous reset entering a clock domain is asserted asynchronously but de-
 ```systemverilog
 // Reset synchroniser: async assert, sync de-assert into clk_i.
 always_ff @(posedge clk_i or negedge rst_ext_ni) begin
-  if (!rst_ext_ni) begin
-    {rst_q, rst_meta_q} <= 2'b00;
-  end else begin
-    {rst_q, rst_meta_q} <= {rst_meta_q, 1'b1};
-  end
+    if (!rst_ext_ni) begin
+        {rst_q, rst_meta_q} <= 2'b00;
+    end else begin
+        {rst_q, rst_meta_q} <= {rst_meta_q, 1'b1};
+    end
 end
 ```
 
@@ -1500,14 +1500,14 @@ Reset the flops that must hold a known value at startup -- state machines, count
 
 ```systemverilog
 always_ff @(posedge clk_i or negedge rst_ni) begin
-  if (!rst_ni) begin
-    valid_q <= 1'b0;      // Control: reset
-  end else begin
-    valid_q <= valid_d;
-  end
+    if (!rst_ni) begin
+        valid_q <= 1'b0;      // Control: reset
+    end else begin
+        valid_q <= valid_d;
+    end
 end
 always_ff @(posedge clk_i) begin
-  data_q <= data_d;       // Datapath: qualified by valid_q, not reset
+    data_q <= data_d;       // Datapath: qualified by valid_q, not reset
 end
 ```
 
@@ -1531,9 +1531,9 @@ A signal used as an asynchronous reset is not also used as ordinary data, and a 
 
 ```systemverilog
 prim_clock_gating u_cg (
-  .clk_i    (clk_i),
-  .en_i     (enable_q),
-  .clk_o    (clk_gated)
+    .clk_i    (clk_i),
+    .en_i     (enable_q),
+    .clk_o    (clk_gated)
 );
 ```
 
@@ -1584,17 +1584,17 @@ An FSM is written as a sequential `always_ff` holding the state register plus a 
 ```systemverilog
 // State register.
 always_ff @(posedge clk_i or negedge rst_ni) begin
-  if (!rst_ni) begin
-    state_q <= IDLE;
-  end else begin
-    state_q <= state_d;
-  end
+    if (!rst_ni) begin
+        state_q <= IDLE;
+    end else begin
+        state_q <= state_d;
+    end
 end
 
 // Next-state and output logic.
 always_comb begin
-  state_d = state_q;
-  ...
+    state_d = state_q;
+    ...
 end
 ```
 
@@ -1602,8 +1602,8 @@ end
 
 ```systemverilog
 always_ff @(posedge clk_i) begin
-  case (state_q)
-    IDLE: if (req_i) begin state_q <= BUSY; out_q <= 1'b1; end
+    case (state_q)
+        IDLE: if (req_i) begin state_q <= BUSY; out_q <= 1'b1; end
 ```
 
 **Enforced by:** review only
@@ -1620,11 +1620,11 @@ An FSM does not drive combinational (Mealy) outputs across a module boundary; su
 
 ```systemverilog
 always_ff @(posedge clk_i or negedge rst_ni) begin
-  if (!rst_ni) begin
-    grant_o <= 1'b0;
-  end else begin
-    grant_o <= (state_d == GRANTED);
-  end
+    if (!rst_ni) begin
+        grant_o <= 1'b0;
+    end else begin
+        grant_o <= (state_d == GRANTED);
+    end
 end
 ```
 
@@ -1672,11 +1672,11 @@ Every one-bit signal crossing an asynchronous clock boundary passes through two 
 
 ```systemverilog
 always_ff @(posedge dst_clk_i or negedge dst_rst_ni) begin
-  if (!dst_rst_ni) begin
-    {sync_q, meta_q} <= 2'b00;
-  end else begin
-    {sync_q, meta_q} <= {meta_q, src_signal_i};
-  end
+    if (!dst_rst_ni) begin
+        {sync_q, meta_q} <= 2'b00;
+    end else begin
+        {sync_q, meta_q} <= {meta_q, src_signal_i};
+    end
 end
 ```
 
@@ -1684,7 +1684,7 @@ end
 
 ```systemverilog
 always_ff @(posedge dst_clk_i) begin
-  captured_q <= src_signal_i;   // One flop: metastability reaches the logic
+    captured_q <= src_signal_i;   // One flop: metastability reaches the logic
 end
 ```
 
@@ -1710,7 +1710,7 @@ prim_fifo_async u_cdc_fifo ( ... );
 
 ```systemverilog
 for (genvar i = 0; i < 8; i++) begin : gen_sync
-  prim_flop_2sync u_sync (.d_i(data_i[i]), .q_o(data_sync[i]));
+    prim_flop_2sync u_sync (.d_i(data_i[i]), .q_o(data_sync[i]));
 end
 ```
 
@@ -1752,7 +1752,7 @@ A signal is registered in its source clock domain immediately before crossing; c
 
 ```systemverilog
 always_ff @(posedge src_clk_i) begin
-  req_q <= req_valid && !busy;   // Registered, then crossed
+    req_q <= req_valid && !busy;   // Registered, then crossed
 end
 ```
 
@@ -1823,7 +1823,7 @@ Every generate `for` body and every branch of a generate `if` carries a `lower_s
 
 ```systemverilog
 for (genvar i = 0; i < NumPorts; i++) begin : gen_port
-  prim_fifo_sync u_fifo ( ... );
+    prim_fifo_sync u_fifo ( ... );
 end
 ```
 
@@ -1831,7 +1831,7 @@ end
 
 ```systemverilog
 for (genvar i = 0; i < NumPorts; i++) begin
-  prim_fifo_sync u_fifo ( ... );
+    prim_fifo_sync u_fifo ( ... );
 end
 ```
 
@@ -1849,7 +1849,7 @@ end
 
 ```systemverilog
 for (genvar i = 0; i < N; i++) begin : gen_stage
-  ...
+    ...
 end
 ```
 
@@ -1858,9 +1858,9 @@ end
 ```systemverilog
 genvar i;
 generate
-  for (i = 0; i < N; i++) begin : gen_stage
-    ...
-  end
+    for (i = 0; i < N; i++) begin : gen_stage
+        ...
+    end
 endgenerate
 ```
 

@@ -11,11 +11,11 @@ SystemVerilog RTL house style, as three coupled deliverables:
   are generated from the same TOML so the two never drift.
 
 Style lineage: lowRISC (`_i/_o`, `clk_i`, `rst_ni`, `_q/_d`, CamelCase params,
-2-space indent, 100 columns).
+100 columns; 4-space indent is ours).
 
 ## Status
 
-Phase 0 (scaffold) done. Design spec:
+Phase 1 done: 76 rules approved 2026-09-27. Next: Phase 2 (`svstyle` core). Design spec:
 [`docs/superpowers/specs/2026-09-22-sv-skill-design.md`](docs/superpowers/specs/2026-09-22-sv-skill-design.md).
 
 ## Development

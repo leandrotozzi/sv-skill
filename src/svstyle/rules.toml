@@ -191,13 +191,13 @@ rationale = "Quoting lowRISC: \"each state alternative should be preceded with a
 good = """
 // IDLE: wait for a request; nothing is in flight.
 IDLE: begin
-  if (req_i) state_d = BUSY;
+    if (req_i) state_d = BUSY;
 end
 """
 bad = """
 typedef enum logic [1:0] {
-  IDLE,  // wait for a request
-  BUSY   // transfer in flight
+    IDLE,  // wait for a request
+    BUSY   // transfer in flight
 } state_e;
 """
 sources = ["lowRISC §Finite State Machines"]
@@ -230,12 +230,12 @@ statement = "A `` `endif`` far from its `` `ifdef`` carries a comment naming the
 rationale = "The opening condition has scrolled off screen by the time the reader reaches the close; without the label, matching them is a manual count. Verible checks both mechanically."
 good = """
 `ifdef SYNTHESIS
-  // ...
+    // ...
 `endif  // SYNTHESIS
 """
 bad = """
 `ifdef SYNTHESIS
-  // ...
+    // ...
 `endif
 """
 sources = ["lowRISC §Comments", "Verible"]
@@ -311,7 +311,7 @@ statement = "Package dependencies form a directed acyclic graph; two packages ne
 rationale = "SystemVerilog has no forward declaration for package contents, so a cycle has no legal compilation order. Tools that appear to accept one are relying on file order, which changes silently when the build system does."
 good = """
 package top_pkg;
-  import common_pkg::*;  // common_pkg imports nothing from top_pkg
+    import common_pkg::*;  // common_pkg imports nothing from top_pkg
 """
 bad = """
 package a_pkg; import b_pkg::*; endpackage
@@ -330,7 +330,7 @@ statement = "`import pkg::*;` is used only for a package belonging to the same I
 rationale = "A file-scope wildcard import leaks every name in the package into every design unit in the file and into anything that includes it, so a later addition to the package can capture an identifier that already resolved elsewhere. Scoping it to the module bounds the damage to one unit."
 good = """
 module hmac_core
-  import hmac_pkg::*;
+    import hmac_pkg::*;
 #(
 """
 bad = """
@@ -354,16 +354,16 @@ statement = "Module ports use the Verilog-2001 combined port-and-direction style
 rationale = "The non-ANSI style splits each port's direction, type and order across three places, so adding a port means three consistent edits and the compiler catches only some mistakes. One port per line is also what makes a trailing comment per port possible at all."
 good = """
 module fifo_sync #(
-  parameter int unsigned Depth = 8  // Entries; must be a power of two
+    parameter int unsigned Depth = 8  // Entries; must be a power of two
 ) (
-  input  logic clk_i,   // System clock
-  input  logic rst_ni   // Asynchronous reset, active-low
+    input  logic clk_i,   // System clock
+    input  logic rst_ni   // Asynchronous reset, active-low
 );
 """
 bad = """
 module fifo_sync (clk, rst_n);
-  input clk;
-  input rst_n;
+    input clk;
+    input rst_n;
 """
 sources = ["lowRISC §Module Declaration"]
 [rule.enforcement]
@@ -400,9 +400,9 @@ statement = "Every instantiation connects ports by name. Positional connection a
 rationale = "A positional list breaks silently when a port is inserted, and `.*` makes the connection depend on names matching in two files that no longer have to agree in writing -- a renamed signal connects to nothing and reports nothing. Measured practice agrees: `.*` appears in 28 OpenTitan files and every one of them is under dv/, fpv/, cov/ or sva/, never in synthesizable RTL."
 good = """
 fifo_sync u_fifo (
-  .clk_i  (clk_i),
-  .rst_ni (rst_ni),
-  .data_i (data_i)
+    .clk_i  (clk_i),
+    .rst_ni (rst_ni),
+    .data_i (data_i)
 );
 """
 bad = """
@@ -442,7 +442,7 @@ statement = "Instance parameters are specified by name in the `#(...)` list. `de
 rationale = "`defparam` applies from a distance, so the effective parameter value of an instance cannot be read from the instantiation; its elaboration order is also weakly specified and it is deprecated in IEEE 1800. Named overrides keep the value where the instance is."
 good = """
 fifo_sync #(
-  .Depth (16)
+    .Depth (16)
 ) u_fifo (
 """
 bad = """
@@ -676,11 +676,11 @@ id        = "FMT-001"
 title     = "The formatter owns whitespace"
 severity  = "MUST"
 category  = "FMT"
-statement = "Indentation is two spaces, never tabs; lines carry no trailing whitespace; the file ends with exactly one newline; lines are at most 100 columns."
-rationale = "Bundled into one rule because none of them is a judgement call -- the formatter produces all four and a reviewer never has to discuss any of them. Two spaces and 100 columns follow the RISC-V open-source ecosystem this style descends from; 80 is too narrow once names carry direction and register suffixes."
+statement = "Indentation is four spaces, never tabs; lines carry no trailing whitespace; the file ends with exactly one newline; lines are at most 100 columns."
+rationale = "Bundled into one rule because none of them is a judgement call -- the formatter produces all four and a reviewer never has to discuss any of them. Four spaces match Python and make nesting depth readable at a glance; 100 columns follows the RISC-V open-source ecosystem this style descends from; 80 is too narrow once names carry direction and register suffixes."
 good = """
 always_comb begin
-  data_d = data_i;
+    data_d = data_i;
 end
 """
 bad = """
@@ -688,7 +688,7 @@ always_comb begin
 \tdata_d = data_i;   
 end
 """
-sources = ["lowRISC §Basics", "Verible defaults"]
+sources = ["lowRISC §Basics (column limit)", "house style (four-space indent)", "Verible defaults"]
 [rule.enforcement]
 tool = "verible-lint"
 rule = ["no-tabs", "no-trailing-spaces", "posix-eof", "line-length", "forbid-line-continuations"]
@@ -723,9 +723,9 @@ statement = "Every `if`, `else`, `for`, `while` and `always` body is wrapped in 
 rationale = "A single-statement body that grows a second statement is a silent bug, and it is exactly the edit a model or a hurried human makes. This is stricter than lowRISC, which permits omitting `begin`/`end` when the whole statement fits on one line. Note the cost: neither the formatter nor the linter can insert `begin`/`end`, so on existing code every violation is a manual edit."
 good = """
 if (clear_i) begin
-  count_d = '0;
+    count_d = '0;
 end else begin
-  count_d = count_q + 1'b1;
+    count_d = count_q + 1'b1;
 end
 """
 bad = """
@@ -793,17 +793,17 @@ statement = "Clocked logic is written in `always_ff` and assigns only with `<=`.
 rationale = "Cummings SNUG-2000 guideline #1. Blocking assignments in a clocked block execute in the active region of the stratified event queue, so a flop reading another flop assigned earlier in the same block sees the new value instead of the old one -- the simulation shows one pipeline stage where the synthesised gates have two, and which one you get depends on statement order."
 good = """
 always_ff @(posedge clk_i or negedge rst_ni) begin
-  if (!rst_ni) begin
-    b_q <= '0;
-  end else begin
-    b_q <= a_q;   // Reads the OLD a_q, as the hardware does
-  end
+    if (!rst_ni) begin
+        b_q <= '0;
+    end else begin
+        b_q <= a_q;   // Reads the OLD a_q, as the hardware does
+    end
 end
 """
 bad = """
 always_ff @(posedge clk_i) begin
-  a_q = data_i;
-  b_q = a_q;      // Reads the NEW a_q: one flop in sim, two in gates
+    a_q = data_i;
+    b_q = a_q;      // Reads the NEW a_q: one flop in sim, two in gates
 end
 """
 sources = ["Cummings SNUG-2000 guideline #1", "lowRISC §Sequential Logic"]
@@ -820,13 +820,13 @@ statement = "Combinational logic is written in `always_comb` and assigns only wi
 rationale = "Cummings SNUG-2000 guideline #3, plus the sensitivity-list half: `always_comb` is checked by the tool for completeness and for having no blocking/nonblocking mix, where `always @(*)` is inferred and an incomplete manual list produces a latch in synthesis that simulation does not show. Nonblocking assignments inside a combinational block defer the update to the NBA region, so a value read later in the same block is stale."
 good = """
 always_comb begin
-  sum = a_i + b_i;
-  carry = sum[8];     // Sees the value just assigned
+    sum = a_i + b_i;
+    carry = sum[8];     // Sees the value just assigned
 end
 """
 bad = """
 always @(a_i) begin   // b_i missing: latch
-  sum <= a_i + b_i;
+    sum <= a_i + b_i;
 end
 """
 sources = ["Cummings SNUG-2000 guidelines #3, #10", "lowRISC §Combinational Logic"]
@@ -843,14 +843,14 @@ statement = "A single `always` block uses either `=` or `<=` throughout, never b
 rationale = "Cummings SNUG-2000 guideline #5. A mixed block splits its own updates across the active and NBA regions, so the behaviour depends on the order the two kinds of statement happen to appear in -- and is not what either kind alone would give."
 good = """
 always_ff @(posedge clk_i) begin
-  a_q <= a_d;
-  b_q <= b_d;
+    a_q <= a_d;
+    b_q <= b_d;
 end
 """
 bad = """
 always_ff @(posedge clk_i) begin
-  temp = a_d;
-  b_q <= temp;
+    temp = a_d;
+    b_q <= temp;
 end
 """
 sources = ["Cummings SNUG-2000 guideline #5"]
@@ -867,7 +867,7 @@ statement = "No variable is assigned from more than one `always` block or contin
 rationale = "Cummings SNUG-2000 guideline #6. Two blocks assigning one variable race: the simulator may execute them in either order within a time step, and synthesis resolves the conflict as a short or an arbitrary winner. The failure is order-dependent, so it often appears only after an unrelated edit."
 good = """
 always_comb begin
-  data_d = load_i ? data_i : data_q;
+    data_d = load_i ? data_i : data_q;
 end
 """
 bad = """
@@ -888,20 +888,20 @@ statement = "A combinational block assigns a default value to every signal it dr
 rationale = "Cummings SNUG-1999 §synthesis mismatch. A signal left unassigned on some path through a combinational block must hold its previous value, which is a latch -- inferred silently, sensitive to a clock it was never meant to have, and usually found in static timing analysis rather than simulation."
 good = """
 always_comb begin
-  valid_o = 1'b0;         // Default
-  data_o  = '0;           // Default
-  if (hit_i) begin
-    valid_o = 1'b1;
-    data_o  = payload_i;
-  end
+    valid_o = 1'b0;         // Default
+    data_o  = '0;           // Default
+    if (hit_i) begin
+        valid_o = 1'b1;
+        data_o  = payload_i;
+    end
 end
 """
 bad = """
 always_comb begin
-  if (hit_i) begin
-    valid_o = 1'b1;       // valid_o latches when hit_i is low
-    data_o  = payload_i;
-  end
+    if (hit_i) begin
+        valid_o = 1'b1;       // valid_o latches when hit_i is low
+        data_o  = payload_i;
+    end
 end
 """
 sources = ["Cummings SNUG-1999 §synthesis mismatch", "lowRISC §Combinational Logic"]
@@ -918,15 +918,15 @@ statement = "Every `case`, `casez` and `unique case` statement has a `default` a
 rationale = "Without a default, any unlisted value leaves the case's outputs unassigned, which infers a latch in combinational logic and leaves the state unchanged in sequential logic. `unique` does not substitute: it adds a runtime check in simulation but does not supply a value, and the check is absent in synthesis."
 good = """
 unique case (state_q)
-  IDLE: state_d = req_i ? BUSY : IDLE;
-  BUSY: state_d = done_i ? IDLE : BUSY;
-  default: state_d = IDLE;   // Unreachable; recovers from an upset state
+    IDLE: state_d = req_i ? BUSY : IDLE;
+    BUSY: state_d = done_i ? IDLE : BUSY;
+    default: state_d = IDLE;   // Unreachable; recovers from an upset state
 endcase
 """
 bad = """
 unique case (state_q)
-  IDLE: state_d = req_i ? BUSY : IDLE;
-  BUSY: state_d = done_i ? IDLE : BUSY;
+    IDLE: state_d = req_i ? BUSY : IDLE;
+    BUSY: state_d = done_i ? IDLE : BUSY;
 endcase
 """
 sources = ["Cummings SNUG-2005", "lowRISC §Case Statements", "Verilator CASEINCOMPLETE"]
@@ -964,14 +964,14 @@ statement = "`casex` does not appear in synthesizable RTL. `casez` is used only 
 rationale = "Cummings SNUG-1999. `casex` treats `x` as a don't-care in the case *expression* as well as the items, so an input that is still unknown silently matches the first arm -- in his cited case an input unknown after reset release was masked in RTL simulation, gate-level simulation missed it, and the first ASIC came back flawed. `casez` has the same mechanism but only a floating `z` can trigger it, which is far less likely to mask a reset bug."
 good = """
 casez (opcode_i)
-  8'b0000_????: op_d = OP_ALU;
-  8'b0001_????: op_d = OP_LOAD;
-  default:      op_d = OP_ILLEGAL;
+    8'b0000_????: op_d = OP_ALU;
+    8'b0001_????: op_d = OP_LOAD;
+    default:      op_d = OP_ILLEGAL;
 endcase
 """
 bad = """
 casex (opcode_i)
-  8'b0000_xxxx: op_d = OP_ALU;   // Matches when opcode_i is itself unknown
+    8'b0000_xxxx: op_d = OP_ALU;   // Matches when opcode_i is itself unknown
 endcase
 """
 sources = ["Cummings SNUG-1999 §casex"]
@@ -987,12 +987,12 @@ statement = "Every function and task declares an explicit `automatic` lifetime, 
 rationale = "A static-lifetime function shares one copy of its locals across every call, so two concurrent calls corrupt each other -- and static is the default in a module. Explicit types stop the implicit single-bit default from silently truncating a wider argument."
 good = """
 function automatic logic [7:0] parity_byte(input logic [7:0] data);
-  return {^data, data[6:0]};
+    return {^data, data[6:0]};
 endfunction
 """
 bad = """
 function parity_byte(data);
-  parity_byte = {^data, data[6:0]};
+    parity_byte = {^data, data[6:0]};
 endfunction
 """
 sources = ["lowRISC §Functions and Tasks", "Verible"]
@@ -1009,13 +1009,13 @@ statement = "`parameter` appears only in a module's formal parameter list; const
 rationale = "A `parameter` in a module body is overridable through the deprecated `defparam` path and confuses which values are part of the module's interface. An untyped parameter takes its type from its default value, so overriding `8` with `8'sd8` silently changes the arithmetic of every expression using it."
 good = """
 module fifo #(
-  parameter int unsigned Depth = 8       // Interface: tunable
+    parameter int unsigned Depth = 8       // Interface: tunable
 ) ();
-  localparam int unsigned PtrW = $clog2(Depth);  // Body: derived
+    localparam int unsigned PtrW = $clog2(Depth);  // Body: derived
 """
 bad = """
 module fifo ();
-  parameter Depth = 8;
+    parameter Depth = 8;
 """
 sources = ["lowRISC §Parameterized Modules", "Verible"]
 [rule.enforcement]
@@ -1070,7 +1070,7 @@ endmodule
 """
 bad = """
 module fifo_sync ( ... );
-  assign data_ou = data_q;   // typo: creates a 1-bit implicit net
+    assign data_ou = data_q;   // typo: creates a 1-bit implicit net
 """
 sources = ["house style", "lowRISC §Declare all signals (states the rule, not the directive)", "Verilator IMPLICIT"]
 [rule.enforcement]
@@ -1091,15 +1091,15 @@ statement = "No case statement carries a `full_case` or `parallel_case` synthesi
 rationale = "Cummings SNUG-1999, \"the evil twins\". They live in comments, so the simulator ignores them while synthesis acts on them -- the design is described differently to the two tools by construction. `full_case` lets synthesis delete logic for values it now believes unreachable (his decoder loses its enable input entirely); `parallel_case` deletes a priority encoder that RTL simulation still models. They are most dangerous when they work, because nothing reports the divergence."
 good = """
 unique case (sel_i)
-  2'b00: y_o = a_i;
-  2'b01: y_o = b_i;
-  default: y_o = '0;
+    2'b00: y_o = a_i;
+    2'b01: y_o = b_i;
+    default: y_o = '0;
 endcase
 """
 bad = """
 case (sel_i)  // synopsys full_case parallel_case
-  2'b00: y_o = a_i;
-  2'b01: y_o = b_i;
+    2'b00: y_o = a_i;
+    2'b01: y_o = b_i;
 endcase
 """
 sources = ["Cummings SNUG-1999 §full_case parallel_case"]
@@ -1115,15 +1115,15 @@ statement = "Use `unique case` with a `default` as the normal form. `priority ca
 rationale = "Cummings SNUG-2005: these are real keywords, so simulation, synthesis and formal all read them, and they double as runtime assertions. But they are not a blanket substitute -- a `default` nullifies `priority` entirely (only `unique`'s overlap check survives), neither removes a latch caused by unassigned outputs, and both raise runtime errors against the standard default-assign-then-partial-case idiom."
 good = """
 unique case (state_q)
-  IDLE: state_d = BUSY;
-  BUSY: state_d = IDLE;
-  default: state_d = IDLE;
+    IDLE: state_d = BUSY;
+    BUSY: state_d = IDLE;
+    default: state_d = IDLE;
 endcase
 """
 bad = """
 priority case (state_q)
-  IDLE: state_d = BUSY;
-  default: state_d = IDLE;   // `default` makes `priority` mean nothing here
+    IDLE: state_d = BUSY;
+    default: state_d = IDLE;   // `default` makes `priority` mean nothing here
 endcase
 """
 sources = ["Cummings SNUG-2005 §unique & priority"]
@@ -1139,15 +1139,15 @@ statement = "Intentional priority is written as an `if`/`else if` chain; a `case
 rationale = "The construct states the designer's intent to every downstream tool and reader. A priority chain written as a case invites someone to add `parallel_case` later to \"optimise\" it, which is exactly the bug SYN-001 describes."
 good = """
 if (err_i) begin
-  resp_d = RESP_ERR;
+    resp_d = RESP_ERR;
 end else if (valid_i) begin
-  resp_d = RESP_OK;
+    resp_d = RESP_OK;
 end
 """
 bad = """
 case (1'b1)
-  err_i:   resp_d = RESP_ERR;   // Overlapping arms in a `case`
-  valid_i: resp_d = RESP_OK;
+    err_i:   resp_d = RESP_ERR;   // Overlapping arms in a `case`
+    valid_i: resp_d = RESP_OK;
 endcase
 """
 sources = ["Cummings SNUG-1999"]
@@ -1164,7 +1164,7 @@ rationale = "Elaboration of a recursive hierarchy terminates only if the tool ca
 good = "// Write the recursion as a generate-for over a flat array of stages."
 bad = """
 module tree #(parameter int N = 8) ();
-  tree #(.N(N/2)) u_left ();
+    tree #(.N(N/2)) u_left ();
 """
 sources = ["lowRISC §Generate Constructs"]
 [rule.enforcement]
@@ -1183,17 +1183,17 @@ statement = "Flip-flops are reset asynchronously by an active-low reset named `r
 rationale = "This is the ecosystem's convention and measurement confirms it is followed, not just written: 902 of 959 reset `always_ff` blocks in OpenTitan and 108 of 130 in Ibex use async active-low, with exactly one positive-edge async reset in all of OpenTitan's hw/ip. Active-low matters physically -- a reset asserted by a pin being pulled low survives loss of the driver. Note that BSG argues the opposite (synchronous, high-true) precisely to avoid the de-assertion hazard RST-002 addresses; this style takes the async path and mandates the synchroniser instead."
 good = """
 always_ff @(posedge clk_i or negedge rst_ni) begin
-  if (!rst_ni) begin
-    count_q <= '0;
-  end else begin
-    count_q <= count_d;
-  end
+    if (!rst_ni) begin
+        count_q <= '0;
+    end else begin
+        count_q <= count_d;
+    end
 end
 """
 bad = """
 always_ff @(posedge clk_i) begin
-  if (rst) begin      // synchronous, active-high
-    count_q <= '0;
+    if (rst) begin      // synchronous, active-high
+        count_q <= '0;
 """
 sources = ["lowRISC §Resets", "Cummings SNUG-2003 §reset techniques", "OpenTitan/Ibex measurement (94.1% / 83.1%)"]
 [rule.enforcement]
@@ -1209,11 +1209,11 @@ rationale = "Cummings SNUG-2003, verbatim: \"EVERY ASIC USING AN ASYNCHRONOUS RE
 good = """
 // Reset synchroniser: async assert, sync de-assert into clk_i.
 always_ff @(posedge clk_i or negedge rst_ext_ni) begin
-  if (!rst_ext_ni) begin
-    {rst_q, rst_meta_q} <= 2'b00;
-  end else begin
-    {rst_q, rst_meta_q} <= {rst_meta_q, 1'b1};
-  end
+    if (!rst_ext_ni) begin
+        {rst_q, rst_meta_q} <= 2'b00;
+    end else begin
+        {rst_q, rst_meta_q} <= {rst_meta_q, 1'b1};
+    end
 end
 """
 bad = """
@@ -1251,14 +1251,14 @@ statement = "Reset the flops that must hold a known value at startup -- state ma
 rationale = "Every reset flop costs a reset-tree endpoint, routing and a larger cell, and the reset tree is one of the hardest nets to close timing on. A datapath register whose value is qualified by a valid bit does not need a defined value at startup, because nothing reads it until the valid bit says so."
 good = """
 always_ff @(posedge clk_i or negedge rst_ni) begin
-  if (!rst_ni) begin
-    valid_q <= 1'b0;      // Control: reset
-  end else begin
-    valid_q <= valid_d;
-  end
+    if (!rst_ni) begin
+        valid_q <= 1'b0;      // Control: reset
+    end else begin
+        valid_q <= valid_d;
+    end
 end
 always_ff @(posedge clk_i) begin
-  data_q <= data_d;       // Datapath: qualified by valid_q, not reset
+    data_q <= data_d;       // Datapath: qualified by valid_q, not reset
 end
 """
 bad = """
@@ -1277,9 +1277,9 @@ statement = "A signal used as an asynchronous reset is not also used as ordinary
 rationale = "A net that reaches both a reset pin and a data pin cannot be timed as either, and the synthesis tool picks one. A clock gated by `if (en)` in RTL produces glitches on the gated clock that the RTL simulation cannot show, because RTL has no notion of a glitch."
 good = """
 prim_clock_gating u_cg (
-  .clk_i    (clk_i),
-  .en_i     (enable_q),
-  .clk_o    (clk_gated)
+    .clk_i    (clk_i),
+    .en_i     (enable_q),
+    .clk_o    (clk_gated)
 );
 """
 bad = """
@@ -1323,23 +1323,23 @@ rationale = "Cummings SNUG-2000 §FSM. Separating the register from the next-sta
 good = """
 // State register.
 always_ff @(posedge clk_i or negedge rst_ni) begin
-  if (!rst_ni) begin
-    state_q <= IDLE;
-  end else begin
-    state_q <= state_d;
-  end
+    if (!rst_ni) begin
+        state_q <= IDLE;
+    end else begin
+        state_q <= state_d;
+    end
 end
 
 // Next-state and output logic.
 always_comb begin
-  state_d = state_q;
-  ...
+    state_d = state_q;
+    ...
 end
 """
 bad = """
 always_ff @(posedge clk_i) begin
-  case (state_q)
-    IDLE: if (req_i) begin state_q <= BUSY; out_q <= 1'b1; end
+    case (state_q)
+        IDLE: if (req_i) begin state_q <= BUSY; out_q <= 1'b1; end
 """
 sources = ["Cummings SNUG-2000 §FSM coding styles"]
 [rule.enforcement]
@@ -1354,11 +1354,11 @@ statement = "An FSM does not drive combinational (Mealy) outputs across a module
 rationale = "Cummings SNUG-2000. A combinational output depends on the FSM's inputs in the same cycle, so it arrives late and its timing path continues into whatever the consumer does with it -- a path that neither module's timing constraints describe on its own."
 good = """
 always_ff @(posedge clk_i or negedge rst_ni) begin
-  if (!rst_ni) begin
-    grant_o <= 1'b0;
-  end else begin
-    grant_o <= (state_d == GRANTED);
-  end
+    if (!rst_ni) begin
+        grant_o <= 1'b0;
+    end else begin
+        grant_o <= (state_d == GRANTED);
+    end
 end
 """
 bad = """
@@ -1395,16 +1395,16 @@ statement = "Every one-bit signal crossing an asynchronous clock boundary passes
 rationale = "Cummings SNUG-2001. Across asynchronous domains a setup/hold violation on the first flop is a certainty, not a risk -- the phase relationship changes continuously. The second flop gives the first a full clock period for metastability to decay before anything samples it. Without it, a metastable output fans out and different gates resolve it differently, so the design disagrees with itself."
 good = """
 always_ff @(posedge dst_clk_i or negedge dst_rst_ni) begin
-  if (!dst_rst_ni) begin
-    {sync_q, meta_q} <= 2'b00;
-  end else begin
-    {sync_q, meta_q} <= {meta_q, src_signal_i};
-  end
+    if (!dst_rst_ni) begin
+        {sync_q, meta_q} <= 2'b00;
+    end else begin
+        {sync_q, meta_q} <= {meta_q, src_signal_i};
+    end
 end
 """
 bad = """
 always_ff @(posedge dst_clk_i) begin
-  captured_q <= src_signal_i;   // One flop: metastability reaches the logic
+    captured_q <= src_signal_i;   // One flop: metastability reaches the logic
 end
 """
 sources = ["Cummings SNUG-2001 §synchronizers"]
@@ -1425,7 +1425,7 @@ prim_fifo_async u_cdc_fifo ( ... );
 """
 bad = """
 for (genvar i = 0; i < 8; i++) begin : gen_sync
-  prim_flop_2sync u_sync (.d_i(data_i[i]), .q_o(data_sync[i]));
+    prim_flop_2sync u_sync (.d_i(data_i[i]), .q_o(data_sync[i]));
 end
 """
 sources = ["Cummings SNUG-2001 §multi-bit signals"]
@@ -1460,7 +1460,7 @@ statement = "A signal is registered in its source clock domain immediately befor
 rationale = "Cummings SNUG-2001. Combinational output settles through a sequence of intermediate values, and every one of them is a potential edge for the destination to capture -- the crossing sees phantom pulses that never existed as logical values. Registering also improves MTBF by cutting how often the crossed signal changes."
 good = """
 always_ff @(posedge src_clk_i) begin
-  req_q <= req_valid && !busy;   // Registered, then crossed
+    req_q <= req_valid && !busy;   // Registered, then crossed
 end
 """
 bad = """
@@ -1514,12 +1514,12 @@ statement = "Every generate `for` body and every branch of a generate `if` carri
 rationale = "The label becomes part of the hierarchical path of everything inside it. Without one the tool invents a name like `genblk3`, so waveforms, timing reports, constraints and bug reports all address the logic by a number that shifts when an unrelated generate is added above it."
 good = """
 for (genvar i = 0; i < NumPorts; i++) begin : gen_port
-  prim_fifo_sync u_fifo ( ... );
+    prim_fifo_sync u_fifo ( ... );
 end
 """
 bad = """
 for (genvar i = 0; i < NumPorts; i++) begin
-  prim_fifo_sync u_fifo ( ... );
+    prim_fifo_sync u_fifo ( ... );
 end
 """
 sources = ["lowRISC §Generate Constructs", "Verible"]
@@ -1536,15 +1536,15 @@ statement = "`generate`/`endgenerate` regions are not written, `genvar` is decla
 rationale = "The `generate` region has been optional since Verilog-2001 and adds a scope level that changes hierarchical paths without changing behaviour. An inline `genvar` scopes the loop variable to its loop, so two loops in one module cannot collide."
 good = """
 for (genvar i = 0; i < N; i++) begin : gen_stage
-  ...
+    ...
 end
 """
 bad = """
 genvar i;
 generate
-  for (i = 0; i < N; i++) begin : gen_stage
-    ...
-  end
+    for (i = 0; i < N; i++) begin : gen_stage
+        ...
+    end
 endgenerate
 """
 sources = ["lowRISC §Generate Constructs", "Verible"]

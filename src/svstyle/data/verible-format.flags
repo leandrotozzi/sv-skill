@@ -2,7 +2,7 @@
 # Verified against verible-verilog-format v0.0-3946-g851d3ff4.
 
 # --- base geometry ---
---indentation_spaces=2
+--indentation_spaces=4
 --wrap_spaces=4
 --column_limit=100
 

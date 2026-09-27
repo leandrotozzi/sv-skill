@@ -51,7 +51,7 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 
 ## FMT — Formatting and layout
 
-- **FMT-001** · MUST · Indentation is two spaces, never tabs; lines carry no trailing whitespace; the file ends with exactly one newline; lines are at most 100 columns.
+- **FMT-001** · MUST · Indentation is four spaces, never tabs; lines carry no trailing whitespace; the file ends with exactly one newline; lines are at most 100 columns.
 - **FMT-002** · MUST · Port declarations, formal parameters, named port connections, named parameter overrides, module-level net declarations, struct members and enum assignments are aligned into columns. Loose assignment statements and case items are not.
 - **FMT-003** · MUST · Every `if`, `else`, `for`, `while` and `always` body is wrapped in `begin`/`end`, even a single statement. `begin` sits on the line of the construct that opens it and `end else begin` is written on one line.
 - **FMT-004** · MUST · There are no empty statements from consecutive semicolons, and no semicolon after the `end` of a block or after a module or generate body.
