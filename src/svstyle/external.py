@@ -9,6 +9,7 @@ the rules DB stay visible (`svstyle rules --unmapped`).
 import re
 import shutil
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
 from .rules import Diag, Rule, tool_index
@@ -76,10 +77,20 @@ def verible_lint(paths: list[str], rules: list[Rule]) -> list[Diag]:
     return parse_verible_lint(res.stdout + res.stderr, rules)  # findings go to stderr
 
 
-def verilator_lint(paths: list[str], rules: list[Rule]) -> list[Diag]:
+def verilator_lint(
+    paths: list[str], rules: list[Rule], include_dirs: Sequence[str] = ()
+) -> list[Diag]:
     # MULTITOP: checking a set of files is not elaborating a design top.
-    args = ["--lint-only", "-Wall", "-Wno-fatal", "-Wno-context", "-Wno-MULTITOP", *paths]
-    return parse_verilator(_run("verilator", args).stderr, rules)
+    dirs = dict.fromkeys([*include_dirs, *(str(Path(p).parent) for p in paths)])
+    args = ["--lint-only", "-Wall", "-Wno-fatal", "-Wno-context", "-Wno-MULTITOP"]
+    args += [f"-I{d}" for d in dirs] + paths
+    # Verilator also lints submodules it finds on its own; report only what was asked.
+    asked = {Path(p).resolve() for p in paths}
+    return [
+        d
+        for d in parse_verilator(_run("verilator", args).stderr, rules)
+        if Path(d.path).resolve() in asked
+    ]
 
 
 def parse_verible_lint(output: str, rules: list[Rule]) -> list[Diag]:

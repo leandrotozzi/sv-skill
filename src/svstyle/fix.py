@@ -8,6 +8,8 @@ and svstyle's inserted comments and directives, so nothing the author wrote
 can be lost.
 """
 
+from collections.abc import Sequence
+
 from pyslang import BumpAllocator, Diagnostics, SourceManager
 from pyslang.parsing import Lexer, TokenKind
 
@@ -38,10 +40,10 @@ def token_signature(text: str) -> list[str]:
     return out
 
 
-def fix_text(text: str, path: str, rules: list[Rule]) -> str:
-    parse(text, path)  # ParseError propagates: refuse before touching anything
+def fix_text(text: str, path: str, rules: list[Rule], include_dirs: Sequence[str] = ()) -> str:
+    parse(text, path, include_dirs)  # ParseError propagates: refuse before touching anything
     formatted = verible_format(text)
-    fixes = [d.fix for d in run_checks(formatted, path, rules) if d.fix]
+    fixes = [d.fix for d in run_checks(formatted, path, rules, include_dirs) if d.fix]
     out = formatted
     # Descending offset; at equal offsets the later fix goes in first, so the
     # earlier one (the header) ends up above it.
@@ -59,7 +61,7 @@ def fix_text(text: str, path: str, rules: list[Rule]) -> str:
     if sig != token_signature(text):
         raise InvariantError(f"{path}: fix changed a non-whitespace token")
     try:
-        parse(out, path)
+        parse(out, path, include_dirs)
     except ParseError as e:
         raise InvariantError(f"{path}: fixed output no longer parses\n{e}") from e
     return out

@@ -147,3 +147,15 @@ def test_fix_invariant_breach_exits_4(capsys, sv, monkeypatch):
     code, _, err = _run(capsys, "fix", p)
     assert code == 4 and "non-whitespace token" in err
     assert p.read_text() == CLEAN
+
+
+def test_check_and_fix_take_include_dirs(capsys, tmp_path):
+    inc = tmp_path / "inc"
+    inc.mkdir()
+    (inc / "defs.svh").write_text("`define WIDTH 8\n")
+    p = tmp_path / "reg_byte.sv"
+    p.write_text(
+        CLEAN.replace("`default_nettype none\n", '`default_nettype none\n`include "defs.svh"\n')
+    )
+    assert _run(capsys, "check", "--no-external", p)[0] == 3
+    assert _run(capsys, "check", "--no-external", "-I", inc, p)[0] == 0

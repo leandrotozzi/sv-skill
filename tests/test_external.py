@@ -118,3 +118,18 @@ def test_nam006_allows_all_caps_only_for_localparams(tmp_path):
     )
     lines = {d.line for d in ext.verible_lint([str(f)], RULES) if d.rule == "NAM-006"}
     assert lines == {3}
+
+
+@needs_verilator
+def test_verilator_reports_only_the_files_asked_for(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # Verilator finds sub.sv in the working directory
+    (tmp_path / "sub.sv").write_text(
+        "module sub (\n    input logic a_i,\n    output logic b_o\n);\n    logic spare;\n"
+        "    assign b_o = a_i;\nendmodule\n"
+    )
+    top = tmp_path / "top.sv"
+    top.write_text(
+        "module top (\n    input logic a_i,\n    output logic b_o\n);\n"
+        "    sub u_sub (\n        .a_i(a_i),\n        .b_o(b_o)\n    );\nendmodule\n"
+    )
+    assert [d.path for d in ext.verilator_lint(["top.sv"], RULES)] == []

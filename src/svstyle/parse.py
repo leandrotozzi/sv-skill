@@ -9,10 +9,11 @@ Everything is line-based because `fix` runs Verible first, which puts each
 declaration, block and instance on its own line.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
-from pyslang import DiagnosticEngine
-from pyslang.parsing import TokenKind, TriviaKind
+from pyslang import Bag, DiagnosticEngine, Diags, SourceManager
+from pyslang.parsing import PreprocessorOptions, TokenKind, TriviaKind
 from pyslang.syntax import SyntaxKind, SyntaxNode, SyntaxTree
 
 K = SyntaxKind
@@ -56,19 +57,23 @@ class Source:
     non_ansi: list[tuple[str, int]]  # (module name, line) of non-ANSI port lists
 
 
-def parse(text: str, name: str = "source.sv") -> Source:
-    tree = SyntaxTree.fromText(text, name)
+def parse(text: str, name: str = "source.sv", include_dirs: Sequence[str] = ()) -> Source:
+    """Parse `text` as the file `name`; includes resolve next to it and on `include_dirs`."""
+    opts = PreprocessorOptions()
+    opts.additionalIncludePaths = list(include_dirs)
+    tree = SyntaxTree.fromText(text, SourceManager(), name, name, Bag([opts]))
     sm = tree.sourceManager
     errors = [d for d in tree.diagnostics if d.isError()]
     if errors:
         engine = DiagnosticEngine(sm)
-        raise ParseError(
-            "\n".join(
-                f"{name}:{sm.getLineNumber(d.location)}:{sm.getColumnNumber(d.location)}: "
-                f"{engine.formatMessage(d)}"
-                for d in errors
-            )
+        msg = "\n".join(
+            f"{name}:{sm.getLineNumber(d.location)}:{sm.getColumnNumber(d.location)}: "
+            f"{engine.formatMessage(d)}"
+            for d in errors
         )
+        if any(d.code == Diags.CouldNotOpenIncludeFile for d in errors):
+            msg += "\n(an `include was not found: pass its directory with -I DIR)"
+        raise ParseError(msg)
     return _Walker(tree, text).run()
 
 
@@ -85,7 +90,14 @@ class _Walker:
         self.root = tree.root
         # Zero-width tokens (the implicit type of `b_i` in `a_i, b_i`) carry no
         # trivia and sit on no line of their own; the lookups below skip them.
-        self.toks = [t for t in _tokens(self.root) if t.rawText or t.kind == TokenKind.EndOfFile]
+        # Tokens pulled in by `include belong to another file, with that file's
+        # line numbers; only this file's tokens (and macro expansions in it) count.
+        self.main = self.root.getLastToken().location.buffer  # EOF of this file
+        self.toks = [
+            t
+            for t in _tokens(self.root)
+            if (t.rawText or t.kind == TokenKind.EndOfFile) and self.is_main(t)
+        ]
         # Last token index on each line, for the trailing-comment lookup.
         self.last_on_line = {self.line(t): i for i, t in enumerate(self.toks)}
         self.anchors: list[Anchor] = []
@@ -94,6 +106,9 @@ class _Walker:
     def run(self) -> Source:
         self.walk(self.root, split_list=False)
         return Source(self.text, self.anchors, self.non_ansi)
+
+    def is_main(self, tok) -> bool:
+        return self.sm.getFullyExpandedLoc(tok.location).buffer == self.main
 
     def line(self, tok) -> int:
         return self.sm.getLineNumber(tok.location)
@@ -119,6 +134,9 @@ class _Walker:
             split_list = any(
                 tr.kind == TriviaKind.Directive for t in _tokens(node)[1:] for tr in t.trivia
             )
+        first = node.getFirstToken()
+        if first is not None and first.rawText and not self.is_main(first):
+            return  # declared in an included file
         if k in DECLS or k in PARAMS or k in PORTS:
             kind = "port" if k in PORTS else "param" if k in PARAMS else "decl"
             # `input logic a_i,\n b_i` - b_i has a zero-width type: it continues a_i's declaration.

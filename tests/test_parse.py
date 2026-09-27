@@ -111,3 +111,31 @@ def test_multi_declarator_statement_is_one_anchor():
         ("a_q, a_d", "// pair"),
         ("A, B", None),
     ]
+
+
+def test_include_resolves_next_to_the_file_and_on_include_dirs(tmp_path):
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    (tmp_path / "a" / "foo.svh").write_text("`define FOO(x) logic x;\n")
+    (tmp_path / "b" / "bar.svh").write_text("`define BAR(x) logic x;\n")
+    f = tmp_path / "a" / "m.sv"
+    f.write_text(
+        '`include "foo.svh"\n`include "bar.svh"\nmodule m;\n    `FOO(a)\n    `BAR(b)\nendmodule\n'
+    )
+    src = parse(f.read_text(), str(f), include_dirs=[str(tmp_path / "b")])
+    assert [a.name for a in src.anchors] == ["a", "b"]
+
+
+def test_missing_include_hints_at_include_dirs(tmp_path):
+    f = tmp_path / "m.sv"
+    f.write_text('`include "nope.svh"\nmodule m;\nendmodule\n')
+    with pytest.raises(ParseError, match="-I"):
+        parse(f.read_text(), str(f))
+
+
+def test_declarations_from_an_included_file_are_not_anchored(tmp_path):
+    (tmp_path / "decls.svh").write_text("logic from_include;\nlogic other;\n")
+    f = tmp_path / "m.sv"
+    f.write_text('module m;\n    `include "decls.svh"\n    logic own;  // Own\nendmodule\n')
+    src = parse(f.read_text(), str(f))
+    assert [(a.name, a.line, a.comment) for a in src.anchors] == [("own", 3, "// Own")]

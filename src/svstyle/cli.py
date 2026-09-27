@@ -211,16 +211,21 @@ def _cmd_check(args, rules: list) -> int:
             code = max(code, 2)
             continue
         try:
-            diags += run_checks(text, path, rules)
+            diags += run_checks(text, path, rules, args.include)
             parsed.append(path)
         except ParseError as exc:
             errors.append(str(exc))
             code = max(code, 3)
     if parsed and not args.no_external:
         _warn_verible_drift()
-        for tool in (external.verible_verify, external.verible_lint, external.verilator_lint):
+        tools = (
+            lambda: external.verible_verify(parsed, rules),
+            lambda: external.verible_lint(parsed, rules),
+            lambda: external.verilator_lint(parsed, rules, args.include),
+        )
+        for tool in tools:
             try:
-                diags += tool(parsed, rules)
+                diags += tool()
             except external.ToolMissing as exc:
                 print(f"warning: {exc}; its rules were not checked", file=sys.stderr)
     return _report(args, diags, errors, code)
@@ -235,7 +240,7 @@ def _cmd_fix(args, rules: list) -> int:
             code = max(code, 2)
             continue
         try:
-            out = fix_text(text, path, rules)
+            out = fix_text(text, path, rules, args.include)
         except external.ToolMissing as exc:
             errors.append(f"{exc}; fix needs it to stay idempotent")
             code = max(code, 2)
@@ -262,7 +267,7 @@ def _cmd_fix(args, rules: list) -> int:
                 )
             else:
                 Path(path).write_text(out, encoding="utf-8")
-        diags += run_checks(out, path, rules)  # what is left for the author
+        diags += run_checks(out, path, rules, args.include)  # what is left for the author
     if not args.json:
         print(f"{'would fix' if args.diff else 'fixed'} {changed} file(s)")
     return _report(args, diags, errors, code, {"files_changed": changed})
@@ -284,6 +289,8 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("check", help="report style violations (svstyle, Verible, Verilator)")
     p.add_argument("files", nargs="+", type=Path)
+    p.add_argument("-I", "--include", metavar="DIR", action="append", default=[],
+                   help="search DIR for `include files (repeatable)")  # fmt: skip
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument("--no-external", action="store_true", help="skip Verible and Verilator")
     p.add_argument("--select", metavar="IDS", help="only these rule IDs/prefixes, comma-separated")
@@ -291,6 +298,8 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("fix", help="format with Verible and insert missing comments/header")
     p.add_argument("files", nargs="+", type=Path)
+    p.add_argument("-I", "--include", metavar="DIR", action="append", default=[],
+                   help="search DIR for `include files (repeatable)")  # fmt: skip
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument("--diff", action="store_true", help="print the diff instead of writing")
 

@@ -7,6 +7,7 @@ Autofixable findings carry an insert-only `fix = (offset, text)`.
 """
 
 import re
+from collections.abc import Sequence
 from datetime import date
 
 from .parse import Source, parse
@@ -39,9 +40,11 @@ TODO_ABOVE = "// TODO: describe\n"
 HOW = {"ordered": "by position", "wildcard": "with .*", "mixed": "partly by position or .*"}
 
 
-def run_checks(text: str, path: str, rules: list[Rule]) -> list[Diag]:
+def run_checks(
+    text: str, path: str, rules: list[Rule], include_dirs: Sequence[str] = ()
+) -> list[Diag]:
     """All svstyle-owned findings for one file. Raises ParseError if it does not parse."""
-    src = parse(text, path)
+    src = parse(text, path, include_dirs)
     ctx = _Ctx(path, tool_index(rules, "svstyle"))
     check_header(ctx, text)
     check_default_nettype(ctx, text)
