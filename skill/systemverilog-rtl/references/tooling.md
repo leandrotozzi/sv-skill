@@ -19,13 +19,15 @@ be idempotent.
 ## Commands
 
 ```sh
-svstyle check FILES [--json] [--no-external] [--select IDS] [--ignore IDS]
-svstyle fix   FILES [--json] [--diff]
+svstyle check FILES [-I DIR]... [--json] [--no-external] [--select IDS] [--ignore IDS]
+svstyle fix   FILES [-I DIR]... [--json] [--diff]
 svstyle rules [--id ID] [--unmapped]
 ```
 
 - `--select` / `--ignore` take comma-separated IDs or prefixes, ruff-style:
   `--select DOC,PRT-003 --ignore DOC-005`.
+- `-I DIR` adds an `` `include`` search directory (repeatable); a file's own
+  directory is always searched. Verilator gets the same directories.
 - `--no-external` runs only svstyle's own checks (fast; no Verible/Verilator).
 - `fix --diff` prints the change instead of writing it.
 - `rules --id PRT-003` prints one rule in full; `--unmapped` lists the rules
@@ -66,7 +68,7 @@ the author after the fix.
 | 0 | clean | no MUST findings (SHOULD allowed) | done |
 | 1 | violations | at least one MUST finding | fix them, rerun |
 | 2 | error | unreadable file, or a required tool missing | read stderr |
-| 3 | refused | the file does not parse | fix the syntax error named in `error` first |
+| 3 | refused | the file does not parse | fix the syntax error named in `error`; a missing `` `include`` needs `-I DIR` |
 | 4 | bug | svstyle broke its own invariant; nothing written | report it with the input file |
 
 ## Who enforces what
@@ -87,6 +89,14 @@ or `EXT-VLTR-<CODE>` (Verilator) at SHOULD. The common ones:
 - `EXT-VLTR-DECLFILENAME`: file and design-unit names differ (STR-001).
 - `EXT-VLTR-PINCONNECTEMPTY`: an output connected as `.q_o()`. Fine when
   deliberate (PRT-004); otherwise connect it.
+
+FMT-002 without `[fix available]` means Verible cannot format the file at
+all (its layout does not converge); lay that region out by hand.
+
+NAM-004 (`_q`/`_d` pairing) does not apply to indexed writes such as
+`mem_q[addr] <= wdata_i`, nor inside a reset branch on `!rst_ni`,
+`!rst_src_ni` or `!rst_dst_ni`. Write memories directly in `always_ff`;
+do not copy a whole array through `always_comb` to satisfy the rule.
 
 ## Waivers (DOC-009)
 

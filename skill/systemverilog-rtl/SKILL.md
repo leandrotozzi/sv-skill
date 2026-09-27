@@ -22,10 +22,12 @@ reset style and comment layout:
 | Template | Use it for |
 |---|---|
 | `assets/skeleton.sv` | any module: registered stage, parameter check, reset vs. datapath flops |
-| `assets/fsm.sv` + `assets/fsm_pkg.sv` | a state machine: enum in a package, `state_q`/`state_d`, commented case arms, registered outputs |
+| `assets/fsm.sv` + `assets/fsm_pkg.sv` | a state machine: `typedef enum` state, `state_q`/`state_d`, commented case arms, registered outputs |
 
 Rename the module and the file together (STR-001: the basename is the
-module name). Packages are `<name>_pkg` in `<name>_pkg.sv`.
+module name). The FSM template keeps its enum in a package because other
+modules usually need the type; an enum used by one module only can be a
+`typedef` inside it. Packages are `<name>_pkg` in `<name>_pkg.sv`.
 
 ## Write it the way the checker expects
 
@@ -56,7 +58,8 @@ svstyle check rtl/*.sv     # svstyle + Verible lint + Verilator, one report
 
 Pass every file of the design in one call: Verilator needs the submodules
 to elaborate, and checking a lone file that instantiates others reports
-`EXT-VLTR-MODMISSING`.
+`EXT-VLTR-MODMISSING`. If the code `` `include``s files from another
+directory, add `-I DIR`; without it the file does not parse (exit 3).
 
 Read each finding as `file:line:col: RULE-ID message`. `[fix available]`
 means `svstyle fix` handles it; everything else is yours. When a rule's
