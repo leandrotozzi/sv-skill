@@ -221,4 +221,4 @@ def _decl_names(node: SyntaxNode) -> str:
         return decl.name.valueText
     if k == K.ParameterDeclarationStatement:
         node = node.parameter
-    return ", ".join(d.name.valueText for d in node.declarators)
+    return ", ".join(d.name.valueText for d in node.declarators if isinstance(d, SyntaxNode))

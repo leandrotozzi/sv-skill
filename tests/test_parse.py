@@ -103,3 +103,11 @@ def test_trailing_comment_before_an_ifdef_is_found():
 def test_trailing_comment_before_an_implicit_type_port_is_found():
     text = "module m (\n    input logic a_i,  // a\n    b_i  // b\n);\nendmodule\n"
     assert [(a.name, a.comment) for a in parse(text).anchors] == [("a_i", "// a"), ("b_i", "// b")]
+
+
+def test_multi_declarator_statement_is_one_anchor():
+    text = "module m;\n    logic a_q, a_d;  // pair\n    localparam int A = 1, B = 2;\nendmodule\n"
+    assert [(a.name, a.comment) for a in parse(text).anchors] == [
+        ("a_q, a_d", "// pair"),
+        ("A, B", None),
+    ]
