@@ -23,6 +23,7 @@ reset style and comment layout:
 |---|---|
 | `assets/skeleton.sv` | any module: registered stage, parameter check, reset vs. datapath flops |
 | `assets/fsm.sv` + `assets/fsm_pkg.sv` | a state machine: `typedef enum` state, `state_q`/`state_d`, commented case arms, registered outputs |
+| `assets/assert_macros.svh` | `` `ASSERT``, `` `ASSERT_KNOWN``, `` `ASSERT_INIT`` (VER-001); both templates include it |
 
 Rename the module and the file together (STR-001: the basename is the
 module name). The FSM template keeps its enum in a package because other
@@ -95,6 +96,10 @@ list against the code you wrote:
   no `casex`, no `full_case`/`parallel_case`; priority as `if`/`else if`.
 - **Parameters** (GEN-003): a parameter with restricted values gets an
   elaboration-time check, as the templates show.
+- **Assertions** (VER-001/002): `` `ASSERT_KNOWN`` on every output, plus
+  `` `ASSERT`` for the protocol rules the design relies on. If the project
+  has no assertion macros of its own, copy `assets/assert_macros.svh` next
+  to the RTL; it compiles to nothing under synthesis.
 - **Naming** (NAM-003, NAM-009, NAM-010): suffix order `_n` first and
   `_i`/`_o` last (`rst_ni`); whole-word names; no SV keywords.
 - **Structure** (STR-003..005, LNG-001): declarations next to the logic that

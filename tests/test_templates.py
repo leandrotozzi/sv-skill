@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,8 @@ from svstyle.fix import fix_text
 from svstyle.rules import load_rules
 
 ASSETS = Path(__file__).parents[1] / "skill" / "systemverilog-rtl" / "assets"
-TEMPLATES = sorted(ASSETS.glob("*.sv"))
+TEMPLATES = sorted([*ASSETS.glob("*.sv"), *ASSETS.glob("*.svh")])
+RTL = sorted(ASSETS.glob("*.sv"), key=lambda p: (not p.name.endswith("_pkg.sv"), p.name))
 needs_tools = pytest.mark.skipif(
     not (shutil.which("verible-verilog-format") and shutil.which("verilator")),
     reason="verible or verilator missing",
@@ -20,13 +22,41 @@ needs_tools = pytest.mark.skipif(
 
 
 def test_there_are_templates():
-    assert {p.name for p in TEMPLATES} == {"skeleton.sv", "fsm.sv", "fsm_pkg.sv"}
+    assert {p.name for p in TEMPLATES} == {
+        "skeleton.sv", "fsm.sv", "fsm_pkg.sv", "assert_macros.svh"
+    }  # fmt: skip
+
+
+@pytest.mark.parametrize("name", ["skeleton.sv", "fsm.sv"])
+def test_modules_check_their_outputs_are_known(name):
+    text = (ASSETS / name).read_text()
+    assert '`include "assert_macros.svh"' in text and "`ASSERT_KNOWN(" in text
+
+
+@needs_tools
+def test_templates_lint_clean_with_assertions_enabled():
+    res = subprocess.run(
+        ["verilator", "--lint-only", "-Wall", "--assert", "-Wno-MULTITOP", *map(str, RTL)],
+        cwd=ASSETS, capture_output=True, text=True,
+    )  # fmt: skip
+    assert res.returncode == 0, res.stderr
+
+
+@pytest.mark.skipif(not shutil.which("yosys"), reason="yosys missing")
+def test_templates_synthesize_with_assertions_compiled_out():
+    for top in ("skeleton", "fsm"):
+        files = " ".join(p.name for p in RTL)
+        res = subprocess.run(
+            ["yosys", "-q", "-p", f"read_verilog -sv {files}; synth -top {top}"],
+            cwd=ASSETS, capture_output=True, text=True,
+        )  # fmt: skip
+        assert res.returncode == 0, res.stderr
 
 
 @needs_tools
 @pytest.mark.parametrize("src", TEMPLATES, ids=lambda p: p.name)
 def test_template_is_a_fix_fixed_point(src):
-    assert fix_text(src.read_text(), src.name, load_rules()) == src.read_text()
+    assert fix_text(src.read_text(), str(src), load_rules()) == src.read_text()
 
 
 @needs_tools

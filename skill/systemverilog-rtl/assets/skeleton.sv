@@ -7,6 +7,8 @@
 
 `default_nettype none
 
+`include "assert_macros.svh"
+
 module skeleton #(
     parameter int unsigned Width = 8  // Payload width in bits; at least 1
 ) (
@@ -50,6 +52,10 @@ module skeleton #(
 
     assign valid_o = valid_q;
     assign data_o  = data_q;
+
+    // Outputs are never X once out of reset (VER-002).
+    `ASSERT_KNOWN(ValidKnown_A, valid_o)
+    `ASSERT_KNOWN(DataKnown_A, data_o)
 endmodule
 
 `resetall

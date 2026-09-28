@@ -8,6 +8,8 @@
 
 `default_nettype none
 
+`include "assert_macros.svh"
+
 module fsm #(
     parameter int unsigned WaitCycles = 4  // Cycles between request and grant; at least 1
 ) (
@@ -77,6 +79,9 @@ module fsm #(
     end
 
     assign grant_o = grant_q;
+
+    // The output is never X once out of reset (VER-002).
+    `ASSERT_KNOWN(GrantKnown_A, grant_o)
 endmodule
 
 `resetall
