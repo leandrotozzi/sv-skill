@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    env:
+      VERIBLE: v0.0-3946-g851d3ff4  # keep in sync with external.KNOWN_GOOD_VERIBLE_VERSION
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install Verible (pinned), Verilator and Yosys
+        run: |
+          curl -sSL "https://github.com/chipsalliance/verible/releases/download/$VERIBLE/verible-$VERIBLE-linux-static-x86_64.tar.gz" \
+            | tar xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/verible-$VERIBLE/bin" >> "$GITHUB_PATH"
+          sudo apt-get update -q && sudo apt-get install -yq verilator yosys
+      - run: uv sync --extra dev
+      - run: uv run ruff check src tests evals
+      - run: uv run ruff format --check src tests evals
+      - run: uv run svstyle rules --check
+      - run: uv run pytest -n auto

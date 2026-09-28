@@ -179,3 +179,8 @@ def test_format_failure_message_is_short(monkeypatch):
     with pytest.raises(ext.ToolFailed) as exc:
         ext.verible_format("module m; endmodule\n")
     assert len(str(exc.value)) < 300 and "converge" in str(exc.value)
+
+
+def test_ci_pins_the_same_verible_as_the_code():
+    ci = (Path(__file__).parents[1] / ".github" / "workflows" / "ci.yml").read_text()
+    assert f"VERIBLE: {ext.KNOWN_GOOD_VERIBLE_VERSION}" in ci
