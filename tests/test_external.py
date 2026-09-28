@@ -311,3 +311,28 @@ def test_yosys_passes_the_templates():
     # Glob order puts fsm.sv before the package it uses; Yosys must read packages first.
     files = [str(assets / "fsm.sv"), str(assets / "fsm_pkg.sv"), str(assets / "skeleton.sv")]
     assert ext.yosys_check(files, RULES, [str(assets)]) == []
+
+
+@needs_verible
+@pytest.mark.parametrize(
+    "stmt,flagged",
+    [
+        ("data_q <= data_i;", False),  # input register, same base name
+        ("data_q2 <= data_q;", False),  # numbered pipeline stage
+        ("level_sync_q <= level_meta_q;", False),  # synchroniser chain
+        ("level_meta_q <= level_src_q;", False),
+        ("data_q <= data_d;", False),
+        ("data_q <= a_i & b_i;", True),  # combinational logic belongs in a _d
+        ("data <= a_i;", True),  # a flop is named _q
+    ],
+)
+def test_nam004_allows_input_pipeline_and_sync_registers(tmp_path, stmt, flagged):
+    f = tmp_path / "m.sv"
+    f.write_text(
+        "module m (\n    input logic clk_i,\n    input logic data_i,\n    input logic a_i,\n"
+        "    input logic b_i\n);\n    logic data_q, data_q2, data_d, data;\n"
+        "    logic level_sync_q, level_meta_q, level_src_q;\n"
+        f"    always_ff @(posedge clk_i) begin\n        {stmt}\n    end\nendmodule\n"
+    )
+    found = [d for d in ext.verible_lint([str(f)], RULES) if d.rule == "NAM-004"]
+    assert bool(found) is flagged, found

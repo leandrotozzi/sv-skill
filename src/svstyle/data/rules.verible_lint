@@ -13,8 +13,10 @@ case-missing-default
 port-name-suffix
 signal-name-style=style_regex:[a-z_0-9]+
 # Indexed writes are memories, not _q/_d pairs; per-domain resets follow the
-# lowRISC CDC naming (rst_src_ni / rst_dst_ni).
-dff-name-style=input:d;output:q;waive_lhs_regex:(?i)(mem.*|.*\[.*);waive_ifs_with_conditions:!rst_ni,!rst_src_ni,!rst_dst_ni,flush_i,!rst_ni || flush_i,flush_i || !rst_ni
+# lowRISC CDC naming (rst_src_ni / rst_dst_ni). Input registers (data_q <=
+# data_i) and numbered pipeline stages (data_q2 <= data_q) need no _d; nor do
+# synchroniser chains, whose flops carry sync/meta in the name (prim_flop_2sync).
+dff-name-style=input:d,i;output:q;waive_lhs_regex:(?i)(mem.*|.*\[.*|.*_(sync|meta)_q\d*);waive_ifs_with_conditions:!rst_ni,!rst_src_ni,!rst_dst_ni,flush_i,!rst_ni || flush_i,flush_i || !rst_ni
 enum-name-style=style_regex:[a-z_0-9]+(_e|_t)
 interface-name-style=style_regex:[a-z_0-9]+(_if)
 struct-union-name-style

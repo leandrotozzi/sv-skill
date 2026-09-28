@@ -645,7 +645,7 @@ input logic rst_in,  // same signal, different spelling
 
 ### NAM-004 (MUST) — Flop pairs are `_q` and `_d`
 
-A registered signal is named `<name>_q` and the value driving its input `<name>_d`; the two are declared together.
+A registered signal is named `<name>_q`, and combinational logic driving its input is named `<name>_d`; the two are declared together. Three loads need no `_d`: an input register from its port (`data_q <= data_i`), a numbered pipeline stage from the previous one (`data_q2 <= data_q`), and a synchroniser chain, whose flops are named `*_meta_q` / `*_sync_q`.
 
 **Why:** The pair makes a register visible as a register at every use, so reading a value one cycle late -- the most common RTL mistake -- becomes a spelling difference the reader can see rather than a timing property they have to reconstruct.
 

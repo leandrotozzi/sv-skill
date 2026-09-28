@@ -13,12 +13,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+EVALS = Path(__file__).parent
+CHECKS = {
+    e["id"]: e.get("checks", []) for e in json.loads((EVALS / "evals.json").read_text())["evals"]
+}
+
 
 def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
 
 
-def grade(out: Path) -> list[dict]:
+def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
     # Packages first: Yosys and Verilator need them before their users.
     # Testbenches some runs leave behind are not RTL; grade the design only.
     rtl = [p.name for p in out.glob("*.sv") if not re.search(r"(^tb_|_tb\.sv$)", p.name)]
@@ -32,7 +37,7 @@ def grade(out: Path) -> list[dict]:
     if not files:
         return exp
 
-    res = run(["svstyle", "check", "--json", *files], out)
+    res = run(["svstyle", "check", "--json", "--synth", *files], out)
     try:
         doc = json.loads(res.stdout)
     except json.JSONDecodeError:
@@ -73,7 +78,45 @@ def grade(out: Path) -> list[dict]:
     ys = run(["yosys", "-q", "-p", f"read_verilog -sv {' '.join(files)}; synth -auto-top"], out)
     check("Yosys reads and synthesizes the design", ys.returncode == 0,
           (ys.stderr or ys.stdout).strip()[-400:] or "ok")  # fmt: skip
+
+    # Per-eval checks from evals.json: what this prompt specifically asked for.
+    rtl_text = "\n".join((out / f).read_text() for f in files)
+    for c in checks:
+        if "present" in c:
+            m = re.search(c["present"], rtl_text)
+            check(c["text"], m, f"found {m.group(0)!r}" if m else f"no match for {c['present']}")
+        elif "yosys_memory" in c:
+            read = f"read_verilog -sv {' '.join(files)}"
+            script = f"{read}; hierarchy -auto-top; proc; memory -nomap; stat"
+            st = run(["yosys", "-p", script], out)  # not -q: that silences `stat`
+            # A memory cell in the `stat` table. `$mem2reg_*` in the log means the
+            # array was turned into flops, which is what this check exists to catch.
+            cells = re.findall(r"^\s+\d*\s*\$mem(?:_v2)?\b.*$", st.stdout, re.MULTILINE)
+            flops = "mem2reg" in st.stdout
+            why = "array turned into flops (mem2reg)" if flops else "; ".join(cells)
+            check(c["text"], cells and not flops, why or "no $mem cell")
+        elif "equiv_tb" in c:
+            check(c["text"], *equiv(out, files, c["equiv_tb"]))
     return exp
+
+
+def equiv(out: Path, files: list[str], spec: dict) -> tuple[bool, str]:
+    """Simulate the original (renamed <module>_ref) against the output with a shared testbench."""
+    work = out.parent / "equiv"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir()
+    ref = (EVALS / spec["ref"]).read_text()
+    (work / "ref.v").write_text(
+        re.sub(rf"\bmodule\s+{spec['module']}\b", f"module {spec['module']}_ref", ref)
+    )
+    tb = EVALS / spec["tb"]
+    sources = [str(work / "ref.v"), *(str(out / f) for f in files), str(tb)]
+    flags = ["--binary", "--timing", "-Wno-lint", "-Wno-style", "-Mdir", str(work / "obj")]
+    build = run(["verilator", *flags, "--top-module", tb.stem, *sources], work)
+    if build.returncode:
+        return False, "testbench does not build: " + build.stderr.strip()[-400:]
+    sim = run([str(work / "obj" / f"V{tb.stem}")], work)
+    return "EQUIV PASS" in sim.stdout, sim.stdout.strip()[-300:]
 
 
 def main(iteration: Path) -> None:
@@ -83,8 +126,10 @@ def main(iteration: Path) -> None:
         if (cfg / "outputs").is_dir():
             (cfg / "run-1").mkdir(exist_ok=True)
             shutil.move(cfg / "outputs", cfg / "run-1" / "outputs")
+        m = re.match(r"eval-(\d+)", cfg.parent.name)
+        checks = CHECKS.get(int(m.group(1)), []) if m else []
         for run_dir in sorted(cfg.glob("run-*")):
-            exp = grade(run_dir / "outputs")
+            exp = grade(run_dir / "outputs", checks)
             passed = sum(e["passed"] for e in exp)
             (run_dir / "grading.json").write_text(json.dumps({
                 "expectations": exp,

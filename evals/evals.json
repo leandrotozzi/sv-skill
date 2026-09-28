@@ -24,6 +24,74 @@
       "prompt": "Can you code a round-robin arbiter in SystemVerilog? N requesters as a parameter (default 4), one-hot grant, the grant is registered and lasts one cycle, and priority rotates past the last winner.",
       "expected_output": "rr_arbiter-like module, parameterised N with check, one-hot registered grant, rotating priority; passes svstyle check, Verilator -Wall and Yosys synth.",
       "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Here's an old Verilog UART transmitter, evals/files/uart_tx.v. Bring it up to our SystemVerilog house style as uart_tx.sv, keeping its behaviour identical cycle for cycle. Rename the ports clk->clk_i, rst_n->rst_ni, start->start_i, data->data_i, tx->tx_o, busy->busy_o and the parameter CLKS_PER_BIT->ClksPerBit; everything else is up to you.",
+      "expected_output": "uart_tx.sv: ANSI ports, logic, always_ff, begin/end, commented; passes svstyle check, Verilator -Wall and Yosys; simulates identically to the original.",
+      "files": [
+        "evals/files/uart_tx.v"
+      ],
+      "checks": [
+        {
+          "text": "Simulates cycle-for-cycle identically to the original",
+          "equiv_tb": {
+            "tb": "files/uart_tx_equiv_tb.sv",
+            "ref": "files/uart_tx.v",
+            "module": "uart_tx"
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "This block tapes out next week. Review evals/files/pkt_stats.sv and fix everything that is wrong with it; keep the port list.",
+      "expected_output": "pkt_stats.sv with the latch on err_o removed, the 16-to-8-bit truncation of count_o resolved, and the 4-bit level no longer crossing clock domains bit by bit (Gray code or handshake).",
+      "files": [
+        "evals/files/pkt_stats.sv"
+      ],
+      "checks": [
+        {
+          "text": "The multi-bit level crossing uses Gray code or a handshake (CDC-002)",
+          "present": "(?i)gray|handshake|\\breq\\b|\\back\\b"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Write an asynchronous FIFO in SystemVerilog: parameterised data width and power-of-two depth, separate write and read clocks and resets, full and empty flags. Put it in async_fifo.sv (submodules in their own files if you use any).",
+      "expected_output": "Gray-coded pointers crossed through two-flop synchronisers, full/empty computed from the synchronised Gray pointers, depth check; passes svstyle check --synth, Verilator -Wall and Yosys.",
+      "files": [],
+      "checks": [
+        {
+          "text": "Pointers cross the clock domains in Gray code (CDC-003)",
+          "present": "(?i)gray"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "I need a ready/valid skid buffer in SystemVerilog that sustains full throughput and cuts the combinational path from the downstream ready back to the upstream ready. skid_buffer.sv, parameterised data width.",
+      "expected_output": "Two-entry skid buffer; upstream ready registered; handshake signal names state the protocol (PRT-007); passes svstyle check --synth, Verilator -Wall and Yosys.",
+      "files": [],
+      "checks": [
+        {
+          "text": "Handshake names state the protocol, e.g. _ready_and_o (PRT-007)",
+          "present": "_ready_(and|then)_[io]\\b|_yumi_[io]\\b"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Write a single-port synchronous RAM in SystemVerilog, 256 words of 32 bits with per-byte write enables, written so that FPGA and ASIC synthesis infer a memory rather than a bank of flops. ram_sp.sv.",
+      "expected_output": "Unreset memory array written in always_ff with byte enables, registered read; Yosys infers a memory; passes svstyle check --synth and Verilator -Wall.",
+      "files": [],
+      "checks": [
+        {
+          "text": "Yosys infers a memory, not flops",
+          "yosys_memory": true
+        }
+      ]
     }
   ]
 }

@@ -92,6 +92,12 @@ through today. Each item names the finding and the fix.
 
 ## M8 — Evals
 
-- [ ] **16.** Brownfield evals: migrate a Verilog-2001 file; find a planted
+- [x] **16.** Brownfield evals: migrate a Verilog-2001 file; find a planted
   latch / width / bit-wise-CDC bug; async FIFO with Gray pointers; ready/valid
-  skid buffer (PRT-007); inferred RAM.
+  skid buffer (PRT-007); inferred RAM. Written as evals 5-9 with per-eval
+  checks in `grade.py` (cycle-for-cycle equivalence testbench, Yosys memory
+  inference, regexes), each validated against a passing and a failing
+  sample. Not yet run through skill-creator (with/without skill).
+- [x] **16b. NAM-004 fired on input registers, pipelines and synchronisers**
+  (found building eval 6). `dff-name-style` now accepts `data_q <= data_i`,
+  numbered stages and `*_meta_q`/`*_sync_q` chains.

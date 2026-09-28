@@ -558,7 +558,7 @@ id        = "NAM-004"
 title     = "Flop pairs are `_q` and `_d`"
 severity  = "MUST"
 category  = "NAM"
-statement = "A registered signal is named `<name>_q` and the value driving its input `<name>_d`; the two are declared together."
+statement = "A registered signal is named `<name>_q`, and combinational logic driving its input is named `<name>_d`; the two are declared together. Three loads need no `_d`: an input register from its port (`data_q <= data_i`), a numbered pipeline stage from the previous one (`data_q2 <= data_q`), and a synchroniser chain, whose flops are named `*_meta_q` / `*_sync_q`."
 rationale = "The pair makes a register visible as a register at every use, so reading a value one cycle late -- the most common RTL mistake -- becomes a spelling difference the reader can see rather than a timing property they have to reconstruct."
 good = """
 logic [7:0] count_q, count_d;  // Byte counter

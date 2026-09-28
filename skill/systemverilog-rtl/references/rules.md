@@ -41,7 +41,7 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 - **NAM-001** · MUST · Modules, packages, interfaces, instances, signals, ports, variables, functions, tasks and named blocks are named in `lower_snake_case`.
 - **NAM-002** · MUST · Module inputs end in `_i`, outputs in `_o`, and bidirectionals in `_io`.
 - **NAM-003** · MUST · Multiple suffixes are concatenated without extra underscores, with `_n` first and `_i`/`_o`/`_io` last: `rst_ni`, `data_qi`, `valid_no`.
-- **NAM-004** · MUST · A registered signal is named `<name>_q` and the value driving its input `<name>_d`; the two are declared together.
+- **NAM-004** · MUST · A registered signal is named `<name>_q`, and combinational logic driving its input is named `<name>_d`; the two are declared together. Three loads need no `_d`: an input register from its port (`data_q <= data_i`), a numbered pipeline stage from the previous one (`data_q2 <= data_q`), and a synchroniser chain, whose flops are named `*_meta_q` / `*_sync_q`.
 - **NAM-005** · MUST · Enumeration types are named `lower_snake_case_e`, other typedefs `lower_snake_case_t`, and every enum and struct used as a type is given a typedef name.
 - **NAM-006** · SHOULD · Tunable parameters and the localparams derived from them are named in `UpperCamelCase`; values that are immutable facts rather than tuning knobs are named in `ALL_CAPS`.
 - **NAM-007** · SHOULD · A boolean parameter is named for the condition being true (`EnableLogging`), not negated (`DisableLogging`).
