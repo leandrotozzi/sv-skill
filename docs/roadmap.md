@@ -109,3 +109,16 @@ through today. Each item names the finding and the fix.
   (lowRISC does not carry `_q` to the boundary) and 62 optional registers, a
   `_q` flop in one generate branch tied off with `assign` in the other. Both
   are now accepted; 119 findings remain, nearly all flops without `_q`.
+
+## Spec follow-ups (decided 2026-09-28)
+
+- **Verible upgrade: stays on `v0.0-3946`.** It is the newest this Intel Mac
+  can run: every macOS release asset from 3946 up to 4296 is arm64-only, and
+  the Homebrew tap builds from source pinned at 3946. Going newer means a
+  local Bazel build or validating only in CI; revisit when there is a bug to
+  fix or an arm64/Linux dev machine.
+- **Domain reference files (CDC, handshakes, FSM): not written.** Evals pass
+  their functional checks with and without the skill; add one when an eval
+  fails on design, not style.
+- **Configurable header template: not needed.** `company` in
+  `.svstyle.toml` is the only per-project setting anyone has asked for.
