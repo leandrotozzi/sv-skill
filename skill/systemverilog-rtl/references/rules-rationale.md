@@ -645,7 +645,7 @@ input logic rst_in,  // same signal, different spelling
 
 ### NAM-004 (MUST) — Flop pairs are `_q` and `_d`
 
-A flip-flop is named `<name>_q`. When combinational logic computes its next value, that value is named `<name>_d` and declared next to it; a flop loaded straight from a port, another flop or a memory needs no `_d`.
+A flip-flop is named `<name>_q`. When combinational logic computes its next value, that value is named `<name>_d` and declared next to it; a flop loaded straight from a port, another flop or a memory needs no `_d`. An output port driven straight from a flop keeps its `_o`.
 
 **Why:** The pair makes a register visible as a register at every use, so reading a value one cycle late -- the most common RTL mistake -- becomes a spelling difference the reader can see rather than a timing property they have to reconstruct.
 

@@ -342,3 +342,30 @@ def test_nam004_only_asks_that_flops_are_named_q(tmp_path, stmt, flagged):
     )
     found = [d for d in ext.verible_lint([str(f)], RULES) if d.rule == "NAM-004"]
     assert bool(found) is flagged, found
+
+
+@needs_verible
+@pytest.mark.parametrize(
+    "body,flagged",
+    [
+        # lowRISC: _d/_q need not reach the module boundary.
+        ("always_ff @(posedge clk_i) begin\n x_o <= a_i;\n end", False),
+        # An optional register: a flop in one generate branch, a wire in the other.
+        (
+            "if (Reg) begin : gen_reg\n always_ff @(posedge clk_i) begin\n x_q <= a_i;\n end\n"
+            " end else begin : gen_noreg\n assign x_q = a_i;\n end\n assign x_o = x_q;",
+            False,
+        ),
+        # A _q that is never a flop is still a lie.
+        ("assign x_q = a_i;\n assign x_o = x_q;", True),
+    ],
+)
+def test_nam004_accepts_registered_outputs_and_optional_registers(tmp_path, body, flagged):
+    f = tmp_path / "m.sv"
+    f.write_text(
+        "module m #(\n    parameter bit Reg = 1\n) (\n    input logic clk_i,\n"
+        "    input logic a_i,\n    output logic x_o\n);\n"
+        f"    logic x_q;\n    {body}\nendmodule\n"
+    )
+    found = [d for d in ext.verible_lint([str(f)], RULES) if d.rule == "NAM-004"]
+    assert bool(found) is flagged, found

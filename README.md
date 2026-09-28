@@ -15,7 +15,8 @@ Style lineage: lowRISC (`_i/_o`, `clk_i`, `rst_ni`, `_q/_d`, CamelCase params,
 
 ## Status
 
-Phase 4 done: with the skill 4/4 evals pass every check (100%, vs. 44% without). Design spec:
+All phases and the [roadmap](docs/roadmap.md) done: with the skill 9/9 evals pass every
+check (100%, vs. 52% without). Design spec:
 [`docs/superpowers/specs/2026-09-22-sv-skill-design.md`](docs/superpowers/specs/2026-09-22-sv-skill-design.md).
 
 ## Development

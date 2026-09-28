@@ -145,8 +145,10 @@ FMT-002 without `[fix available]` means Verible cannot format the file at
 all (its layout does not converge); lay that region out by hand.
 
 NAM-004 checks that every flop is named `_q` (indexed memory writes such as
-`mem_q[addr] <= wdata_i` excepted). It does not require a `_d` on the right:
-`data_q <= data_i`, `rdata_q <= mem_q[addr_i]`, pipeline stages and
+`mem_q[addr] <= wdata_i` excepted). An output port registered in place
+(`valid_o <= ...`) keeps its `_o`, and a `_q` that is a flop in one generate
+branch may be tied off with `assign` in the other. It does not require a
+`_d` on the right: `data_q <= data_i`, `rdata_q <= mem_q[addr_i]`, pipeline stages and
 synchroniser chains are fine as written. Name a `_d` only where
 combinational logic really computes the next value; never add one just to
 satisfy a tool.

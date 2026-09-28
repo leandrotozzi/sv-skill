@@ -15,8 +15,9 @@ signal-name-style=style_regex:[a-z_0-9]+
 # Checks the output side only: a flop is named _q, so a register is visible
 # as one at every use. The input side is not checked -- demanding a _d on
 # every load forced filler signals on input registers, pipeline stages, RAM
-# reads and synchroniser chains. Indexed writes are memories.
-dff-name-style=input:;output:q;waive_lhs_regex:(?i)(mem.*|.*\[.*);waive_ifs_with_conditions:!rst_ni,!rst_src_ni,!rst_dst_ni,flush_i,!rst_ni || flush_i,flush_i || !rst_ni
+# reads and synchroniser chains. Indexed writes are memories. A registered
+# output keeps its _o: lowRISC does not carry _q to the module boundary.
+dff-name-style=input:;output:q;waive_lhs_regex:(?i)(mem.*|.*\[.*|.*_o);waive_ifs_with_conditions:!rst_ni,!rst_src_ni,!rst_dst_ni,flush_i,!rst_ni || flush_i,flush_i || !rst_ni
 enum-name-style=style_regex:[a-z_0-9]+(_e|_t)
 interface-name-style=style_regex:[a-z_0-9]+(_if)
 struct-union-name-style

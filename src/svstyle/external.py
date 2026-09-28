@@ -39,6 +39,7 @@ FIXED_BY_FIX = {
     "legacy-generate-region", "explicit-function-lifetime", "explicit-task-lifetime",
     "always-comb",
 }  # fmt: skip
+NOT_NBA_RE = re.compile(r"^(\w+) should be driven by a nonblocking assignment")
 PACKAGE_RE = re.compile(r"^\s*package\s+\w+\s*;", re.MULTILINE)
 # The code is optional: elaboration errors (an undeclared name under
 # `default_nettype none) print as a bare `%Error:`.
@@ -98,7 +99,17 @@ def verible_verify(paths: list[str], rules: list[Rule]) -> list[Diag]:
 
 def verible_lint(paths: list[str], rules: list[Rule]) -> list[Diag]:
     res = _run("verible-verilog-lint", [f"--rules_config={LINT_CONFIG}", *paths])
-    return parse_verible_lint(res.stdout + res.stderr, rules)  # findings go to stderr
+    diags = parse_verible_lint(res.stdout + res.stderr, rules)  # findings go to stderr
+    return [d for d in diags if not _optional_register(d)]
+
+
+def _optional_register(d: Diag) -> bool:
+    """A `_q` tied off in one generate branch and a flop in another is still a flop."""
+    m = NOT_NBA_RE.match(d.message)
+    if d.rule != "NAM-004" or not m:
+        return False
+    text = Path(d.path).read_text()
+    return re.search(rf"^\s*{re.escape(m.group(1))}\s*<=", text, re.MULTILINE) is not None
 
 
 def verilator_lint(

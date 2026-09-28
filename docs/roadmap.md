@@ -104,3 +104,8 @@ through today. Each item names the finding and the fix.
   the output side only -- every flop is `_q` -- and never demands a `_d` on
   the right. Corpus: 373 -> 197 findings on Ibex/prim, zero new ones; evals
   unchanged with the skill (100%).
+- [x] **16c. NAM-004 false positives on the corpus.** Of 197 findings on
+  Ibex/prim, 91 were not violations: 29 output ports registered in place
+  (lowRISC does not carry `_q` to the boundary) and 62 optional registers, a
+  `_q` flop in one generate branch tied off with `assign` in the other. Both
+  are now accepted; 119 findings remain, nearly all flops without `_q`.
