@@ -341,7 +341,9 @@ module hmac_core #(
 """
 sources = ["lowRISC §Packages"]
 [rule.enforcement]
-tool = "review"
+tool    = "svstyle"
+rule    = "import_scope"
+autofix = false
 
 # ===========================================================================
 # PRT -- ports and connections
@@ -377,7 +379,7 @@ id        = "PRT-002"
 title     = "Clocks first, then resets, then the rest"
 severity  = "MUST"
 category  = "PRT"
-statement = "The port list opens with the clock port(s), then all reset inputs, then the remaining ports grouped by interface."
+statement = "The port list opens with a clock, then its resets, then the remaining ports grouped by interface. A module with several clocks repeats the pattern per domain: each clock opens its own group with its resets right after it."
 rationale = "A fixed prefix means the reader checks the clocking and reset scheme of an unfamiliar module by looking at one place, and an instantiation's first two lines are comparable across every module in the tree."
 good = """
 input  logic clk_i,    // System clock
@@ -391,7 +393,9 @@ input  logic rst_ni,   // Asynchronous reset, active-low
 """
 sources = ["lowRISC §Module Declaration"]
 [rule.enforcement]
-tool = "review"
+tool    = "svstyle"
+rule    = "port_order"
+autofix = false
 
 [[rule]]
 id        = "PRT-003"
@@ -544,7 +548,9 @@ good = "input logic rst_ni,  // Asynchronous reset, active-low"
 bad = "input logic rst_in,  // same signal, different spelling"
 sources = ["lowRISC §Suffixes"]
 [rule.enforcement]
-tool = "review"
+tool    = "svstyle"
+rule    = "suffix_order"
+autofix = false
 
 [[rule]]
 id        = "NAM-004"
@@ -789,7 +795,9 @@ good = "logic [7:0] data_q;  // Registered payload"
 bad = "reg [7:0] data_q;"
 sources = ["lowRISC §Use logic for synthesis"]
 [rule.enforcement]
-tool = "review"
+tool    = "svstyle"
+rule    = "logic_only"
+autofix = false
 
 [[rule]]
 id        = "LNG-002"
@@ -1181,7 +1189,9 @@ endcase
 """
 sources = ["Cummings SNUG-1999 §full_case parallel_case"]
 [rule.enforcement]
-tool = "review"
+tool    = "svstyle"
+rule    = "synthesis_directives"
+autofix = false
 
 [[rule]]
 id        = "SYN-002"
@@ -1276,7 +1286,9 @@ always_ff @(posedge clk_i) begin
 """
 sources = ["lowRISC §Resets", "Cummings SNUG-2003 §reset techniques", "OpenTitan/Ibex measurement (94.1% / 83.1%)"]
 [rule.enforcement]
-tool = "review"
+tool    = "svstyle"
+rule    = "reset_style"
+autofix = false
 
 [[rule]]
 id        = "RST-002"

@@ -13,7 +13,9 @@ from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 
-from .parse import Source, parse
+from pyslang.parsing import TokenKind
+
+from .parse import Source, parse, raw_tokens
 from .rules import Diag, Rule, tool_index
 
 # Without a `.svstyle.toml` naming the company, headers carry this placeholder
@@ -68,6 +70,19 @@ TODO_TRAILING = "  // TODO: describe"
 TODO_ABOVE = "// TODO: describe\n"
 HOW = {"ordered": "by position", "wildcard": "with .*", "mixed": "partly by position or .*"}
 
+# ponytail: name heuristics for PRT-002; a clock or reset named otherwise ranks
+# with "the rest" and is not checked. Waive or rename if one misfires.
+CLOCK_RE = re.compile(r"(?:\w+_)?clk(?:_(?!en)\w+)?_i")
+# A scan reset belongs to the DFT interface (with test_en_i), not the functional resets.
+RESET_RE = re.compile(r"(?!scan_)(?:\w+_)?rst(?:_\w+)?_n?i")
+SUFFIX_ORDER_RE = re.compile(r"_(?:i|o|io)n$")
+RESET_NAME_RE = re.compile(r"\b\w*rst\w*\b")
+DIRECTIVE_RE = re.compile(
+    r"(?://|/\*).*\b(?:synopsys|synthesis|pragma|cadence|ambit)\b.*\b(full_case|parallel_case)\b"
+    r"|\(\*[^)]*\b(full_case|parallel_case)\b"
+)
+LEGACY_NETS = {TokenKind.RegKeyword: "reg", TokenKind.WireKeyword: "wire"}
+
 
 def run_checks(
     text: str,
@@ -83,7 +98,33 @@ def run_checks(
     check_default_nettype(ctx, text)
     check_comments(ctx, src)
     check_ports(ctx, src)
-    return sorted(ctx.out, key=lambda d: d.line)
+    check_constructs(ctx, text, src)
+    check_resets(ctx, src)
+    return sorted(apply_waivers(ctx.out, text), key=lambda d: d.line)
+
+
+# `// svstyle: waive LNG-001, DOC-004 <reason>`: on its own line it covers the
+# next line, trailing it covers its own. The reason is required (DOC-009); a
+# bare waiver is not recognised, so the finding stays.
+WAIVER_RE = re.compile(
+    r"//\s*svstyle:\s*waive\s+"
+    r"(?P<ids>(?:[A-Z]{3}-\d{3}|EXT-[\w-]+)(?:\s*,\s*(?:[A-Z]{3}-\d{3}|EXT-[\w-]+))*)"
+    r"\s+\S"
+)
+
+
+def waivers(text: str) -> dict[int, set[str]]:
+    out: dict[int, set[str]] = {}
+    for no, ln in enumerate(text.splitlines(), 1):
+        if m := WAIVER_RE.search(ln):
+            target = no + 1 if ln.lstrip().startswith("//") else no
+            out.setdefault(target, set()).update(re.split(r"\s*,\s*", m.group("ids")))
+    return out
+
+
+def apply_waivers(diags: list[Diag], text: str) -> list[Diag]:
+    waived = waivers(text)
+    return [d for d in diags if d.rule not in waived.get(d.line, ())]
 
 
 class _Ctx:
@@ -175,6 +216,12 @@ def check_comments(ctx: _Ctx, src: Source) -> None:
 def check_ports(ctx: _Ctx, src: Source) -> None:
     for name, line in src.non_ansi:
         ctx.emit(rule="ansi_ports", line=line, message=f"module `{name}` uses non-ANSI ports")
+    for ports in src.port_lists:
+        check_port_order(ctx, ports)
+        for name, line in ports:
+            if SUFFIX_ORDER_RE.search(name):
+                msg = f"`{name}`: the direction suffix goes last (`_ni`, not `_in`)"
+                ctx.emit(rule="suffix_order", line=line, message=msg)
     for a in src.anchors:
         if a.kind == "port" and (", " in a.name or a.detail == "continued"):
             msg = f"one port per declaration, each with its own direction and type: {a.name}"
@@ -184,3 +231,53 @@ def check_ports(ctx: _Ctx, src: Source) -> None:
                 rule="named_ports", line=a.line,
                 message=f"instance `{a.name}` connects ports {HOW[a.detail]}, not by name",
             )  # fmt: skip
+
+
+def check_port_order(ctx: _Ctx, ports: list[tuple[str, int]]) -> None:
+    """Each clock opens a domain group -- its clock, its resets, then the rest --
+    so a CDC module reads clk_wr_i, rst_wr_ni, ..., clk_rd_i, rst_rd_ni, ...
+    The list opens with a clock; a reset never follows the rest of its group.
+    """
+    if not ports or not any(CLOCK_RE.fullmatch(n) for n, _ in ports):
+        return
+    name, line = ports[0]
+    if not CLOCK_RE.fullmatch(name):
+        msg = f"port list opens with `{name}`; clocks first, then resets, then the rest"
+        ctx.emit(rule="port_order", line=line, message=msg)
+        return
+    rest = False
+    for name, line in ports:
+        if CLOCK_RE.fullmatch(name):
+            rest = False
+        elif not RESET_RE.fullmatch(name):
+            rest = True
+        elif rest:
+            msg = f"reset `{name}` follows other ports; put it right after its clock"
+            ctx.emit(rule="port_order", line=line, message=msg)
+            return
+
+
+def check_constructs(ctx: _Ctx, text: str, src: Source) -> None:
+    for kind, _, offset in raw_tokens(text):
+        if kw := LEGACY_NETS.get(kind):
+            line = text.count("\n", 0, offset) + 1
+            ctx.emit(rule="logic_only", line=line, message=f"`{kw}`: declare `logic` instead")
+    for no, ln in enumerate(text.splitlines(), 1):
+        if m := DIRECTIVE_RE.search(ln):
+            what = m.group(1) or m.group(2)
+            msg = f"`{what}` directive: simulation and synthesis would see different logic"
+            ctx.emit(rule="synthesis_directives", line=no, message=msg)
+    for line in src.file_imports:
+        msg = "file-scope import leaks into every unit; import in the module header"
+        ctx.emit(rule="import_scope", line=line, message=msg)
+
+
+def check_resets(ctx: _Ctx, src: Source) -> None:
+    for line, edges, pred in src.ff_blocks:
+        high = [sig for edge, sig in edges if edge == "posedge" and RESET_NAME_RE.fullmatch(sig)]
+        if high:
+            msg = f"`posedge {high[0]}`: asynchronous resets are active-low (`negedge rst_ni`)"
+            ctx.emit(rule="reset_style", line=line, message=msg)
+        elif len(edges) == 1 and pred and RESET_NAME_RE.search(pred):
+            msg = "synchronous reset; reset asynchronously: `@(posedge clk_i or negedge rst_ni)`"
+            ctx.emit(rule="reset_style", line=line, message=msg)

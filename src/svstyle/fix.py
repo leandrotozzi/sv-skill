@@ -10,12 +10,9 @@ can be lost.
 
 from collections.abc import Sequence
 
-from pyslang import BumpAllocator, Diagnostics, SourceManager
-from pyslang.parsing import Lexer, TokenKind
-
 from .checks import PLACEHOLDER, run_checks
 from .external import verible_format
-from .parse import ParseError, parse
+from .parse import ParseError, parse, raw_tokens
 from .rules import Rule
 
 NETTYPE = "`default_nettype none"
@@ -32,12 +29,7 @@ def token_signature(text: str) -> list[str]:
     Uses the raw lexer, not the preprocessor, so directives and `ifdef`-disabled
     text are part of the signature: a fix that touches them is caught too.
     """
-    sm = SourceManager()
-    lexer = Lexer(sm.assignText("sig.sv", text), BumpAllocator(), Diagnostics(), sm)
-    out = []
-    while (tok := lexer.lex()).kind != TokenKind.EndOfFile:
-        out.append(tok.rawText)
-    return out
+    return [raw for _, raw, _ in raw_tokens(text)]
 
 
 def fix_text(

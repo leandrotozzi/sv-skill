@@ -37,6 +37,15 @@ SNIPPETS = {
     "DOC-002": ("m.sv", "// Copyright (c) 2026 X\n// All rights reserved\n//\n// Description:\n"
                         "//   TODO: describe\n\n" + mod("    assign b_o = a_i;")),
     "DOC-003": ("m.sv", mod("    assign b_o = a_i;")),
+    "STR-005": ("m.sv", "package p_pkg;\nendpackage\nimport p_pkg::*;\n" + mod("    assign b_o = a_i;")),
+    "PRT-002": ("m.sv", mod("    assign b_o = a_i;", ports="    input  logic a_i,\n    input  logic clk_i,\n    output logic b_o")),
+    "NAM-003": ("m.sv", mod("    assign b_o = a_i & rst_in;", ports="    input  logic rst_in,\n    input  logic a_i,\n    output logic b_o")),
+    "LNG-001": ("m.sv", mod("    wire x;\n    assign x = a_i;\n    assign b_o = x;")),
+    "SYN-001": ("m.sv", mod("    always_comb begin\n        b_o = 1'b0;\n        case (a_i)  // synopsys full_case\n"
+                            "            1'b1: b_o = 1'b1;\n            default: b_o = 1'b0;\n        endcase\n    end")),
+    "RST-001": ("m.sv", mod("    logic x_q;\n    always_ff @(posedge clk_i) begin\n        if (rst_ni) begin\n"
+                            "            x_q <= 1'b0;\n        end else begin\n            x_q <= a_i;\n        end\n"
+                            "    end\n    assign b_o = x_q;")),
     "DOC-004": ("m.sv", mod("    logic x;\n    assign x = a_i;\n    assign b_o = x;")),
     "DOC-005": ("m.sv", mod("    always_comb begin\n        b_o = a_i;\n    end")),
     "DOC-006": ("m.sv", mod("    sub u_sub (\n        .a_i(a_i),\n        .b_o(b_o)\n    );", tail=SUB)),

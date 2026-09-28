@@ -29,7 +29,7 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 ## PRT — Ports and connections
 
 - **PRT-001** · MUST · Module ports use the Verilog-2001 combined port-and-direction style, one port per line, with the closing `);` on its own line.
-- **PRT-002** · MUST · The port list opens with the clock port(s), then all reset inputs, then the remaining ports grouped by interface.
+- **PRT-002** · MUST · The port list opens with a clock, then its resets, then the remaining ports grouped by interface. A module with several clocks repeats the pattern per domain: each clock opens its own group with its resets right after it.
 - **PRT-003** · MUST · Every instantiation connects ports by name. Positional connection and `.*` are not used in synthesizable RTL.
 - **PRT-004** · MUST · Every declared port appears in every instantiation, in declaration order; unused outputs are written as explicit no-connects and unused inputs are tied off explicitly.
 - **PRT-005** · MUST · Instance parameters are specified by name in the `#(...)` list. `defparam` is not used.

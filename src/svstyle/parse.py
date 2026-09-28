@@ -9,11 +9,12 @@ Everything is line-based because `fix` runs Verible first, which puts each
 declaration, block and instance on its own line.
 """
 
+import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from pyslang import Bag, DiagnosticEngine, Diags, SourceManager
-from pyslang.parsing import PreprocessorOptions, TokenKind, TriviaKind
+from pyslang import Bag, BumpAllocator, DiagnosticEngine, Diagnostics, Diags, SourceManager
+from pyslang.parsing import Lexer, PreprocessorOptions, TokenKind, TriviaKind
 from pyslang.syntax import SyntaxKind, SyntaxNode, SyntaxTree
 
 K = SyntaxKind
@@ -55,6 +56,28 @@ class Source:
     text: str
     anchors: list[Anchor]
     non_ansi: list[tuple[str, int]]  # (module name, line) of non-ANSI port lists
+    port_lists: list[list[tuple[str, int]]] = field(default_factory=list)  # (name, line) per module
+    file_imports: list[int] = field(default_factory=list)  # lines of file-scope `import`
+    # always_ff: (line, [(edge, signal)], first `if` predicate or None)
+    ff_blocks: list[tuple[int, list[tuple[str, str]], str | None]] = field(default_factory=list)
+
+
+EDGE_RE = re.compile(r"\b(posedge|negedge)\s+(\w+)")
+
+
+def raw_tokens(text: str) -> list[tuple[TokenKind, str, int]]:
+    """(kind, text, offset) of every token of `text`, from the raw lexer.
+
+    No preprocessing: directives and `ifdef`-disabled text are tokens too. Plain
+    tuples, because a pyslang Token dies with the allocator that lexed it.
+    """
+    sm = SourceManager()
+    alloc = BumpAllocator()
+    lexer = Lexer(sm.assignText("raw.sv", text), alloc, Diagnostics(), sm)
+    out = []
+    while (tok := lexer.lex()).kind != TokenKind.EndOfFile:
+        out.append((tok.kind, tok.rawText, tok.location.offset))
+    return out
 
 
 def parse(text: str, name: str = "source.sv", include_dirs: Sequence[str] = ()) -> Source:
@@ -102,10 +125,38 @@ class _Walker:
         self.last_on_line = {self.line(t): i for i, t in enumerate(self.toks)}
         self.anchors: list[Anchor] = []
         self.non_ansi: list[tuple[str, int]] = []
+        self.src = Source(text, self.anchors, self.non_ansi)
 
     def run(self) -> Source:
         self.walk(self.root, split_list=False)
-        return Source(self.text, self.anchors, self.non_ansi)
+        # A file with one design unit parses to that unit as the root; only a
+        # CompilationUnit's members are at file scope.
+        if self.root.kind == K.CompilationUnit:
+            self.src.file_imports = [
+                self.line(m.getFirstToken())
+                for m in self.root.members
+                if m.kind == K.PackageImportDeclaration and self.is_main(m.getFirstToken())
+            ]
+        return self.src
+
+    def record_ports(self, ports: SyntaxNode) -> None:
+        names = []
+        for p in ports.ports:
+            if isinstance(p, SyntaxNode) and p.kind in PORTS:
+                tok = (p.declarator if p.kind == K.ImplicitAnsiPort else p).name
+                names.append((tok.valueText, self.line(tok)))
+        self.src.port_lists.append(names)
+
+    def record_ff(self, node: SyntaxNode) -> None:
+        stmt = node.statement
+        if stmt.kind != K.TimingControlStatement:
+            return
+        edges = EDGE_RE.findall(str(stmt.timingControl))
+        body = stmt.statement
+        if body.kind == K.SequentialBlockStatement and len(body.items):
+            body = body.items[0]
+        pred = str(body.predicate) if body.kind == K.ConditionalStatement else None
+        self.src.ff_blocks.append((self.line(node.getFirstToken()), edges, pred))
 
     def is_main(self, tok) -> bool:
         return self.sm.getFullyExpandedLoc(tok.location).buffer == self.main
@@ -128,6 +179,8 @@ class _Walker:
             ports = node.header.ports
             if ports.kind == K.NonAnsiPortList:
                 self.non_ansi.append((node.header.name.valueText, self.line(ports.getFirstToken())))
+            elif ports.kind == K.AnsiPortList and self.is_main(node.getFirstToken()):
+                self.record_ports(ports)
         if k in (K.AnsiPortList, K.ParameterPortList):
             # A directive inside the list means lines appear and vanish per
             # configuration; inserting comments there is not safe.
@@ -145,6 +198,8 @@ class _Walker:
             return
         if k in BLOCKS:
             self.above(node, "block", node.getFirstToken().rawText)
+            if k == K.AlwaysFFBlock:
+                self.record_ff(node)
             return
         if k == K.HierarchyInstantiation:
             names = ", ".join(i.decl.name.valueText for i in node.instances if i.decl)

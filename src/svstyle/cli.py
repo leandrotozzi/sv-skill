@@ -14,7 +14,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import __version__, docgen, external
-from .checks import PLACEHOLDER, ConfigError, load_config, run_checks
+from .checks import PLACEHOLDER, ConfigError, apply_waivers, load_config, run_checks
 from .fix import InvariantError, fix_text
 from .parse import ParseError
 from .rules import RULES_TOML, RulesError, by_category, load_rules, tool_index
@@ -204,7 +204,7 @@ def _report(args, diags: list, errors: list[str], code: int, extra: dict | None 
 
 
 def _cmd_check(args, rules: list) -> int:
-    diags, errors, code, parsed = [], [], 0, []
+    diags, errors, code, texts = [], [], 0, {}
     for path in map(str, args.files):
         text = _read(path, errors)
         if text is None:
@@ -213,13 +213,14 @@ def _cmd_check(args, rules: list) -> int:
         try:
             company = load_config(path).get("company", PLACEHOLDER)
             diags += run_checks(text, path, rules, args.include, company)
-            parsed.append(path)
+            texts[path] = text
         except ConfigError as exc:
             errors.append(str(exc))
             code = max(code, 2)
         except ParseError as exc:
             errors.append(str(exc))
             code = max(code, 3)
+    parsed = list(texts)
     if parsed and not args.no_external:
         _warn_verible_drift()
         tools = (
@@ -229,10 +230,20 @@ def _cmd_check(args, rules: list) -> int:
         )
         for tool in tools:
             try:
-                diags += tool()
+                resolved = {str(Path(p).resolve()): t for p, t in texts.items()}
+                for path, found in _by_path(tool()).items():
+                    text = resolved.get(str(Path(path).resolve()))
+                    diags += found if text is None else apply_waivers(found, text)
             except external.ToolMissing as exc:
                 print(f"warning: {exc}; its rules were not checked", file=sys.stderr)
     return _report(args, diags, errors, code)
+
+
+def _by_path(diags: list) -> dict[str, list]:
+    out: dict[str, list] = {}
+    for d in diags:
+        out.setdefault(d.path, []).append(d)
+    return out
 
 
 def _cmd_fix(args, rules: list) -> int:

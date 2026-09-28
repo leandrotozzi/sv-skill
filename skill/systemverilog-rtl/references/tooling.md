@@ -89,11 +89,11 @@ the author after the fix.
 
 | Owner | Rules | Notes |
 |---|---|---|
-| `svstyle` | DOC-001..006, PRT-001, PRT-003, LNG-014 | header, comments, ANSI ports, named connections, `default_nettype` |
+| `svstyle` | DOC-001..006, PRT-001..003, NAM-003, STR-005, LNG-001, LNG-014, SYN-001, RST-001 | header, comments, ANSI ports, port order, named connections, suffix order, import scope, `logic`, `default_nettype`, no synthesis directives, async active-low reset |
 | Verible format | FMT-002 | reported as "file needs formatting"; `svstyle fix` resolves it |
 | Verible lint | naming, `always_comb`/`always_ff` usage, `begin`/`end`, file names, literals, ... | tool rule name maps to the house ID |
 | Verilator `-Wall` | LNG-004..006, LNG-009, LNG-015..017, PRT-004, RST-005 | latches, multi-driven, mixed assignments, `casex`, widths, undriven/unused signals, missing pins; also backs up STR-001, PRT-005, LNG-003, LNG-007, LNG-013, LNG-014, SYN-002 |
-| review | 36 rules | `svstyle rules --unmapped`; walk them yourself |
+| review | 30 rules | `svstyle rules --unmapped`; walk them yourself |
 
 Tool findings with no house rule pass through as `EXT-VL-<rule>` (Verible)
 or `EXT-VLTR-<CODE>` (Verilator) at SHOULD. The common ones:
@@ -120,7 +120,19 @@ do not copy a whole array through `always_comb` to satisfy the rule.
 
 ## Waivers (DOC-009)
 
-A deliberate departure carries a comment saying why, and the tool's pragma:
+`svstyle` waives any finding -- its own, Verible's or Verilator's -- with one
+comment that names the rule and says why. On its own line it covers the next
+line; trailing a line it covers that line. Without a reason it is ignored.
+
+```systemverilog
+// svstyle: waive RST-001 DSP blocks need a synchronous reset
+always_ff @(posedge clk_i) begin
+    ...
+wire pad_io;  // svstyle: waive LNG-001 bidirectional pad
+```
+
+The tools' own pragmas also work, and are what a reader outside this flow
+recognises:
 
 ```systemverilog
 module phy_if #(

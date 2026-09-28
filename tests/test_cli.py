@@ -104,6 +104,26 @@ def test_check_runs_external_tools(capsys):
     assert code == 1 and {"NAM-002", "FMT-002", "DOC-003"} <= rules
 
 
+@needs_verible
+def test_waiver_covers_external_tool_findings(capsys, sv):
+    text = CLEAN.replace(
+        "    logic [Width-1:0] q_q;  // First-stage register",
+        "    // svstyle: waive NAM-001 name fixed by the vendor netlist\n"
+        "    logic [Width-1:0] q_q, vendorQ;  // First-stage register",
+    )
+    rules = {
+        d["rule"] for d in json.loads(_run(capsys, "check", "--json", sv(text))[1])["diagnostics"]
+    }
+    assert "NAM-001" not in rules
+    rules = {
+        d["rule"]
+        for d in json.loads(
+            _run(capsys, "check", "--json", sv(text.replace("waive NAM-001", "x")))[1]
+        )["diagnostics"]
+    }
+    assert "NAM-001" in rules  # the same file without the waiver does report it
+
+
 # --- fix ------------------------------------------------------------------------
 
 

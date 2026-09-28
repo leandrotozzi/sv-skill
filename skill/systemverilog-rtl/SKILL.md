@@ -81,34 +81,36 @@ waivers, read `references/tooling.md`.
 About half the rules need judgement. Before calling the RTL done, walk this
 list against the code you wrote:
 
-- **Reset** (RST-001..004): async active-low `rst_ni`, reset test first;
-  reset control (state, counters, valids), leave datapath unreset; a reset
-  entering a clock domain goes through a reset synchroniser.
+- **Reset** (RST-002..004): reset control (state, counters, valids), leave
+  datapath unreset; a reset entering a clock domain goes through a reset
+  synchroniser, one per domain.
 - **Clock-domain crossings** (CDC-001..006): two flops for a single bit,
   registered in the source domain first; never a synchroniser per bit of a
   bus -- use a handshake, Gray code or an async FIFO; crossings live in a
   module whose only job is the crossing.
 - **FSMs** (FSM-001..004): `typedef enum` state, one FSM per module, no
   combinational outputs across the module boundary.
-- **Ports and instances** (PRT-002, PRT-006, PRT-007): clocks, then
-  resets, then the rest grouped by interface; packed structs rather than
-  interfaces as ports; ready/valid naming that says which protocol it is.
-- **Case statements** (SYN-001..003): `unique case` + `default`;
-  no `full_case`/`parallel_case`; priority as `if`/`else if`.
+- **Ports** (PRT-006, PRT-007): the rest of the port list grouped by
+  interface; packed structs rather than interfaces as ports; ready/valid
+  naming that says which protocol it is.
+- **Case statements** (SYN-002, SYN-003): `unique case` + `default`;
+  priority as `if`/`else if`.
 - **Parameters** (GEN-003): a parameter with restricted values gets an
   elaboration-time check, as the templates show.
 - **Assertions** (VER-001/002): `` `ASSERT_KNOWN`` on every output, plus
   `` `ASSERT`` for the protocol rules the design relies on. If the project
   has no assertion macros of its own, copy `assets/assert_macros.svh` next
   to the RTL; it compiles to nothing under synthesis.
-- **Naming** (NAM-003, NAM-009, NAM-010): suffix order `_n` first and
-  `_i`/`_o` last (`rst_ni`); whole-word names; no SV keywords.
-- **Structure** (STR-003..005, LNG-001): declarations next to the logic that
-  drives them, `logic` rather than `wire`, package imports in the module
-  header. If the flow includes Yosys, reference package items as
-  `pkg::Name` instead: open-source Yosys cannot parse an import in the header.
+- **Naming** (NAM-009): whole-word names; a signal outside the default
+  clock domain carries its domain's prefix.
+- **Structure** (STR-003, STR-004): declarations next to the logic that
+  drives them; no package import cycles. If the flow includes Yosys,
+  reference package items as `pkg::Name` rather than importing in the
+  header: open-source Yosys cannot parse an import there.
 - **Departures** (DOC-009): if the design genuinely needs to break a rule,
-  say why in a comment and add the tool's waiver pragma.
+  waive it where it happens with the reason in the same comment:
+  `// svstyle: waive RST-001 DSP blocks need a synchronous reset` on the
+  line above (or trailing the line). A waiver without a reason is ignored.
 
 ## Done means
 

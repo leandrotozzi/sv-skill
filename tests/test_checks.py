@@ -200,3 +200,171 @@ def test_config_rejects_unknown_keys(tmp_path):
     (tmp_path / ".svstyle.toml").write_text('compnay = "typo"\n')
     with pytest.raises(ConfigError, match="compnay"):
         load_config(tmp_path / "m.sv")
+
+
+# --- M4: review rules made mechanical ---------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "old,new,rid,line",
+    [
+        ("    logic [Width-1:0] q_q;", "    reg [Width-1:0] q_q;", "LNG-001", 18),
+        ("    logic [Width-1:0] q_q;", "    wire [Width-1:0] q_q;", "LNG-001", 18),
+        (
+            "    input  logic             rst_ni,",
+            "    input  wire              rst_ni,",
+            "LNG-001",
+            14,
+        ),
+        ("if (!rst_ni) begin", "if (!rst_ni) begin  // synopsys full_case", "SYN-001", 22),
+        ("module reg_byte #(", "(* parallel_case *)\nmodule reg_byte #(", "SYN-001", 10),
+    ],
+    ids=["reg", "wire", "wire-port", "full_case", "parallel_case-attr"],
+)
+def test_forbidden_constructs(old, new, rid, line):
+    assert (rid, line) in _found(_edit(old, new))
+
+
+def test_full_case_mentioned_in_prose_is_not_a_directive():
+    text = _edit("// Capture the payload.", "// Capture the payload; no full_case needed.")
+    assert "SYN-001" not in {d.rule for d in _check(text)}
+
+
+def test_reg_inside_a_comment_or_string_is_ignored():
+    text = _edit("// Capture the payload.", "// Capture the payload into a reg or wire.")
+    assert "LNG-001" not in {d.rule for d in _check(text)}
+
+
+def test_clock_and_reset_come_first():
+    text = _edit(
+        "    input  logic             clk_i,   // System clock\n"
+        "    input  logic             rst_ni,  // Asynchronous reset, active-low\n"
+        "    input  logic [Width-1:0] d_i,     // Payload in\n",
+        "    input  logic [Width-1:0] d_i,     // Payload in\n"
+        "    input  logic             clk_i,   // System clock\n"
+        "    input  logic             rst_ni,  // Asynchronous reset, active-low\n",
+    )
+    assert _found(text) == [("PRT-002", 13)]
+
+
+def test_reset_before_clock_is_out_of_order():
+    text = _edit(
+        "    input  logic             clk_i,   // System clock\n"
+        "    input  logic             rst_ni,  // Asynchronous reset, active-low\n",
+        "    input  logic             rst_ni,  // Asynchronous reset, active-low\n"
+        "    input  logic             clk_i,   // System clock\n",
+    )
+    assert _found(text) == [("PRT-002", 13)]
+
+
+def test_each_clock_opens_its_own_domain_group():
+    """lowRISC CDC style: clk_wr_i, rst_wr_ni, write side, clk_rd_i, rst_rd_ni, read side."""
+    text = _edit(
+        "    output logic [Width-1:0] q_o      // Payload, two cycles later\n",
+        "    output logic [Width-1:0] q_o,     // Payload, two cycles later\n"
+        "    input  logic             clk_rd_i,   // Read clock\n"
+        "    input  logic             rst_rd_ni,  // Read reset\n"
+        "    output logic             empty_o     // Read side\n",
+    )
+    assert "PRT-002" not in {d.rule for d in _check(text)}
+
+
+def test_a_reset_after_the_rest_of_its_group_is_out_of_order():
+    text = _edit(
+        "    output logic [Width-1:0] q_o      // Payload, two cycles later\n",
+        "    output logic [Width-1:0] q_o,     // Payload, two cycles later\n"
+        "    input  logic             rst_sw_ni   // Software reset\n",
+    )
+    assert ("PRT-002", 17) in _found(text)
+
+
+def test_active_low_suffix_order():
+    text = _edit("rst_ni,  // Asynchronous", "rst_in,  // Asynchronous")
+    assert ("NAM-003", 14) in _found(text)
+
+
+def test_file_scope_import():
+    text = _edit("module reg_byte #(", "import foo_pkg::*;\n\nmodule reg_byte #(")
+    assert ("STR-005", 10) in _found(text)
+
+
+def test_import_in_the_module_header_is_fine():
+    text = _edit("module reg_byte #(", "module reg_byte\n    import foo_pkg::*;\n#(")
+    assert "STR-005" not in {d.rule for d in _check(text)}
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("@(posedge clk_i or negedge rst_ni)", "@(posedge clk_i or posedge rst_i)"),
+        ("@(posedge clk_i or negedge rst_ni)", "@(posedge clk_i)"),
+    ],
+    ids=["active-high-async", "synchronous"],
+)
+def test_reset_style(old, new):
+    text = _edit(old, new)
+    text = text.replace("if (!rst_ni)", "if (!rst_ni)" if "negedge" in new else "if (rst_i)")
+    text = text.replace("rst_ni,  // Asynchronous", "rst_i,   // Asynchronous")
+    assert ("RST-001", 21) in _found(text)
+
+
+def test_unreset_datapath_flop_is_not_a_reset_style_finding():
+    text = _edit(
+        "    // Second stage",
+        "    // Datapath copy, deliberately not reset.\n"
+        "    always_ff @(posedge clk_i) begin\n        q_q2 <= q_q;\n    end\n\n"
+        "    // Second stage",
+    )
+    assert "RST-001" not in {d.rule for d in _check(text)}
+
+
+# --- DOC-009: inline waivers --------------------------------------------------------
+
+
+def test_waiver_on_the_line_above_silences_one_rule():
+    text = _edit(
+        "    logic [Width-1:0] q_q;",
+        "    // svstyle: waive LNG-001 -- vendor macro expects a net\n    wire [Width-1:0] q_q;",
+    )
+    assert "LNG-001" not in {d.rule for d in _check(text)}
+
+
+def test_trailing_waiver_silences_that_line_only():
+    text = _edit(
+        "    logic [Width-1:0] q_q;  // First-stage register",
+        "    wire [Width-1:0] q_q;  // svstyle: waive LNG-001 tri-state pad\n"
+        "    wire [Width-1:0] r_q;  // Not waived",
+    )
+    assert [f for f in _found(text) if f[0] == "LNG-001"] == [("LNG-001", 19)]
+
+
+def test_waiver_without_a_reason_does_not_count():
+    text = _edit(
+        "    logic [Width-1:0] q_q;", "    // svstyle: waive LNG-001\n    wire [Width-1:0] q_q;"
+    )
+    assert "LNG-001" in {d.rule for d in _check(text)}
+
+
+def test_waived_finding_is_not_autofixed():
+    text = _edit("  // First-stage register", "")
+    text = _edit(
+        "    logic [Width-1:0] q_q;",
+        "    // svstyle: waive DOC-004 obvious\n    logic [Width-1:0] q_q;",
+        text,
+    )
+    assert "DOC-004" not in {d.rule for d in _check(text)}
+
+
+def test_import_in_the_body_of_a_lone_unit_is_not_file_scope():
+    """pyslang makes a file's only design unit the root: its members are not the file's."""
+    text = _edit("    logic [Width-1:0] q_q;", "    import foo_pkg::*;\n    logic [Width-1:0] q_q;")
+    assert "STR-005" not in {d.rule for d in _check(text)}
+
+
+def test_scan_reset_groups_with_the_test_interface():
+    text = _edit(
+        "    output logic [Width-1:0] q_o      // Payload, two cycles later\n",
+        "    output logic [Width-1:0] q_o,     // Payload, two cycles later\n"
+        "    input  logic             scan_rst_ni  // DFT scan reset\n",
+    )
+    assert "PRT-002" not in {d.rule for d in _check(text)}

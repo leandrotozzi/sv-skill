@@ -391,7 +391,7 @@ import hmac_pkg::*;
 module hmac_core #(
 ```
 
-**Enforced by:** review only
+**Enforced by:** svstyle `import_scope`
 
 **Sources:** lowRISC §Packages
 
@@ -428,7 +428,7 @@ module fifo_sync (clk, rst_n);
 
 ### PRT-002 (MUST) — Clocks first, then resets, then the rest
 
-The port list opens with the clock port(s), then all reset inputs, then the remaining ports grouped by interface.
+The port list opens with a clock, then its resets, then the remaining ports grouped by interface. A module with several clocks repeats the pattern per domain: each clock opens its own group with its resets right after it.
 
 **Why:** A fixed prefix means the reader checks the clocking and reset scheme of an unfamiliar module by looking at one place, and an instantiation's first two lines are comparable across every module in the tree.
 
@@ -448,7 +448,7 @@ input  logic clk_i,    // System clock
 input  logic rst_ni,   // Asynchronous reset, active-low
 ```
 
-**Enforced by:** review only
+**Enforced by:** svstyle `port_order`
 
 **Sources:** lowRISC §Module Declaration
 
@@ -639,7 +639,7 @@ input logic rst_ni,  // Asynchronous reset, active-low
 input logic rst_in,  // same signal, different spelling
 ```
 
-**Enforced by:** review only
+**Enforced by:** svstyle `suffix_order`
 
 **Sources:** lowRISC §Suffixes
 
@@ -955,7 +955,7 @@ logic [7:0] data_q;  // Registered payload
 reg [7:0] data_q;
 ```
 
-**Enforced by:** review only
+**Enforced by:** svstyle `logic_only`
 
 **Sources:** lowRISC §Use logic for synthesis
 
@@ -1409,7 +1409,7 @@ case (sel_i)  // synopsys full_case parallel_case
 endcase
 ```
 
-**Enforced by:** review only
+**Enforced by:** svstyle `synthesis_directives`
 
 **Sources:** Cummings SNUG-1999 §full_case parallel_case
 
@@ -1522,7 +1522,7 @@ always_ff @(posedge clk_i) begin
         count_q <= '0;
 ```
 
-**Enforced by:** review only
+**Enforced by:** svstyle `reset_style`
 
 **Sources:** lowRISC §Resets, Cummings SNUG-2003 §reset techniques, OpenTitan/Ibex measurement (94.1% / 83.1%)
 

@@ -47,10 +47,12 @@ through today. Each item names the finding and the fix.
 
 ## M4 — Mechanise cheap `review` rules (pyslang)
 
-- [ ] **8.** LNG-001 (`reg`/`wire`), LNG-009 (`casex`), SYN-001
+- [x] **8.** LNG-001 (`reg`/`wire`), LNG-009 (`casex`), SYN-001
   (`full_case`/`parallel_case`), PRT-002 (clock then reset first), NAM-003
   (`_in`/`_on`), STR-005 (file-scope import), RST-001 (reset style).
-  PRT-004 comes with M1 via PINMISSING.
+  PRT-004 comes with M1 via PINMISSING, LNG-009 via CASEX. Probed on 194
+  Ibex/prim files: one finding, a deliberate synchronous reset. PRT-002
+  groups ports per clock domain, as lowRISC CDC modules do.
 
 ## M5 — Missing rules for clean synthesis
 
@@ -70,8 +72,9 @@ through today. Each item names the finding and the fix.
 
 - [ ] **11.** Directories and `-f files.f` filelists as inputs.
 - [ ] **12.** `.svstyle.toml`: `select`, `ignore`, `include`.
-- [ ] **13.** Inline waiver for svstyle-owned rules
-  (`// svstyle: waive DOC-004`), as DOC-009 requires.
+- [x] **13.** Inline waiver for svstyle-owned rules
+  (`// svstyle: waive DOC-004 <reason>`), as DOC-009 requires. Covers
+  Verible and Verilator findings too; a waiver without a reason is ignored.
 - [ ] **14.** `fix --diff` exits non-zero when it would change a file.
 - [ ] **15.** Optional `check --synth` (Yosys `hierarchy -check; proc;
   check -assert`).
