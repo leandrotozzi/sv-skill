@@ -126,8 +126,8 @@ def main(iteration: Path) -> None:
         if (cfg / "outputs").is_dir():
             (cfg / "run-1").mkdir(exist_ok=True)
             shutil.move(cfg / "outputs", cfg / "run-1" / "outputs")
-        m = re.match(r"eval-(\d+)", cfg.parent.name)
-        checks = CHECKS.get(int(m.group(1)), []) if m else []
+        meta = cfg.parent / "eval_metadata.json"
+        checks = CHECKS.get(json.loads(meta.read_text())["eval_id"], []) if meta.exists() else []
         for run_dir in sorted(cfg.glob("run-*")):
             exp = grade(run_dir / "outputs", checks)
             passed = sum(e["passed"] for e in exp)
