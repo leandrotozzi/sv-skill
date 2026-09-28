@@ -97,7 +97,10 @@ through today. Each item names the finding and the fix.
   skid buffer (PRT-007); inferred RAM. Written as evals 5-9 with per-eval
   checks in `grade.py` (cycle-for-cycle equivalence testbench, Yosys memory
   inference, regexes), each validated against a passing and a failing
-  sample. Not yet run through skill-creator (with/without skill).
-- [x] **16b. NAM-004 fired on input registers, pipelines and synchronisers**
-  (found building eval 6). `dff-name-style` now accepts `data_q <= data_i`,
-  numbered stages and `*_meta_q`/`*_sync_q` chains.
+  sample. Run 2026-09-28 (iteration 3, Opus): 100% with the skill, 52%
+  without. Functional checks pass in both; the gap is style and tooling.
+- [x] **16b. NAM-004 forced filler `_d` signals** (found building eval 6 and
+  in the eval runs: skid buffer, RAM read, pulse sync). The rule now checks
+  the output side only -- every flop is `_q` -- and never demands a `_d` on
+  the right. Corpus: 373 -> 197 findings on Ibex/prim, zero new ones; evals
+  unchanged with the skill (100%).

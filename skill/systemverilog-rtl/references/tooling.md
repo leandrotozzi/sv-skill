@@ -144,13 +144,12 @@ reported; a port missing from the instance is (PRT-004).
 FMT-002 without `[fix available]` means Verible cannot format the file at
 all (its layout does not converge); lay that region out by hand.
 
-NAM-004 (`_q`/`_d` pairing) does not apply to indexed writes such as
-`mem_q[addr] <= wdata_i`, nor inside a reset branch on `!rst_ni`,
-`!rst_src_ni` or `!rst_dst_ni`. A flop may load straight from its own input
-port (`data_q <= data_i`), from the previous numbered stage
-(`data_q2 <= data_q`), or along a synchroniser chain named `*_meta_q` /
-`*_sync_q`; anything else goes through a `_d`. Write memories directly in `always_ff`;
-do not copy a whole array through `always_comb` to satisfy the rule.
+NAM-004 checks that every flop is named `_q` (indexed memory writes such as
+`mem_q[addr] <= wdata_i` excepted). It does not require a `_d` on the right:
+`data_q <= data_i`, `rdata_q <= mem_q[addr_i]`, pipeline stages and
+synchroniser chains are fine as written. Name a `_d` only where
+combinational logic really computes the next value; never add one just to
+satisfy a tool.
 
 ## Waivers (DOC-009)
 

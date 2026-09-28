@@ -317,21 +317,27 @@ def test_yosys_passes_the_templates():
 @pytest.mark.parametrize(
     "stmt,flagged",
     [
-        ("data_q <= data_i;", False),  # input register, same base name
-        ("data_q2 <= data_q;", False),  # numbered pipeline stage
+        # Every legitimate load: no filler _d signal is ever required.
+        ("data_q <= data_i;", False),  # input register
+        ("skid_data_q <= in_data_i;", False),  # from another port
+        ("data_q2 <= data_q;", False),  # pipeline stage
         ("level_sync_q <= level_meta_q;", False),  # synchroniser chain
-        ("level_meta_q <= level_src_q;", False),
-        ("data_q <= data_d;", False),
-        ("data_q <= a_i & b_i;", True),  # combinational logic belongs in a _d
-        ("data <= a_i;", True),  # a flop is named _q
+        ("rdata_q <= mem_q[addr_i];", False),  # registered RAM read
+        ("data_q <= a_i & b_i;", False),  # small logic inline is fine
+        ("if (!wr_rst_n) begin\n data_q <= '0;\n end else begin\n data_q <= data_d;\n end", False),
+        # What the rule is for: a flop is visibly a flop.
+        ("data <= a_i;", True),
+        ("if (!wr_rst_n) begin\n data <= '0;\n end else begin\n data <= a_i;\n end", True),
     ],
 )
-def test_nam004_allows_input_pipeline_and_sync_registers(tmp_path, stmt, flagged):
+def test_nam004_only_asks_that_flops_are_named_q(tmp_path, stmt, flagged):
     f = tmp_path / "m.sv"
     f.write_text(
-        "module m (\n    input logic clk_i,\n    input logic data_i,\n    input logic a_i,\n"
-        "    input logic b_i\n);\n    logic data_q, data_q2, data_d, data;\n"
-        "    logic level_sync_q, level_meta_q, level_src_q;\n"
+        "module m (\n    input logic clk_i,\n    input logic data_i,\n    input logic in_data_i,\n"
+        "    input logic a_i,\n    input logic b_i,\n    input logic wr_rst_n,\n"
+        "    input logic [1:0] addr_i\n);\n"
+        "    logic data_q, data_q2, data_d, data, skid_data_q, rdata_q;\n"
+        "    logic level_sync_q, level_meta_q;\n    logic mem_q[4];\n"
         f"    always_ff @(posedge clk_i) begin\n        {stmt}\n    end\nendmodule\n"
     )
     found = [d for d in ext.verible_lint([str(f)], RULES) if d.rule == "NAM-004"]
