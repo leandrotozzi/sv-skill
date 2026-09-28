@@ -77,7 +77,8 @@ class Diag:
     severity: str
     message: str
     fixable: bool = False
-    fix: tuple[int, str] | None = None  # (offset, text) to insert; svstyle's own checks only
+    # (offset, text) to insert, or (offset, text, n) to replace n chars; own checks only
+    fix: tuple | None = None
 
 
 def _rule_from_toml(raw: dict, index: int) -> Rule:

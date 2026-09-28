@@ -16,6 +16,20 @@ warns that alignment may drift) and `verilator`. `check` skips a missing tool
 with a warning; `fix` refuses without Verible, because its output would not
 be idempotent.
 
+## Configuration: `.svstyle.toml`
+
+`svstyle` reads the nearest `.svstyle.toml` found walking up from each file,
+so one file at the repository root covers the whole tree:
+
+```toml
+company = "ACME Corp"   # the copyright holder in every file header
+```
+
+With it, `fix` writes new headers with that company and replaces the
+`<Company>` placeholder in existing ones. Without it the placeholder stays and
+DOC-001 reports it as a SHOULD. An unknown key or a wrong type is an error
+(exit 2), so a typo never silently disables the setting.
+
 ## Commands
 
 ```sh

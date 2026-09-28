@@ -37,9 +37,11 @@ is missing -- it is not a comment. So write every comment yourself, as you go:
 
 - **Header** (DOC-001/002): the copyright block from the template, with a
   `Description:` that says what the module does and its non-obvious
-  constraints (latency, power-of-two depth, one-hot inputs). Put the user's
-  company in place of `<Company>` if you know it; otherwise leave the
-  placeholder, which `svstyle` reports as a SHOULD until someone replaces it.
+  constraints (latency, power-of-two depth, one-hot inputs). Keep
+  `<Company>` as written: `svstyle fix` fills it from the nearest
+  `.svstyle.toml`. If there is none and the user tells you the company,
+  create one at the repository root containing `company = "Their Company"`;
+  otherwise the placeholder stays and is reported as a SHOULD.
 - **Trailing comment on every port, parameter and declaration** (DOC-003/004):
   what the signal means, when it is valid, what it is relative to. Not its
   type or direction -- the declaration already says that.

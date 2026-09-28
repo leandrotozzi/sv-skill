@@ -159,3 +159,22 @@ def test_check_and_fix_take_include_dirs(capsys, tmp_path):
     )
     assert _run(capsys, "check", "--no-external", p)[0] == 3
     assert _run(capsys, "check", "--no-external", "-I", inc, p)[0] == 0
+
+
+@needs_verible
+def test_fix_fills_company_from_config(capsys, tmp_path):
+    (tmp_path / ".svstyle.toml").write_text('company = "Foo Inc"\n')
+    p = tmp_path / "reg_byte.sv"
+    p.write_text(CLEAN.replace("ACME Corp", "<Company>"))
+    assert _run(capsys, "fix", p)[0] == 0
+    assert p.read_text() == CLEAN.replace("ACME Corp", "Foo Inc")
+    code, out, _ = _run(capsys, "check", "--no-external", p)
+    assert code == 0 and out.strip().endswith("0 findings")
+
+
+def test_bad_config_exits_2(capsys, tmp_path):
+    (tmp_path / ".svstyle.toml").write_text("company = 3\n")
+    p = tmp_path / "reg_byte.sv"
+    p.write_text(CLEAN)
+    code, _, err = _run(capsys, "check", "--no-external", p)
+    assert code == 2 and ".svstyle.toml" in err

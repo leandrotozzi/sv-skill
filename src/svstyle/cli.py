@@ -14,7 +14,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import __version__, docgen, external
-from .checks import run_checks
+from .checks import PLACEHOLDER, ConfigError, load_config, run_checks
 from .fix import InvariantError, fix_text
 from .parse import ParseError
 from .rules import RULES_TOML, RulesError, by_category, load_rules
@@ -211,8 +211,12 @@ def _cmd_check(args, rules: list) -> int:
             code = max(code, 2)
             continue
         try:
-            diags += run_checks(text, path, rules, args.include)
+            company = load_config(path).get("company", PLACEHOLDER)
+            diags += run_checks(text, path, rules, args.include, company)
             parsed.append(path)
+        except ConfigError as exc:
+            errors.append(str(exc))
+            code = max(code, 2)
         except ParseError as exc:
             errors.append(str(exc))
             code = max(code, 3)
@@ -240,7 +244,12 @@ def _cmd_fix(args, rules: list) -> int:
             code = max(code, 2)
             continue
         try:
-            out = fix_text(text, path, rules, args.include)
+            company = load_config(path).get("company", PLACEHOLDER)
+            out = fix_text(text, path, rules, args.include, company)
+        except ConfigError as exc:
+            errors.append(str(exc))
+            code = max(code, 2)
+            continue
         except external.ToolMissing as exc:
             errors.append(f"{exc}; fix needs it to stay idempotent")
             code = max(code, 2)
@@ -270,7 +279,7 @@ def _cmd_fix(args, rules: list) -> int:
                 )
             else:
                 Path(path).write_text(out, encoding="utf-8")
-        diags += run_checks(out, path, rules, args.include)  # what is left for the author
+        diags += run_checks(out, path, rules, args.include, company)  # left for the author
     if not args.json:
         print(f"{'would fix' if args.diff else 'fixed'} {changed} file(s)")
     return _report(args, diags, errors, code, {"files_changed": changed})

@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from pyslang import BumpAllocator, Diagnostics, SourceManager
 from pyslang.parsing import Lexer, TokenKind
 
-from .checks import run_checks
+from .checks import PLACEHOLDER, run_checks
 from .external import verible_format
 from .parse import ParseError, parse
 from .rules import Rule
@@ -40,19 +40,27 @@ def token_signature(text: str) -> list[str]:
     return out
 
 
-def fix_text(text: str, path: str, rules: list[Rule], include_dirs: Sequence[str] = ()) -> str:
+def fix_text(
+    text: str,
+    path: str,
+    rules: list[Rule],
+    include_dirs: Sequence[str] = (),
+    company: str = PLACEHOLDER,
+) -> str:
     parse(text, path, include_dirs)  # ParseError propagates: refuse before touching anything
     formatted = verible_format(text)
-    fixes = [d.fix for d in run_checks(formatted, path, rules, include_dirs) if d.fix]
+    fixes = [d.fix for d in run_checks(formatted, path, rules, include_dirs, company) if d.fix]
     out = formatted
     # Descending offset; at equal offsets the later fix goes in first, so the
     # earlier one (the header) ends up above it.
-    for _, (off, ins) in sorted(enumerate(fixes), key=lambda f: (f[1][0], f[0]), reverse=True):
-        out = out[:off] + ins + out[off:]
+    for _, (off, ins, *cut) in sorted(
+        enumerate(fixes), key=lambda f: (f[1][0], f[0]), reverse=True
+    ):
+        out = out[:off] + ins + out[off + (cut[0] if cut else 0) :]
     out = verible_format(out)
 
     sig = token_signature(out)
-    inserted = "".join(ins for _, ins in fixes)
+    inserted = "".join(f[1] for f in fixes)
     if NETTYPE in inserted:
         i = sig.index("`default_nettype")
         del sig[i : i + 2]

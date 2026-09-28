@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from svstyle.checks import COMPANY, HEADER, PLACEHOLDER, run_checks
+from svstyle.checks import HEADER, PLACEHOLDER, ConfigError, load_config, run_checks
 from svstyle.rules import load_rules
 
 RULES = load_rules()
@@ -33,7 +33,7 @@ def test_clean_file_has_no_findings():
 def test_missing_header_is_fixable_at_top():
     text = CLEAN[CLEAN.index("`default_nettype") :]
     (d,) = [d for d in _check(text) if d.rule == "DOC-001"]
-    header = HEADER.format(year=date.today().year, company=COMPANY)
+    header = HEADER.format(year=date.today().year, company=PLACEHOLDER)
     assert (d.line, d.severity, d.fix) == (1, "MUST", (0, header))
 
 
@@ -160,3 +160,43 @@ def test_port_continuing_previous_declaration_on_its_own_line():
         "    input  logic [Width-1:0] d_i,     // Payload in\n    e_i,  // Second payload\n",
     )
     assert _found(text) == [("PRT-001", 16)]
+
+
+# --- .svstyle.toml: the company in the header ---------------------------------------
+
+
+def test_missing_header_uses_configured_company():
+    text = CLEAN[CLEAN.index("`default_nettype") :]
+    (d,) = [
+        d for d in run_checks(text, "reg_byte.sv", RULES, company="Foo Inc") if d.rule == "DOC-001"
+    ]
+    assert d.fix[1].startswith(f"// Copyright (c) {date.today().year} Foo Inc\n")
+
+
+def test_placeholder_is_replaced_from_config():
+    text = _edit("ACME Corp", PLACEHOLDER)
+    (d,) = run_checks(text, "reg_byte.sv", RULES, company="Foo Inc")
+    off, new, old_len = d.fix
+    assert (d.rule, d.severity) == ("DOC-001", "SHOULD")
+    assert text[:off] + new + text[off + old_len :] == CLEAN.replace("ACME Corp", "Foo Inc")
+
+
+def test_placeholder_without_config_points_at_the_config_file():
+    (d,) = _check(_edit("ACME Corp", PLACEHOLDER))
+    assert d.fix is None and ".svstyle.toml" in d.message
+
+
+def test_config_is_found_walking_up(tmp_path):
+    (tmp_path / ".svstyle.toml").write_text('company = "Foo Inc"\n')
+    (tmp_path / "rtl" / "sub").mkdir(parents=True)
+    assert load_config(tmp_path / "rtl" / "sub" / "m.sv") == {"company": "Foo Inc"}
+
+
+def test_no_config_is_empty(tmp_path):
+    assert load_config(tmp_path / "m.sv") == {}
+
+
+def test_config_rejects_unknown_keys(tmp_path):
+    (tmp_path / ".svstyle.toml").write_text('compnay = "typo"\n')
+    with pytest.raises(ConfigError, match="compnay"):
+        load_config(tmp_path / "m.sv")

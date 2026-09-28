@@ -3,20 +3,49 @@
 Each check reports under its tool-side rule name (`rule="port_comment"`),
 mapped to the house rule ID through rules.toml; `svstyle rules --check` greps
 for those names, so a rule without an implementation here fails CI.
-Autofixable findings carry an insert-only `fix = (offset, text)`.
+Autofixable findings carry `fix = (offset, text)` to insert, or
+`(offset, text, n)` to replace n characters (only ever inside a comment).
 """
 
 import re
+import tomllib
 from collections.abc import Sequence
 from datetime import date
+from pathlib import Path
 
 from .parse import Source, parse
 from .rules import Diag, Rule, tool_index
 
-# Set this to your company. While it is the placeholder, every header svstyle
-# writes carries it, and DOC-001 warns until it is replaced by hand.
+# Without a `.svstyle.toml` naming the company, headers carry this placeholder
+# and DOC-001 warns until it is replaced.
 PLACEHOLDER = "<Company>"
-COMPANY = PLACEHOLDER
+CONFIG_NAME = ".svstyle.toml"
+CONFIG_KEYS = {"company": str}
+
+
+class ConfigError(Exception):
+    """A `.svstyle.toml` is malformed (exit 2)."""
+
+
+def load_config(path: str | Path) -> dict:
+    """The nearest `.svstyle.toml` above `path`, like ruff finds `ruff.toml`; {} if none."""
+    for d in Path(path).resolve().parents:
+        cfg = d / CONFIG_NAME
+        if cfg.is_file():
+            try:
+                data = tomllib.loads(cfg.read_text(encoding="utf-8"))
+            except tomllib.TOMLDecodeError as e:
+                raise ConfigError(f"{cfg}: {e}") from e
+            for key, value in data.items():
+                if key not in CONFIG_KEYS:
+                    raise ConfigError(
+                        f"{cfg}: unknown key {key!r} (known: {', '.join(CONFIG_KEYS)})"
+                    )
+                if not isinstance(value, CONFIG_KEYS[key]):
+                    raise ConfigError(f"{cfg}: {key} must be a {CONFIG_KEYS[key].__name__}")
+            return data
+    return {}
+
 
 HEADER = (
     "// Copyright (c) {year} {company}\n"
@@ -41,12 +70,16 @@ HOW = {"ordered": "by position", "wildcard": "with .*", "mixed": "partly by posi
 
 
 def run_checks(
-    text: str, path: str, rules: list[Rule], include_dirs: Sequence[str] = ()
+    text: str,
+    path: str,
+    rules: list[Rule],
+    include_dirs: Sequence[str] = (),
+    company: str = PLACEHOLDER,
 ) -> list[Diag]:
     """All svstyle-owned findings for one file. Raises ParseError if it does not parse."""
     src = parse(text, path, include_dirs)
     ctx = _Ctx(path, tool_index(rules, "svstyle"))
-    check_header(ctx, text)
+    check_header(ctx, text, company)
     check_default_nettype(ctx, text)
     check_comments(ctx, src)
     check_ports(ctx, src)
@@ -69,21 +102,24 @@ class _Ctx:
         )  # fmt: skip
 
 
-def check_header(ctx: _Ctx, text: str) -> None:
+def check_header(ctx: _Ctx, text: str, company: str) -> None:
     m = HEADER_RE.match(text)
     if m is None:
         if OURS_RE.match(text):
             ctx.emit(rule="header", line=1, message="file header is malformed")
         else:
             # A foreign licence header stays; ours goes above it.
-            header = HEADER.format(year=date.today().year, company=COMPANY)
+            header = HEADER.format(year=date.today().year, company=company)
             ctx.emit(rule="header", line=1, message="missing file header", fix=(0, header))
         return
     if m.group("company") == PLACEHOLDER:
-        ctx.emit(
-            rule="header", line=1, severity="SHOULD",
-            message=f"header company is still the placeholder {PLACEHOLDER}",
-        )  # fmt: skip
+        if company == PLACEHOLDER:
+            msg = f"header company is still {PLACEHOLDER}; set company in {CONFIG_NAME}"
+            ctx.emit(rule="header", line=1, severity="SHOULD", message=msg)
+        else:
+            fix = (m.start("company"), company, len(PLACEHOLDER))
+            msg = f"header company is still {PLACEHOLDER}; {CONFIG_NAME} says {company}"
+            ctx.emit(rule="header", line=1, severity="SHOULD", message=msg, fix=fix)
     desc = " ".join(ln[2:].strip() for ln in m.group("desc").splitlines())
     if desc.startswith("TODO") or len(desc.split()) < MIN_DESCRIPTION_WORDS:
         ctx.emit(
