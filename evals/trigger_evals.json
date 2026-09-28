@@ -1,0 +1,22 @@
+[
+  {"query": "i need a parameterized async fifo in systemverilog for crossing from the 200MHz adc clock to our 100MHz axi side, gray pointers, depth 16. can you write it?", "should_trigger": true},
+  {"query": "Can you review rtl/uart_rx.sv? I think the state machine has a latch somewhere and the reviewers keep complaining about naming", "should_trigger": true},
+  {"query": "svstyle check is yelling DOC-004 and PRT-003 at me on dma_ctrl.sv, what do those mean and how do I fix them", "should_trigger": true},
+  {"query": "write a round robin arbiter for 8 masters, registered grant, sv. it goes into the noc router so keep the critical path short", "should_trigger": true},
+  {"query": "Add a 2-flop synchronizer for the external button input before it goes into the debounce logic in top_io.sv", "should_trigger": true},
+  {"query": "clean up this module before I send it for review: fix the indentation, add the missing port comments and whatever else our style guide wants\n\nmodule crc8(input clk, input rst_n, input [7:0] d, input v, output reg [7:0] crc); ...", "should_trigger": true},
+  {"query": "we need a small register block: 4 RW 32-bit config registers and one RO status register on a simple valid/ready bus. SystemVerilog, lowRISC style please", "should_trigger": true},
+  {"query": "why does RST-004 say I shouldn't reset the datapath flops? our old guideline was to reset everything", "should_trigger": true},
+  {"query": "turn this always @(*) + reg based code into proper always_comb/always_ff with logic types, it's for the new chip:\n\nalways @(posedge clk) if (en) q <= d;", "should_trigger": true},
+  {"query": "design a pwm generator with 12-bit duty cycle and a programmable period, one module per file, packages for the shared types", "should_trigger": true},
+  {"query": "write a UVM sequence and driver for our AXI-lite agent so we can hit the register block with random reads and writes", "should_trigger": false},
+  {"query": "set up a cocotb testbench in python for fifo_sync.sv that checks full/empty against a model", "should_trigger": false},
+  {"query": "convert this VHDL entity to VHDL-2008 and fix the numeric_std conversions: entity counter is port(clk : in std_logic; ...", "should_trigger": false},
+  {"query": "my vivado timing report shows -0.4ns WNS on the path from adc_data_reg to the dsp48, what XDC constraints should I add?", "should_trigger": false},
+  {"query": "explain the difference between setup and hold time and why metastability happens, with a diagram if possible, for an interview", "should_trigger": false},
+  {"query": "write a python script that parses a gate-level verilog netlist and counts the flops per module", "should_trigger": false},
+  {"query": "add SVA properties to our formal testbench bind file for the handshake: req must stay high until ack, checked with SymbiYosys", "should_trigger": false},
+  {"query": "write a C++ verilator harness with a main() that drives clk and dumps an fst for the top module", "should_trigger": false},
+  {"query": "can you port this chisel module to spinalhdl? class Counter extends Module { val io = IO(new Bundle { ... }) }", "should_trigger": false},
+  {"query": "our svstyle python package fails to build with hatchling on python 3.14, here's the traceback from uv build", "should_trigger": false}
+]
