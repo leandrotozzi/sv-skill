@@ -829,7 +829,7 @@ always_comb begin
 end
 ```
 
-**Enforced by:** verible lint `no-tabs` `no-trailing-spaces` `posix-eof` `line-length` `forbid-line-continuations`
+**Enforced by:** verible lint `no-tabs` `no-trailing-spaces` `posix-eof` `line-length` `forbid-line-continuations` · autofixable
 
 **Sources:** lowRISC §Basics (column limit), house style (four-space indent), Verible defaults
 
@@ -855,7 +855,7 @@ input logic [31:0] addr_i, // Byte address
 output logic valid_o // Response valid
 ```
 
-**Enforced by:** verible format
+**Enforced by:** verible format · autofixable
 
 **Sources:** lowRISC §Tabular Alignment, house style (the wider set)
 

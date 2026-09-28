@@ -60,6 +60,11 @@ def test_parse_verilator_maps_codes_and_passes_unknown_through():
     ]
 
 
+def test_formatter_owned_lint_findings_are_fixable_except_what_it_cannot_wrap():
+    out = "a.sv:1:1: tab [Style: x] [no-tabs]\na.sv:2:1: long [Style: x] [line-length]\n"
+    assert [d.fixable for d in ext.parse_verible_lint(out, RULES)] == [True, False]
+
+
 def test_parse_verible_lint_reports_its_own_syntax_errors():
     """pyslang already accepted the file, so this is Verible's parser, not the author's bug."""
     (d,) = ext.parse_verible_lint('vbad.sv:3:1-9: syntax error at token "endmodule"\n', RULES)

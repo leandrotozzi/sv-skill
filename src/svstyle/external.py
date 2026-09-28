@@ -31,6 +31,9 @@ VERIBLE_LINT_RE = re.compile(
 VERIBLE_SYNTAX_RE = re.compile(
     r"^(?P<path>.+?):(?P<line>\d+):(?P<col>\d+)(?:-\d+)?: (?P<msg>syntax error.*)$"
 )
+# FMT-001 is the formatter's, but it cannot shorten a long string or comment
+# or remove a `\` continuation: those findings stay the author's.
+FORMAT_CANNOT_FIX = {"line-length", "forbid-line-continuations"}
 PACKAGE_RE = re.compile(r"^\s*package\s+\w+\s*;", re.MULTILINE)
 # The code is optional: elaboration errors (an undeclared name under
 # `default_nettype none) print as a bare `%Error:`.
@@ -129,9 +132,12 @@ def parse_verible_lint(output: str, rules: list[Rule]) -> list[Diag]:
     out = []
     for line in output.splitlines():
         if m := VERIBLE_LINT_RE.match(line):
-            rule = index.get(m.group("rule"))
-            rid, sev = (rule.id, rule.severity) if rule else ("EXT-VL-" + m.group("rule"), "SHOULD")
-            out.append(_diag(m, rid, sev))
+            name = m.group("rule")
+            if rule := index.get(name):
+                fixable = rule.autofix and name not in FORMAT_CANNOT_FIX
+                out.append(_diag(m, rule.id, rule.severity, fixable))
+            else:
+                out.append(_diag(m, "EXT-VL-" + name, "SHOULD"))
         elif m := VERIBLE_SYNTAX_RE.match(line):
             msg = f"Verible cannot parse this; its lint rules were not checked: {m.group('msg')}"
             out.append(Diag(m.group("path"), int(m.group("line")), int(m.group("col")),
@@ -154,7 +160,8 @@ def parse_verilator(output: str, rules: list[Rule]) -> list[Diag]:
     return out
 
 
-def _diag(m: re.Match, rule: str, severity: str) -> Diag:
+def _diag(m: re.Match, rule: str, severity: str, fixable: bool = False) -> Diag:
     return Diag(
-        m.group("path"), int(m.group("line")), int(m.group("col")), rule, severity, m.group("msg")
-    )
+        m.group("path"), int(m.group("line")), int(m.group("col")), rule, severity,
+        m.group("msg"), fixable=fixable,
+    )  # fmt: skip

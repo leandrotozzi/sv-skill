@@ -697,6 +697,7 @@ sources = ["lowRISC §Basics (column limit)", "house style (four-space indent)",
 [rule.enforcement]
 tool = "verible-lint"
 rule = ["no-tabs", "no-trailing-spaces", "posix-eof", "line-length", "forbid-line-continuations"]
+autofix = true
 
 [[rule]]
 id        = "FMT-002"
@@ -718,6 +719,7 @@ output logic valid_o // Response valid
 sources = ["lowRISC §Tabular Alignment", "house style (the wider set)"]
 [rule.enforcement]
 tool = "verible-format"
+autofix = true
 
 [[rule]]
 id        = "FMT-003"

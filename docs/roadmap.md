@@ -38,10 +38,12 @@ through today. Each item names the finding and the fix.
 
 ## M3 — The DB maps to reality
 
-- [ ] **6. `autofix` is wrong outside svstyle rules.** FMT-001/FMT-002 are
+- [x] **6. `autofix` is wrong outside svstyle rules.** FMT-001/FMT-002 are
   fixed by `svstyle fix` (Verible) but declare `autofix = false`.
-- [ ] **7. No rule → test link.** Add a test: every rule not enforced by
+- [x] **7. No rule → test link.** Add a test: every rule not enforced by
   `review` has a violation fixture that triggers its ID.
+  Done as `tests/test_rule_coverage.py`: one snippet per rule, run end to
+  end through `svstyle check`.
 
 ## M4 — Mechanise cheap `review` rules (pyslang)
 
