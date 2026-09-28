@@ -31,9 +31,14 @@ VERIBLE_LINT_RE = re.compile(
 VERIBLE_SYNTAX_RE = re.compile(
     r"^(?P<path>.+?):(?P<line>\d+):(?P<col>\d+)(?:-\d+)?: (?P<msg>syntax error.*)$"
 )
-# FMT-001 is the formatter's, but it cannot shorten a long string or comment
-# or remove a `\` continuation: those findings stay the author's.
-FORMAT_CANNOT_FIX = {"line-length", "forbid-line-continuations"}
+# The Verible findings `svstyle fix` resolves: the formatter's whitespace, and
+# the legacy constructs fix.py rewrites. Everything else Verible reports, even
+# under a rule marked autofix (line-length, genvar placement), stays the author's.
+FIXED_BY_FIX = {
+    "no-tabs", "no-trailing-spaces", "posix-eof", "explicit-begin", "endif-comment",
+    "legacy-generate-region", "explicit-function-lifetime", "explicit-task-lifetime",
+    "always-comb",
+}  # fmt: skip
 PACKAGE_RE = re.compile(r"^\s*package\s+\w+\s*;", re.MULTILINE)
 # The code is optional: elaboration errors (an undeclared name under
 # `default_nettype none) print as a bare `%Error:`.
@@ -134,7 +139,7 @@ def parse_verible_lint(output: str, rules: list[Rule]) -> list[Diag]:
         if m := VERIBLE_LINT_RE.match(line):
             name = m.group("rule")
             if rule := index.get(name):
-                fixable = rule.autofix and name not in FORMAT_CANNOT_FIX
+                fixable = name in FIXED_BY_FIX
                 out.append(_diag(m, rule.id, rule.severity, fixable))
             else:
                 out.append(_diag(m, "EXT-VL-" + name, "SHOULD"))

@@ -32,11 +32,11 @@ module kitchen_sink #(
 
     localparam int unsigned Total = Lanes * Width;  // TODO: describe
     logic [Width-1:0] mem_q                    [Lanes];  // Unpacked storage
-    wire              any_w;  // TODO: describe
+    logic             any_w;  // TODO: describe
 
 `ifdef KS_DEBUG
     logic debug_q;
-`endif
+`endif  // KS_DEBUG
 
     // Register every lane.
     always_ff @(posedge clk_i or negedge rst_ni) begin

@@ -266,7 +266,22 @@ def check_constructs(ctx: _Ctx, text: str, src: Source) -> None:
     for kind, _, offset in raw_tokens(text):
         if kw := LEGACY_NETS.get(kind):
             line = text.count("\n", 0, offset) + 1
-            ctx.emit(rule="logic_only", line=line, message=f"`{kw}`: declare `logic` instead")
+            # `reg` is always a variable; a `wire` only when the tree says so.
+            safe = kw == "reg" or offset in src.safe_wires
+            fix = (offset, "logic", len(kw)) if safe else None
+            msg = f"`{kw}`: declare `logic` instead"
+            ctx.emit(rule="logic_only", line=line, message=msg, fix=fix)
+    for line, kind, fix in src.legacy_always:
+        if kind == "edge":
+            msg = "clocked `always`: write `always_ff`" + (
+                "" if fix else " (it has `=` or a delay)"
+            )
+            ctx.emit(rule="always_ff_style", line=line, message=msg, fix=fix)
+        else:
+            msg = (
+                "`always` with a sensitivity list: write `always_comb`, which cannot miss a signal"
+            )
+            ctx.emit(rule="always_comb_style", line=line, message=msg)
     for no, ln in enumerate(text.splitlines(), 1):
         if m := DIRECTIVE_RE.search(ln):
             what = m.group(1) or m.group(2)

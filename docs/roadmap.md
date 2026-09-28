@@ -62,11 +62,16 @@ through today. Each item names the finding and the fix.
 
 ## M6 — `fix` for legacy code
 
-- [ ] **10. Token-rewriting fixes.** Keep the token-signature invariant but
+- [x] **10. Token-rewriting fixes.** Keep the token-signature invariant but
   allow a whitelist of substitutions per fix: `reg`→`logic`,
   `always @(*)`→`always_comb`, `always @(posedge …)`→`always_ff` (only when
   every assignment is `<=`), `begin`/`end` insertion (FMT-003), `` `endif``
   labels (DOC-010), drop `generate`/`endgenerate` (GEN-002), add `automatic`.
+  Invariant is now a token-edit whitelist; safety is decided from the tree.
+  Verified: Yosys formal equivalence on a legacy module (test), 194-file
+  Ibex/prim corpus fixed with no invariant breach, idempotent, identical
+  Verilator lint before/after. Clocked `always` and `always @(list)` were
+  not reported by anyone before; now LNG-002/LNG-003 via svstyle.
 
 ## M7 — CLI UX
 

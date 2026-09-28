@@ -60,6 +60,16 @@ class Source:
     file_imports: list[int] = field(default_factory=list)  # lines of file-scope `import`
     # always_ff: (line, [(edge, signal)], first `if` predicate or None)
     ff_blocks: list[tuple[int, list[tuple[str, str]], str | None]] = field(default_factory=list)
+    # Plain `always` other than `@*`: (line, "edge" | "list", fix or None). The
+    # fix makes an edge block always_ff; None when that would change behaviour.
+    legacy_always: list[tuple[int, str, tuple | None]] = field(default_factory=list)
+    # Offsets of `wire` keywords that can become `logic` without changing
+    # meaning. Not an inout port, and no initialiser: `wire x = a;` is an assign
+    # while `logic x = a;` is only an initial value. Wires the tree cannot see
+    # (macros, disabled `ifdef` text) are never listed.
+    safe_wires: set[int] = field(default_factory=set)
+    # Token-rewriting fixes for code the formatter cannot touch: (offset, text, cut).
+    rewrites: list[tuple[int, str, int]] = field(default_factory=list)
 
 
 EDGE_RE = re.compile(r"\b(posedge|negedge)\s+(\w+)")
@@ -129,6 +139,7 @@ class _Walker:
 
     def run(self) -> Source:
         self.walk(self.root, split_list=False)
+        self.modernise(self.root)
         # A file with one design unit parses to that unit as the root; only a
         # CompilationUnit's members are at file scope.
         if self.root.kind == K.CompilationUnit:
@@ -138,6 +149,89 @@ class _Walker:
                 if m.kind == K.PackageImportDeclaration and self.is_main(m.getFirstToken())
             ]
         return self.src
+
+    def modernise(self, node: SyntaxNode) -> None:
+        """Collect the legacy constructs `fix` may rewrite, over the whole tree.
+
+        Only this file's own text, outside macro expansions and preprocessor
+        splits, is ever rewritten; everything else is reported and left alone.
+        """
+        k = node.kind
+        first = node.getFirstToken()
+        if k == K.ClassDeclaration or (
+            first is not None and first.rawText and not self.is_main(first)
+        ):
+            return
+        # Containers are always entered; anything smaller that a macro or an
+        # `ifdef reaches into is left exactly as written.
+        containers = (K.ModuleDeclaration, K.CompilationUnit, K.PackageDeclaration)
+        if k not in containers and (self.in_macro(node) or self.has_directive(node)):
+            return
+        if k == K.NetDeclaration and node.netType.rawText == "wire":
+            if not any(isinstance(d, SyntaxNode) and d.initializer for d in node.declarators):
+                self.src.safe_wires.add(self.offset(node.netType))
+        elif k == K.ImplicitAnsiPort and node.header.kind == K.NetPortHeader:
+            h = node.header
+            if (
+                h.netType.rawText == "wire"
+                and h.direction.rawText != "inout"
+                and not node.declarator.initializer
+            ):
+                self.src.safe_wires.add(self.offset(h.netType))
+        elif k == K.AlwaysBlock:
+            self.legacy_always(node)
+        elif k == K.GenerateRegion:
+            for tok in (node.keyword, node.endgenerate):
+                self.delete_line_or_token(tok)
+        elif (
+            k in (K.FunctionDeclaration, K.TaskDeclaration) and not node.prototype.lifetime.rawText
+        ):
+            kw = node.prototype.keyword
+            self.src.rewrites.append((self.offset(kw) + len(kw.rawText), " automatic", 0))
+        for body in _bodies(node):
+            if body.kind != K.SequentialBlockStatement and not self.in_macro(body):
+                last = body.getLastToken()
+                self.src.rewrites.append((self.offset(body.getFirstToken()), "begin ", 0))
+                self.src.rewrites.append((self.offset(last) + len(last.rawText), " end", 0))
+        for child in node:
+            if isinstance(child, SyntaxNode):
+                self.modernise(child)
+
+    def has_directive(self, node: SyntaxNode) -> bool:
+        return any(tr.kind == TriviaKind.Directive for t in _tokens(node)[1:] for tr in t.trivia)
+
+    def legacy_always(self, node: SyntaxNode) -> None:
+        stmt = node.statement
+        line = self.line(node.keyword)
+        if stmt.kind != K.TimingControlStatement:
+            self.src.legacy_always.append((line, "list", None))
+            return
+        timing = str(stmt.timingControl).strip()
+        kinds = {n.kind for n in _nodes(stmt.statement)}
+        # Another timing control inside means it is not a flop or a comb block.
+        nested = kinds & {K.TimingControlStatement, K.DelayControl}
+        start = self.offset(node.keyword)
+        if re.fullmatch(r"@\s*(\*|\(\s*\*\s*\))", timing):
+            last = stmt.timingControl.getLastToken()
+            cut = self.offset(last) + len(last.rawText) - start
+            # Verible's always-comb reports this one; svstyle only rewrites it.
+            if not nested:
+                self.src.rewrites.append((start, "always_comb", cut))
+        elif EDGE_RE.search(timing):
+            fix = None if nested or K.AssignmentExpression in kinds else (start, "always_ff", 6)
+            self.src.legacy_always.append((line, "edge", fix))
+        else:
+            self.src.legacy_always.append((line, "list", None))
+
+    def delete_line_or_token(self, tok) -> None:
+        start = self.offset(tok)
+        end = start + len(tok.rawText)
+        line_start = self.text.rfind("\n", 0, start) + 1
+        line_end = self.text.find("\n", end)
+        line_end = len(self.text) if line_end == -1 else line_end + 1
+        if not (self.text[line_start:start] + self.text[end:line_end]).strip():
+            start, end = line_start, line_end  # alone on its line: drop the line
+        self.src.rewrites.append((start, "", end - start))
 
     def record_ports(self, ports: SyntaxNode) -> None:
         names = []
@@ -255,6 +349,41 @@ class _Walker:
                 fixable=not self.in_macro(node),
             )
         )  # fmt: skip
+
+
+def _nodes(node: SyntaxNode) -> list[SyntaxNode]:
+    out: list = []
+    node.visit(lambda x: out.append(x) if isinstance(x, SyntaxNode) else None)
+    return out
+
+
+# Loop statements whose body Verible's explicit-begin wants wrapped.
+LOOPS = {
+    K.ForLoopStatement, K.LoopStatement, K.ForeverStatement, K.ForeachLoopStatement,
+}  # fmt: skip
+PROCESSES = {
+    K.AlwaysBlock, K.AlwaysCombBlock, K.AlwaysFFBlock, K.AlwaysLatchBlock, K.InitialBlock,
+}  # fmt: skip
+
+
+def _bodies(node: SyntaxNode) -> list[SyntaxNode]:
+    """The statements of `node` that explicit-begin wants inside begin/end.
+
+    An `else if` is not one: the `if` is the else-branch's structure, and
+    wrapping it would turn a flat chain into a staircase.
+    """
+    k = node.kind
+    if k == K.ConditionalStatement:
+        out = [node.statement]
+        if node.elseClause is not None and node.elseClause.clause.kind != K.ConditionalStatement:
+            out.append(node.elseClause.clause)
+        return out
+    if k in LOOPS:
+        return [node.statement]
+    if k in PROCESSES:
+        stmt = node.statement
+        return [stmt.statement if stmt.kind == K.TimingControlStatement else stmt]
+    return []
 
 
 def _trivia(tok) -> list:

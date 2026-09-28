@@ -52,6 +52,15 @@ is missing -- it is not a comment. So write every comment yourself, as you go:
 
 Then run the tools.
 
+## Existing code
+
+To bring legacy RTL into the style, run `svstyle fix` on it first: besides
+formatting, it turns `reg`/`wire` into `logic`, `always @(*)` into
+`always_comb`, clocked `always` into `always_ff`, and wraps lone statements
+in `begin`/`end`, wherever that provably keeps the meaning. Then work through
+what `check` still reports; `references/tooling.md` lists what `fix` leaves
+alone and why.
+
 ## The loop
 
 ```sh

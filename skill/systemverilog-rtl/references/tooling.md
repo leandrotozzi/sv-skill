@@ -59,8 +59,24 @@ svstyle rules [--id ID] [--unmapped]
 
 `fix` never rebuilds the file. It runs Verible, inserts what is missing
 (header, `` `default_nettype none`` / `` `resetall``, `// TODO: describe`
-comments), runs Verible again, and then verifies that no token other than
-those insertions changed. If that check fails nothing is written.
+comments, `` `endif  // NAME`` labels), and modernises legacy code where the
+syntax tree proves the meaning is unchanged:
+
+| Legacy | Becomes | Left alone when |
+|---|---|---|
+| `reg` | `logic` | never |
+| `wire` | `logic` | an `inout` port, or an initialiser (`wire x = a;` is an assign) |
+| `always @(*)` / `always @*` | `always_comb` | the body has a delay or event control |
+| `always @(posedge ...)` | `always_ff` | the body has a blocking `=` or a delay |
+| a lone statement under `if`/`else`/loop/`always` | `begin ... end` around it | it is an `else if` |
+| `generate` / `endgenerate` | removed | never |
+| `function` / `task` | `... automatic ...` | inside a class |
+
+Nothing inside a macro or reached by an `` `ifdef`` split is rewritten. It
+then runs Verible again and verifies that every token change is one of the
+above; if not, nothing is written (exit 4). `always @(a or b)` is reported
+(LNG-003), not rewritten: `always_comb` would add the signals the list forgot,
+which changes what simulation does.
 
 ## Output
 

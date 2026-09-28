@@ -5,7 +5,7 @@ import pytest
 
 from svstyle import external as ext
 from svstyle.fix import token_signature
-from svstyle.rules import load_rules
+from svstyle.rules import load_rules, tool_index
 
 RULES = load_rules()
 KS = Path(__file__).parent / "fixtures" / "input" / "kitchen_sink.sv"
@@ -63,6 +63,11 @@ def test_parse_verilator_maps_codes_and_passes_unknown_through():
 def test_formatter_owned_lint_findings_are_fixable_except_what_it_cannot_wrap():
     out = "a.sv:1:1: tab [Style: x] [no-tabs]\na.sv:2:1: long [Style: x] [line-length]\n"
     assert [d.fixable for d in ext.parse_verible_lint(out, RULES)] == [True, False]
+
+
+def test_every_verible_name_fix_resolves_belongs_to_an_autofix_rule():
+    index = tool_index(RULES, "verible-lint")
+    assert {n: index[n].autofix for n in ext.FIXED_BY_FIX} == dict.fromkeys(ext.FIXED_BY_FIX, True)
 
 
 def test_parse_verible_lint_reports_its_own_syntax_errors():

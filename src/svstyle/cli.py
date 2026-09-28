@@ -60,13 +60,12 @@ def _check(rules: list) -> int:
     skipped: list[str] = []
 
     # 1. svstyle-owned rules must have an implementation in checks.py.
-    own = [r for r in rules if r.tool == "svstyle"]
+    own = tool_index(rules, "svstyle")
     if CHECKS_PY.exists():
         impl = CHECKS_PY.read_text(encoding="utf-8")
-        for r in own:
-            for name in r.tool_rules:
-                if f'rule="{name}"' not in impl and f"rule='{name}'" not in impl:
-                    problems.append(f"{r.id}: no implementation of rule={name!r} in checks.py")
+        for name, r in own.items():
+            if f'rule="{name}"' not in impl and f"rule='{name}'" not in impl:
+                problems.append(f"{r.id}: no implementation of rule={name!r} in checks.py")
     elif own:
         skipped.append(f"checks.py absent: {len(own)} svstyle rule(s) unverified (Phase 2)")
 

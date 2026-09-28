@@ -267,7 +267,7 @@ A `` `endif`` far from its `` `ifdef`` carries a comment naming the condition it
 `endif
 ```
 
-**Enforced by:** verible lint `endif-comment` `mismatched-labels`
+**Enforced by:** verible lint `endif-comment` `mismatched-labels` · autofixable
 
 **Sources:** lowRISC §Comments, Verible
 
@@ -882,7 +882,7 @@ if (clear_i) count_d = '0;
 else count_d = count_q + 1'b1;
 ```
 
-**Enforced by:** verible lint `explicit-begin` `module-begin-block`
+**Enforced by:** verible lint `explicit-begin` `module-begin-block` · autofixable
 
 **Sources:** house style (stricter than lowRISC §begin/end)
 
@@ -955,7 +955,7 @@ logic [7:0] data_q;  // Registered payload
 reg [7:0] data_q;
 ```
 
-**Enforced by:** svstyle `logic_only`
+**Enforced by:** svstyle `logic_only` · autofixable
 
 **Sources:** lowRISC §Use logic for synthesis
 
@@ -986,7 +986,7 @@ always_ff @(posedge clk_i) begin
 end
 ```
 
-**Enforced by:** verible lint `always-ff-non-blocking`
+**Enforced by:** verible lint `always-ff-non-blocking`; also svstyle `always_ff_style` · autofixable
 
 **Sources:** Cummings SNUG-2000 guideline #1, lowRISC §Sequential Logic
 
@@ -1013,7 +1013,7 @@ always @(a_i) begin   // b_i missing: latch
 end
 ```
 
-**Enforced by:** verible lint `always-comb` `always-comb-blocking`; also verilator `ALWCOMBORDER`
+**Enforced by:** verible lint `always-comb` `always-comb-blocking`; also svstyle `always_comb_style`; also verilator `ALWCOMBORDER` · autofixable
 
 **Sources:** Cummings SNUG-2000 guidelines #3, #10, lowRISC §Combinational Logic
 
@@ -1208,7 +1208,7 @@ function parity_byte(data);
 endfunction
 ```
 
-**Enforced by:** verible lint `explicit-function-lifetime` `explicit-task-lifetime` `explicit-function-task-parameter-type`
+**Enforced by:** verible lint `explicit-function-lifetime` `explicit-task-lifetime` `explicit-function-task-parameter-type` · autofixable
 
 **Sources:** lowRISC §Functions and Tasks, Verible
 
@@ -1953,7 +1953,7 @@ generate
 endgenerate
 ```
 
-**Enforced by:** verible lint `legacy-generate-region` `legacy-genvar-declaration` `v2001-generate-begin`
+**Enforced by:** verible lint `legacy-generate-region` `legacy-genvar-declaration` `v2001-generate-begin` · autofixable
 
 **Sources:** lowRISC §Generate Constructs, Verible
 

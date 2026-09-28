@@ -16,7 +16,7 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 - **DOC-007** · MUST · A comment on its own line describes the code that follows; a comment on a line with code describes that line. Use `//`, not `/* */`.
 - **DOC-008** · MUST · Each state alternative inside an FSM case statement is preceded by a comment describing that state's function; those descriptions do not also live on the enum declaration.
 - **DOC-009** · MUST · Code that deliberately departs from a rule in this guide carries a brief comment saying why, plus a lint waiver pragma where the tool supports one.
-- **DOC-010** · SHOULD · A `` `endif`` far from its `` `ifdef`` carries a comment naming the condition it closes, and a named `begin` closes as `end : name`.
+- **DOC-010** · SHOULD · A `` `endif`` far from its `` `ifdef`` carries a comment naming the condition it closes, and a named `begin` closes as `end : name`. `[fix]`
 
 ## STR — File structure
 
@@ -53,22 +53,22 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 
 - **FMT-001** · MUST · Indentation is four spaces, never tabs; lines carry no trailing whitespace; the file ends with exactly one newline; lines are at most 100 columns. `[fix]`
 - **FMT-002** · MUST · Port declarations, formal parameters, named port connections, named parameter overrides, module-level net declarations, struct members and enum assignments are aligned into columns. Loose assignment statements and case items are not. `[fix]`
-- **FMT-003** · MUST · Every `if`, `else`, `for`, `while` and `always` body is wrapped in `begin`/`end`, even a single statement. `begin` sits on the line of the construct that opens it and `end else begin` is written on one line.
+- **FMT-003** · MUST · Every `if`, `else`, `for`, `while` and `always` body is wrapped in `begin`/`end`, even a single statement. `begin` sits on the line of the construct that opens it and `end else begin` is written on one line. `[fix]`
 - **FMT-004** · MUST · There are no empty statements from consecutive semicolons, and no semicolon after the `end` of a block or after a module or generate body.
 - **FMT-005** · SHOULD · An expression mixing operators of different precedence carries explicit parentheses around the intended grouping.
 
 ## LNG — Language features
 
-- **LNG-001** · MUST · Signals are declared `logic`. `wire` appears only where a net is genuinely multiply driven, which in practice means a bidirectional pad, and carries a comment saying so.
-- **LNG-002** · MUST · Clocked logic is written in `always_ff` and assigns only with `<=`.
-- **LNG-003** · MUST · Combinational logic is written in `always_comb` and assigns only with `=`. `always @(*)` and manual sensitivity lists are not used.
+- **LNG-001** · MUST · Signals are declared `logic`. `wire` appears only where a net is genuinely multiply driven, which in practice means a bidirectional pad, and carries a comment saying so. `[fix]`
+- **LNG-002** · MUST · Clocked logic is written in `always_ff` and assigns only with `<=`. `[fix]`
+- **LNG-003** · MUST · Combinational logic is written in `always_comb` and assigns only with `=`. `always @(*)` and manual sensitivity lists are not used. `[fix]`
 - **LNG-004** · MUST · A single `always` block uses either `=` or `<=` throughout, never both.
 - **LNG-005** · MUST · No variable is assigned from more than one `always` block or continuous assignment.
 - **LNG-006** · MUST · A combinational block assigns a default value to every signal it drives, immediately after the block opens and before any conditional logic.
 - **LNG-007** · MUST · Every `case`, `casez` and `unique case` statement has a `default` arm, even when it is empty or only raises an error.
 - **LNG-008** · MUST · Sized literals state a width that matches their context; a literal is never wider than its declared size, and `'0`/`'1`/`'x` are used for context-width fills.
 - **LNG-009** · MUST · `casex` does not appear in synthesizable RTL. `casez` is used only where the truth table genuinely has don't-care bits, with don't-cares written as `?` and never as `z`.
-- **LNG-010** · MUST · Every function and task declares an explicit `automatic` lifetime, an explicit return type, and an explicit direction and type on each argument.
+- **LNG-010** · MUST · Every function and task declares an explicit `automatic` lifetime, an explicit return type, and an explicit direction and type on each argument. `[fix]`
 - **LNG-011** · MUST · `parameter` appears only in a module's formal parameter list; constants inside a module body are `localparam`. Both declare an explicit type.
 - **LNG-012** · MUST · Packed dimensions are declared `[N-1:0]` and unpacked dimensions `[0:N-1]` or `[N]`; no dimension may evaluate to a negative size.
 - **LNG-013** · MUST · Synthesizable RTL contains no system tasks or functions that exist only for simulation, and no `#` delays.
@@ -111,7 +111,7 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 ## GEN — Generate and parameterisation
 
 - **GEN-001** · MUST · Every generate `for` body and every branch of a generate `if` carries a `lower_snake_case` label prefixed `gen_`, written as `begin : gen_name`.
-- **GEN-002** · MUST · `generate`/`endgenerate` regions are not written, `genvar` is declared inline in the `for` header, and a generate body is not wrapped in an extra bare `begin` block.
+- **GEN-002** · MUST · `generate`/`endgenerate` regions are not written, `genvar` is declared inline in the `for` header, and a generate body is not wrapped in an extra bare `begin` block. `[fix]`
 - **GEN-003** · MUST · A parameter with restricted legal values carries an assertion or an elaboration-time check stating the restriction.
 
 ## VER — Assertions and verification

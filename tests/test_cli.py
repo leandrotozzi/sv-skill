@@ -166,7 +166,7 @@ def test_fix_invariant_breach_exits_4(capsys, sv, monkeypatch):
     monkeypatch.setattr(fx, "verible_format", lambda t: t.replace("endmodule", "endmodule ;"))
     p = sv()
     code, _, err = _run(capsys, "fix", p)
-    assert code == 4 and "non-whitespace token" in err
+    assert code == 4 and "fix changed tokens" in err
     assert p.read_text() == CLEAN
 
 

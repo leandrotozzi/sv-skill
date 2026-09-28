@@ -242,6 +242,7 @@ sources = ["lowRISC §Comments", "Verible"]
 [rule.enforcement]
 tool = "verible-lint"
 rule = ["endif-comment", "mismatched-labels"]
+autofix = true
 
 # ===========================================================================
 # STR -- file structure
@@ -749,6 +750,7 @@ sources = ["house style (stricter than lowRISC §begin/end)"]
 [rule.enforcement]
 tool = "verible-lint"
 rule = ["explicit-begin", "module-begin-block"]
+autofix = true
 
 [[rule]]
 id        = "FMT-004"
@@ -797,7 +799,7 @@ sources = ["lowRISC §Use logic for synthesis"]
 [rule.enforcement]
 tool    = "svstyle"
 rule    = "logic_only"
-autofix = false
+autofix = true
 
 [[rule]]
 id        = "LNG-002"
@@ -825,6 +827,9 @@ sources = ["Cummings SNUG-2000 guideline #1", "lowRISC §Sequential Logic"]
 [rule.enforcement]
 tool = "verible-lint"
 rule = "always-ff-non-blocking"
+autofix = true
+[rule.also]
+svstyle = ["always_ff_style"]
 
 [[rule]]
 id        = "LNG-003"
@@ -848,7 +853,9 @@ sources = ["Cummings SNUG-2000 guidelines #3, #10", "lowRISC §Combinational Log
 [rule.enforcement]
 tool = "verible-lint"
 rule = ["always-comb", "always-comb-blocking"]
+autofix = true
 [rule.also]
+svstyle = ["always_comb_style"]
 verilator = ["ALWCOMBORDER"]
 
 [[rule]]
@@ -1019,6 +1026,7 @@ sources = ["lowRISC §Functions and Tasks", "Verible"]
 [rule.enforcement]
 tool = "verible-lint"
 rule = ["explicit-function-lifetime", "explicit-task-lifetime", "explicit-function-task-parameter-type"]
+autofix = true
 
 [[rule]]
 id        = "LNG-011"
@@ -1642,6 +1650,7 @@ sources = ["lowRISC §Generate Constructs", "Verible"]
 [rule.enforcement]
 tool = "verible-lint"
 rule = ["legacy-generate-region", "legacy-genvar-declaration", "v2001-generate-begin"]
+autofix = true
 
 [[rule]]
 id        = "GEN-003"

@@ -35,7 +35,7 @@ SEVERITIES = ("MUST", "SHOULD", "MAY")
 # Who enforces a rule. `review` means no tool can: the skill and a human carry it.
 TOOLS = ("verible-format", "verible-lint", "verilator", "svstyle", "review")
 # Tools that report diagnostics by name, so can back up a rule another tool owns.
-ALSO_TOOLS = ("verible-lint", "verilator")
+ALSO_TOOLS = ("verible-lint", "verilator", "svstyle")
 
 _REQUIRED = ("id", "title", "severity", "category", "statement", "rationale", "sources")
 
