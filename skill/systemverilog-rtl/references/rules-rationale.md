@@ -10,7 +10,7 @@ heading, e.g. `### DOC-003`, instead of loading the whole file.
 - PRT — Ports and connections: PRT-001 … PRT-007
 - NAM — Naming: NAM-001 … NAM-010
 - FMT — Formatting and layout: FMT-001 … FMT-005
-- LNG — Language features: LNG-001 … LNG-014
+- LNG — Language features: LNG-001 … LNG-017
 - SYN — Synthesis and portability: SYN-001 … SYN-004
 - RST — Reset and clocking: RST-001 … RST-005
 - FSM — State machines: FSM-001 … FSM-004
@@ -293,7 +293,7 @@ module fifo_sync #(
 module fifo_sync #(
 ```
 
-**Enforced by:** verible lint `module-filename` `package-filename` `one-module-per-file`
+**Enforced by:** verible lint `module-filename` `package-filename` `one-module-per-file`; also verilator `DECLFILENAME`
 
 **Sources:** lowRISC §Files, Verilator DECLFILENAME
 
@@ -498,7 +498,7 @@ Every declared port appears in every instantiation, in declaration order; unused
 // status_o and debug_i simply absent from the instantiation
 ```
 
-**Enforced by:** review only
+**Enforced by:** verilator `PINMISSING`
 
 **Sources:** lowRISC §Module Instantiation
 
@@ -523,7 +523,7 @@ fifo_sync u_fifo ( ... );
 defparam u_fifo.Depth = 16;
 ```
 
-**Enforced by:** verible lint `forbid-defparam` `module-port`
+**Enforced by:** verible lint `forbid-defparam` `module-port`; also verilator `DEFPARAM`
 
 **Sources:** lowRISC §Module Instantiation, Verilator DEFPARAM
 
@@ -1013,7 +1013,7 @@ always @(a_i) begin   // b_i missing: latch
 end
 ```
 
-**Enforced by:** verible lint `always-comb` `always-comb-blocking`
+**Enforced by:** verible lint `always-comb` `always-comb-blocking`; also verilator `ALWCOMBORDER`
 
 **Sources:** Cummings SNUG-2000 guidelines #3, #10, lowRISC §Combinational Logic
 
@@ -1129,7 +1129,7 @@ unique case (state_q)
 endcase
 ```
 
-**Enforced by:** verible lint `case-missing-default`
+**Enforced by:** verible lint `case-missing-default`; also verilator `CASEINCOMPLETE`
 
 **Sources:** Cummings SNUG-2005, lowRISC §Case Statements, Verilator CASEINCOMPLETE
 
@@ -1182,7 +1182,7 @@ casex (opcode_i)
 endcase
 ```
 
-**Enforced by:** review only
+**Enforced by:** verilator `CASEX`
 
 **Sources:** Cummings SNUG-1999 §casex
 
@@ -1279,7 +1279,7 @@ assign data_o = data_q;
 assign #1 data_o = data_q;
 ```
 
-**Enforced by:** verible lint `invalid-system-task-function`
+**Enforced by:** verible lint `invalid-system-task-function`; also verilator `ASSIGNDLY` `STMTDLY`
 
 **Sources:** Cummings SNUG-2000 guideline #8, Verible
 
@@ -1305,9 +1305,82 @@ module fifo_sync ( ... );
     assign data_ou = data_q;   // typo: creates a 1-bit implicit net
 ```
 
-**Enforced by:** svstyle `default_nettype` · autofixable
+**Enforced by:** svstyle `default_nettype`; also verilator `IMPLICIT` · autofixable
 
 **Sources:** house style, lowRISC §Declare all signals (states the rule, not the directive), Verilator IMPLICIT
+
+### LNG-015 (MUST) — Operand widths match; selects stay in range
+
+Both sides of an assignment and the operands of an operator have the same width, or the code states the conversion with a cast (`W'(x)`), a replication or an explicit zero-extension; every part- and bit-select lies within the declared range.
+
+**Why:** An implicit width change is silent in both simulation and synthesis: a wider value is truncated and a narrower one is zero- or sign-extended by rules most readers cannot recite. The design compiles, and the missing top bit shows up as wrong arithmetic at the first large value. An out-of-range select reads `x` in simulation and an arbitrary bit in gates.
+
+**Good:**
+
+```systemverilog
+logic [3:0] nibble_o;
+assign nibble_o = data_i[3:0];          // Width stated by the select
+assign sum_d    = 9'(a_i) + 9'(b_i);    // Carry kept by the cast
+```
+
+**Bad:**
+
+```systemverilog
+logic [3:0] nibble_o;
+assign nibble_o = data_i;               // 8 bits into 4, silently truncated
+```
+
+**Enforced by:** verilator `WIDTH` `WIDTHTRUNC` `WIDTHEXPAND` `WIDTHXZEXPAND` `WIDTHCONCAT` `SELRANGE`
+
+**Sources:** Verilator WIDTH, lowRISC §Number Formatting
+
+### LNG-016 (MUST) — Every signal that is read has a driver
+
+No signal is read without being driven; an input that is intentionally constant is tied off explicitly where it is declared or connected.
+
+**Why:** An undriven net simulates as `z` or `x` and synthesis replaces it with a constant of its own choosing, usually zero, then optimises away everything that depended on it. The gates and the simulation both look plausible and disagree with each other and with the author.
+
+**Good:**
+
+```systemverilog
+logic busy_q;  // Driven by the state register below
+assign busy_o = busy_q;
+```
+
+**Bad:**
+
+```systemverilog
+logic busy_q;  // Declared, never assigned
+assign busy_o = busy_q;
+```
+
+**Enforced by:** verilator `UNDRIVEN`
+
+**Sources:** Verilator UNDRIVEN, house style
+
+### LNG-017 (SHOULD) — Every declared signal is used
+
+A declared signal is read somewhere; a signal or input bit that is deliberately unused carries a comment and a scoped Verilator waiver.
+
+**Why:** An unused signal is either dead code or a connection that was meant to be made. The second is a bug that no other check reports, and it hides among the first unless the dead code is removed or waived where it stands.
+
+**Good:**
+
+```systemverilog
+// verilator lint_off UNUSEDSIGNAL
+logic [7:0] spare_q;  // Reserved for the next revision
+// verilator lint_on UNUSEDSIGNAL
+```
+
+**Bad:**
+
+```systemverilog
+logic [7:0] parity_q;  // Computed, then never connected to parity_o
+```
+
+**Enforced by:** verilator `UNUSEDSIGNAL` `UNUSEDGENVAR`
+
+**Sources:** Verilator UNUSEDSIGNAL, house style
 
 ## SYN — Synthesis and portability
 
@@ -1365,7 +1438,7 @@ priority case (state_q)
 endcase
 ```
 
-**Enforced by:** review only
+**Enforced by:** review only; also verilator `CASEOVERLAP`
 
 **Sources:** Cummings SNUG-2005 §unique & priority
 

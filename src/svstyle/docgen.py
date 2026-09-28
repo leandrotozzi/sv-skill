@@ -7,7 +7,6 @@ the files are regenerated with `svstyle rules --gen`.
 
 import html
 import re
-from datetime import date
 
 from .rules import CATEGORIES, Rule, by_category
 
@@ -71,6 +70,8 @@ def render_markdown_full(rules: list[Rule]) -> str:
                 out += ["**Bad:**", "", "```systemverilog", r.bad, "```", ""]
             names = " ".join(f"`{n}`" for n in r.tool_rules)
             enforced = TOOL_LABEL[r.tool] + (f" {names}" if names else "")
+            for tool, codes in r.also:
+                enforced += f"; also {TOOL_LABEL[tool]} " + " ".join(f"`{n}`" for n in codes)
             if r.autofix:
                 enforced += " · autofixable"
             out += [f"**Enforced by:** {enforced}", "", f"**Sources:** {', '.join(r.sources)}", ""]
@@ -194,6 +195,8 @@ def _esc(text: str) -> str:
 
 def _card(r: Rule) -> str:
     tool = TOOL_LABEL[r.tool] + (f" · {' '.join(r.tool_rules)}" if r.tool_rules else "")
+    for t, codes in r.also:
+        tool += f" · {TOOL_LABEL[t]} · {' '.join(codes)}"
     if r.autofix:
         tool += ' · <span class="fix">fix</span>'
     # Strip punctuation rather than escaping it: the raw text would put HTML
@@ -276,7 +279,7 @@ def render_html(rules: list[Rule], company: str = "") -> str:
 <div class="mast">
 <h1>SystemVerilog RTL style guide</h1>
 <p>{subtitle}</p>
-<p style="font-size:.78rem">{owner}generated {date.today().isoformat()} ·
+<p style="font-size:.78rem">{owner}
 <span id="shown">{len(rules)}</span> of {len(rules)} shown · click a rule ID to copy it</p>
 </div>
 <div class="stats">{stats}</div>

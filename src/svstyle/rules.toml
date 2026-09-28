@@ -266,6 +266,8 @@ sources = ["lowRISC §Files", "Verilator DECLFILENAME"]
 [rule.enforcement]
 tool = "verible-lint"
 rule = ["module-filename", "package-filename", "one-module-per-file"]
+[rule.also]
+verilator = ["DECLFILENAME"]
 
 [[rule]]
 id        = "STR-002"
@@ -431,7 +433,8 @@ bad = """
 """
 sources = ["lowRISC §Module Instantiation"]
 [rule.enforcement]
-tool = "review"
+tool = "verilator"
+rule = "PINMISSING"
 
 [[rule]]
 id        = "PRT-005"
@@ -453,6 +456,8 @@ sources = ["lowRISC §Module Instantiation", "Verilator DEFPARAM"]
 [rule.enforcement]
 tool = "verible-lint"
 rule = ["forbid-defparam", "module-port"]
+[rule.also]
+verilator = ["DEFPARAM"]
 
 [[rule]]
 id        = "PRT-006"
@@ -833,6 +838,8 @@ sources = ["Cummings SNUG-2000 guidelines #3, #10", "lowRISC §Combinational Log
 [rule.enforcement]
 tool = "verible-lint"
 rule = ["always-comb", "always-comb-blocking"]
+[rule.also]
+verilator = ["ALWCOMBORDER"]
 
 [[rule]]
 id        = "LNG-004"
@@ -933,6 +940,8 @@ sources = ["Cummings SNUG-2005", "lowRISC §Case Statements", "Verilator CASEINC
 [rule.enforcement]
 tool = "verible-lint"
 rule = "case-missing-default"
+[rule.also]
+verilator = ["CASEINCOMPLETE"]
 
 [[rule]]
 id        = "LNG-008"
@@ -976,7 +985,8 @@ endcase
 """
 sources = ["Cummings SNUG-1999 §casex"]
 [rule.enforcement]
-tool = "review"
+tool = "verilator"
+rule = "CASEX"
 
 [[rule]]
 id        = "LNG-010"
@@ -1054,6 +1064,8 @@ sources = ["Cummings SNUG-2000 guideline #8", "Verible"]
 [rule.enforcement]
 tool = "verible-lint"
 rule = "invalid-system-task-function"
+[rule.also]
+verilator = ["ASSIGNDLY", "STMTDLY"]
 
 [[rule]]
 id        = "LNG-014"
@@ -1077,6 +1089,69 @@ sources = ["house style", "lowRISC §Declare all signals (states the rule, not t
 tool    = "svstyle"
 rule    = "default_nettype"
 autofix = true
+[rule.also]
+verilator = ["IMPLICIT"]
+
+[[rule]]
+id        = "LNG-015"
+title     = "Operand widths match; selects stay in range"
+severity  = "MUST"
+category  = "LNG"
+statement = "Both sides of an assignment and the operands of an operator have the same width, or the code states the conversion with a cast (`W'(x)`), a replication or an explicit zero-extension; every part- and bit-select lies within the declared range."
+rationale = "An implicit width change is silent in both simulation and synthesis: a wider value is truncated and a narrower one is zero- or sign-extended by rules most readers cannot recite. The design compiles, and the missing top bit shows up as wrong arithmetic at the first large value. An out-of-range select reads `x` in simulation and an arbitrary bit in gates."
+good = """
+logic [3:0] nibble_o;
+assign nibble_o = data_i[3:0];          // Width stated by the select
+assign sum_d    = 9'(a_i) + 9'(b_i);    // Carry kept by the cast
+"""
+bad = """
+logic [3:0] nibble_o;
+assign nibble_o = data_i;               // 8 bits into 4, silently truncated
+"""
+sources = ["Verilator WIDTH", "lowRISC §Number Formatting"]
+[rule.enforcement]
+tool = "verilator"
+rule = ["WIDTH", "WIDTHTRUNC", "WIDTHEXPAND", "WIDTHXZEXPAND", "WIDTHCONCAT", "SELRANGE"]
+
+[[rule]]
+id        = "LNG-016"
+title     = "Every signal that is read has a driver"
+severity  = "MUST"
+category  = "LNG"
+statement = "No signal is read without being driven; an input that is intentionally constant is tied off explicitly where it is declared or connected."
+rationale = "An undriven net simulates as `z` or `x` and synthesis replaces it with a constant of its own choosing, usually zero, then optimises away everything that depended on it. The gates and the simulation both look plausible and disagree with each other and with the author."
+good = """
+logic busy_q;  // Driven by the state register below
+assign busy_o = busy_q;
+"""
+bad = """
+logic busy_q;  // Declared, never assigned
+assign busy_o = busy_q;
+"""
+sources = ["Verilator UNDRIVEN", "house style"]
+[rule.enforcement]
+tool = "verilator"
+rule = "UNDRIVEN"
+
+[[rule]]
+id        = "LNG-017"
+title     = "Every declared signal is used"
+severity  = "SHOULD"
+category  = "LNG"
+statement = "A declared signal is read somewhere; a signal or input bit that is deliberately unused carries a comment and a scoped Verilator waiver."
+rationale = "An unused signal is either dead code or a connection that was meant to be made. The second is a bug that no other check reports, and it hides among the first unless the dead code is removed or waived where it stands."
+good = """
+// verilator lint_off UNUSEDSIGNAL
+logic [7:0] spare_q;  // Reserved for the next revision
+// verilator lint_on UNUSEDSIGNAL
+"""
+bad = """
+logic [7:0] parity_q;  // Computed, then never connected to parity_o
+"""
+sources = ["Verilator UNUSEDSIGNAL", "house style"]
+[rule.enforcement]
+tool = "verilator"
+rule = ["UNUSEDSIGNAL", "UNUSEDGENVAR"]
 
 # ===========================================================================
 # SYN -- synthesis and portability
@@ -1129,6 +1204,8 @@ endcase
 sources = ["Cummings SNUG-2005 §unique & priority"]
 [rule.enforcement]
 tool = "review"
+[rule.also]
+verilator = ["CASEOVERLAP"]
 
 [[rule]]
 id        = "SYN-003"

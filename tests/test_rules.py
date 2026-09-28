@@ -181,6 +181,39 @@ def test_rejects_two_rules_claiming_the_same_tool_rule(tmp_path):
         load_rules(write(tmp_path, MULTI + second))
 
 
+ALSO = MULTI + '[rule.also]\nverilator = ["WIDTHTRUNC", "WIDTHEXPAND"]\n'
+
+
+def test_a_rule_may_name_secondary_enforcers(tmp_path):
+    (rule,) = load_rules(write(tmp_path, ALSO))
+    assert rule.also == (("verilator", ("WIDTHTRUNC", "WIDTHEXPAND")),)
+    assert tool_index([rule], "verilator")["WIDTHEXPAND"].id == "FMT-001"
+    assert "`WIDTHTRUNC`" in render_markdown_full([rule])
+    assert "WIDTHTRUNC" in render_html([rule])
+
+
+@pytest.mark.parametrize(
+    "also,message",
+    [
+        ('review = ["X"]', "also: tool must be one of"),
+        ('clang = ["X"]', "also: tool must be one of"),
+        ("verilator = []", "also.verilator must be a name or a list of names"),
+    ],
+)
+def test_rejects_malformed_also(tmp_path, also, message):
+    with pytest.raises(RulesError, match=message):
+        load_rules(write(tmp_path, MULTI + f"[rule.also]\n{also}\n"))
+
+
+def test_also_names_are_claimed_like_primary_ones(tmp_path):
+    second = MULTI.replace('id        = "FMT-001"', 'id        = "FMT-002"').replace(
+        'tool = "verible-lint"\nrule = ["no-tabs", "no-trailing-spaces", "posix-eof"]',
+        'tool = "verilator"\nrule = "WIDTHTRUNC"',
+    )
+    with pytest.raises(RulesError, match="already claimed by FMT-001"):
+        load_rules(write(tmp_path, ALSO + second))
+
+
 def test_the_shipped_verible_config_parses_to_61_rules():
     """The config is a delta on Verible's default ruleset, so it lists every rule."""
     from svstyle.cli import VERIBLE_LINT_CONFIG

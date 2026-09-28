@@ -5,14 +5,14 @@ description: Write, review and fix synthesizable SystemVerilog RTL in a lowRISC-
 
 # SystemVerilog RTL
 
-A house style with 76 rules, a checker/fixer (`svstyle`) that enforces the
+A house style, a checker/fixer (`svstyle`) that enforces the
 mechanical ones, and templates that already pass it. The rules exist so that
 RTL reads the same no matter who wrote it -- a person or a model -- and so a
 reviewer spends time on the design, not on whitespace and naming.
 
 ## Before writing any code
 
-Read `references/rules.md` (118 lines, one line per rule). It is short on
+Read `references/rules.md` (one line per rule). It is short on
 purpose: every rule you break there is a finding you will have to fix later.
 
 Start from the closest template in `assets/` rather than a blank file. Each
@@ -70,6 +70,8 @@ reason is unclear, or the user questions it, look it up in
 `references/rules-rationale.md` by searching for its heading (`### PRT-003`)
 rather than loading the whole file. Findings named `EXT-VL-*` / `EXT-VLTR-*`
 are tool warnings no house rule claims yet; fix them as the tool says.
+`EXT-VLTR-ERROR` means the design did not elaborate (an undeclared name, a
+bad connection): fix it first, because the rest of the report is incomplete.
 
 If `svstyle` is not on PATH, or for exit codes, `--json`, `--select` and
 waivers, read `references/tooling.md`.
@@ -88,12 +90,11 @@ list against the code you wrote:
   module whose only job is the crossing.
 - **FSMs** (FSM-001..004): `typedef enum` state, one FSM per module, no
   combinational outputs across the module boundary.
-- **Ports and instances** (PRT-002, PRT-004, PRT-006, PRT-007): clocks, then
-  resets, then the rest grouped by interface; every port connected in every
-  instance, unused outputs as explicit no-connects; ready/valid naming that
-  says which protocol it is.
-- **Case statements** (SYN-001..003, LNG-009): `unique case` + `default`;
-  no `casex`, no `full_case`/`parallel_case`; priority as `if`/`else if`.
+- **Ports and instances** (PRT-002, PRT-006, PRT-007): clocks, then
+  resets, then the rest grouped by interface; packed structs rather than
+  interfaces as ports; ready/valid naming that says which protocol it is.
+- **Case statements** (SYN-001..003): `unique case` + `default`;
+  no `full_case`/`parallel_case`; priority as `if`/`else if`.
 - **Parameters** (GEN-003): a parameter with restricted values gets an
   elaboration-time check, as the templates show.
 - **Assertions** (VER-001/002): `` `ASSERT_KNOWN`` on every output, plus

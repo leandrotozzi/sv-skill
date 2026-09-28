@@ -34,6 +34,8 @@ SEVERITIES = ("MUST", "SHOULD", "MAY")
 
 # Who enforces a rule. `review` means no tool can: the skill and a human carry it.
 TOOLS = ("verible-format", "verible-lint", "verilator", "svstyle", "review")
+# Tools that report diagnostics by name, so can back up a rule another tool owns.
+ALSO_TOOLS = ("verible-lint", "verilator")
 
 _REQUIRED = ("id", "title", "severity", "category", "statement", "rationale", "sources")
 
@@ -60,6 +62,10 @@ class Rule:
     autofix: bool
     good: str = ""
     bad: str = ""
+    # Secondary enforcers from `[rule.also]`: another tool that reports the same
+    # rule under its own names (LNG-007 is Verible `case-missing-default` and
+    # Verilator CASEINCOMPLETE). They map diagnostics; `tool` stays the owner.
+    also: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     @property
     def number(self) -> int:
@@ -87,7 +93,7 @@ def _rule_from_toml(raw: dict, index: int) -> Rule:
     if missing:
         raise RulesError(f"{where}: missing or empty {', '.join(missing)}")
 
-    known = {f.name for f in fields(Rule)} - {"tool", "tool_rule", "autofix"}
+    known = {f.name for f in fields(Rule)} - {"tool", "tool_rules", "autofix"}
     unknown = set(raw) - known - {"enforcement"}
     if unknown:
         raise RulesError(f"{where}: unknown key(s) {', '.join(sorted(unknown))}")
@@ -106,14 +112,14 @@ def _rule_from_toml(raw: dict, index: int) -> Rule:
     tool = enf.get("tool")
     if tool not in TOOLS:
         raise RulesError(f"{rid}: enforcement.tool must be one of {', '.join(TOOLS)}")
-    raw_rule = enf.get("rule", ())
-    if isinstance(raw_rule, str):
-        raw_rule = (raw_rule,) if raw_rule else ()
-    if not all(isinstance(n, str) and n for n in raw_rule):
-        raise RulesError(f"{rid}: enforcement.rule must be a name or a list of names")
-    tool_rules = tuple(raw_rule)
-    if len(set(tool_rules)) != len(tool_rules):
-        raise RulesError(f"{rid}: enforcement.rule repeats a name")
+    tool_rules = _names(enf.get("rule", ()), f"{rid}: enforcement.rule")
+    also = []
+    for t, names in (raw.get("also") or {}).items():
+        if t not in ALSO_TOOLS:
+            raise RulesError(f"{rid}: also: tool must be one of {', '.join(ALSO_TOOLS)}")
+        also.append((t, _names(names, f"{rid}: also.{t}")))
+        if not also[-1][1]:
+            raise RulesError(f"{rid}: also.{t} must be a name or a list of names")
     if tool == "review" and tool_rules:
         raise RulesError(f"{rid}: enforcement.rule is meaningless for tool='review'")
     if tool not in ("review", "verible-format") and not tool_rules:
@@ -135,7 +141,25 @@ def _rule_from_toml(raw: dict, index: int) -> Rule:
         autofix=autofix,
         good=raw.get("good", "").strip("\n"),
         bad=raw.get("bad", "").strip("\n"),
+        also=tuple(also),
     )
+
+
+def _names(raw, where: str) -> tuple[str, ...]:
+    if isinstance(raw, str):
+        raw = (raw,) if raw else ()
+    if not isinstance(raw, list | tuple) or not all(isinstance(n, str) and n for n in raw):
+        raise RulesError(f"{where} must be a name or a list of names")
+    if len(set(raw)) != len(raw):
+        raise RulesError(f"{where} repeats a name")
+    return tuple(raw)
+
+
+def claims(rule: Rule) -> list[tuple[str, str]]:
+    """Every (tool, tool-side name) this rule answers for, owner first."""
+    return [(rule.tool, n) for n in rule.tool_rules] + [
+        (t, n) for t, names in rule.also for n in names
+    ]
 
 
 def load_rules(path: Path | None = None) -> list[Rule]:
@@ -160,11 +184,10 @@ def load_rules(path: Path | None = None) -> list[Rule]:
     # mapping ambiguous and silently hide one of them.
     claimed: dict[tuple[str, str], str] = {}
     for rule in rules:
-        for name in rule.tool_rules:
-            key = (rule.tool, name)
+        for key in claims(rule):
             if key in claimed:
                 raise RulesError(
-                    f"{rule.id}: {rule.tool} rule {name!r} is already claimed by {claimed[key]}"
+                    f"{rule.id}: {key[0]} rule {key[1]!r} is already claimed by {claimed[key]}"
                 )
             claimed[key] = rule.id
 
@@ -185,4 +208,4 @@ def tool_index(rules: list[Rule], tool: str) -> dict[str, Rule]:
 
     Used to translate Verible and Verilator diagnostics into house rule IDs.
     """
-    return {name: r for r in rules if r.tool == tool for name in r.tool_rules}
+    return {name: r for r in rules for t, name in claims(r) if t == tool}

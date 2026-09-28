@@ -26,11 +26,20 @@ VERIBLE_LINT_RE = re.compile(
     r"^(?P<path>.+?):(?P<line>\d+):(?P<col>\d+)(?:-\d+)?: (?P<msg>.*?)"
     r"(?: \[Style: [^\]]*\])? \[(?P<rule>[a-z0-9-]+)\]$"
 )
-PACKAGE_RE = re.compile(r"^\s*package\s+\w+\s*;", re.MULTILINE)
-VERILATOR_RE = re.compile(
-    r"^%(?:Warning|Error)-(?P<code>[A-Z0-9_]+): (?P<path>.+?):(?P<line>\d+):(?P<col>\d+): "
-    r"(?P<msg>.*)$"
+# pyslang accepted the file before Verible saw it, so this is Verible's parser
+# falling short, not the author's bug: say so, at SHOULD, instead of going quiet.
+VERIBLE_SYNTAX_RE = re.compile(
+    r"^(?P<path>.+?):(?P<line>\d+):(?P<col>\d+)(?:-\d+)?: (?P<msg>syntax error.*)$"
 )
+PACKAGE_RE = re.compile(r"^\s*package\s+\w+\s*;", re.MULTILINE)
+# The code is optional: elaboration errors (an undeclared name under
+# `default_nettype none) print as a bare `%Error:`.
+VERILATOR_RE = re.compile(
+    r"^%(?P<kind>Warning|Error)(?:-(?P<code>[A-Z0-9_]+))?: "
+    r"(?P<path>.+?):(?P<line>\d+):(?P<col>\d+): (?P<msg>.*)$"
+)
+# Errors that are expected when checking part of a design, so they stay SHOULD.
+SOFT_ERRORS = {"MODMISSING"}
 
 
 class ToolMissing(Exception):
@@ -89,8 +98,19 @@ def verilator_lint(
 ) -> list[Diag]:
     # MULTITOP: checking a set of files is not elaborating a design top.
     dirs = dict.fromkeys([*include_dirs, *(str(Path(p).parent) for p in paths)])
+    # PINCONNECTEMPTY: `.q_o()` is the explicit no-connect PRT-004 asks for.
     args = ["--lint-only", "-Wall", "-Wno-fatal", "-Wno-context", "-Wno-MULTITOP"]
-    args += [f"-I{d}" for d in dirs] + paths
+    args += ["-Wno-PINCONNECTEMPTY"] + [f"-I{d}" for d in dirs] + paths
+    res = _run("verilator", args)
+    diags = parse_verilator(res.stderr, rules)
+    lines = res.stderr.splitlines()
+    located = any((m := VERILATOR_RE.match(ln)) and m.group("kind") == "Error" for ln in lines)
+    if res.returncode != 0 and not located:
+        # Failed without saying where: the design did not elaborate, so its
+        # silence about everything else is not a clean bill.
+        why = next((ln for ln in lines if ln.startswith("%Error")), "")
+        why = why or f"verilator exit {res.returncode}"
+        diags.append(Diag(paths[0], 1, 1, "EXT-VLTR-ERROR", "MUST", why))
     # Verilator also lints submodules it finds on its own; report only what was asked.
     asked = {Path(p).resolve() for p in paths}
     # A package's constants are used by modules elsewhere in the design, so
@@ -98,36 +118,43 @@ def verilator_lint(
     packages = {Path(p).resolve() for p in paths if PACKAGE_RE.search(Path(p).read_text())}
     return [
         d
-        for d in parse_verilator(_run("verilator", args).stderr, rules)
+        for d in diags
         if (path := Path(d.path).resolve()) in asked
         and not (path in packages and d.rule == "EXT-VLTR-UNUSEDPARAM")
     ]
 
 
 def parse_verible_lint(output: str, rules: list[Rule]) -> list[Diag]:
-    return _translate(VERIBLE_LINT_RE, output, tool_index(rules, "verible-lint"), "EXT-VL-")
+    index = tool_index(rules, "verible-lint")
+    out = []
+    for line in output.splitlines():
+        if m := VERIBLE_LINT_RE.match(line):
+            rule = index.get(m.group("rule"))
+            rid, sev = (rule.id, rule.severity) if rule else ("EXT-VL-" + m.group("rule"), "SHOULD")
+            out.append(_diag(m, rid, sev))
+        elif m := VERIBLE_SYNTAX_RE.match(line):
+            msg = f"Verible cannot parse this; its lint rules were not checked: {m.group('msg')}"
+            out.append(Diag(m.group("path"), int(m.group("line")), int(m.group("col")),
+                            "EXT-VL-syntax", "SHOULD", msg))  # fmt: skip
+    return out
 
 
 def parse_verilator(output: str, rules: list[Rule]) -> list[Diag]:
-    return _translate(VERILATOR_RE, output, tool_index(rules, "verilator"), "EXT-VLTR-")
-
-
-def _translate(regex: re.Pattern, output: str, index: dict[str, Rule], prefix: str) -> list[Diag]:
+    index = tool_index(rules, "verilator")
     out = []
     for line in output.splitlines():
-        m = regex.match(line)
-        if not m:
+        if not (m := VERILATOR_RE.match(line)):
             continue
-        name = m.group("rule") if "rule" in regex.groupindex else m.group("code")
-        rule = index.get(name)
-        out.append(
-            Diag(
-                m.group("path"),
-                int(m.group("line")),
-                int(m.group("col")),
-                rule.id if rule else prefix + name,
-                rule.severity if rule else "SHOULD",
-                m.group("msg"),
-            )
-        )
+        code = m.group("code") or "ERROR"
+        if rule := index.get(code):
+            out.append(_diag(m, rule.id, rule.severity))
+        else:
+            hard = m.group("kind") == "Error" and code not in SOFT_ERRORS
+            out.append(_diag(m, "EXT-VLTR-" + code, "MUST" if hard else "SHOULD"))
     return out
+
+
+def _diag(m: re.Match, rule: str, severity: str) -> Diag:
+    return Diag(
+        m.group("path"), int(m.group("line")), int(m.group("col")), rule, severity, m.group("msg")
+    )

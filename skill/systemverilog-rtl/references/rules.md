@@ -73,6 +73,9 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 - **LNG-012** · MUST · Packed dimensions are declared `[N-1:0]` and unpacked dimensions `[0:N-1]` or `[N]`; no dimension may evaluate to a negative size.
 - **LNG-013** · MUST · Synthesizable RTL contains no system tasks or functions that exist only for simulation, and no `#` delays.
 - **LNG-014** · SHOULD · Each `.sv` file begins with `` `default_nettype none`` after the header and ends with `` `resetall``. `[fix]`
+- **LNG-015** · MUST · Both sides of an assignment and the operands of an operator have the same width, or the code states the conversion with a cast (`W'(x)`), a replication or an explicit zero-extension; every part- and bit-select lies within the declared range.
+- **LNG-016** · MUST · No signal is read without being driven; an input that is intentionally constant is tied off explicitly where it is declared or connected.
+- **LNG-017** · SHOULD · A declared signal is read somewhere; a signal or input bit that is deliberately unused carries a comment and a scoped Verilator waiver.
 
 ## SYN — Synthesis and portability
 

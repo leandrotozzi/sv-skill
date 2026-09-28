@@ -92,8 +92,8 @@ the author after the fix.
 | `svstyle` | DOC-001..006, PRT-001, PRT-003, LNG-014 | header, comments, ANSI ports, named connections, `default_nettype` |
 | Verible format | FMT-002 | reported as "file needs formatting"; `svstyle fix` resolves it |
 | Verible lint | naming, `always_comb`/`always_ff` usage, `begin`/`end`, file names, literals, ... | tool rule name maps to the house ID |
-| Verilator `-Wall` | LNG-004..006, RST-005 | latches, multi-driven signals, mixed assignments |
-| review | 38 rules | `svstyle rules --unmapped`; walk them yourself |
+| Verilator `-Wall` | LNG-004..006, LNG-009, LNG-015..017, PRT-004, RST-005 | latches, multi-driven, mixed assignments, `casex`, widths, undriven/unused signals, missing pins; also backs up STR-001, PRT-005, LNG-003, LNG-007, LNG-013, LNG-014, SYN-002 |
+| review | 36 rules | `svstyle rules --unmapped`; walk them yourself |
 
 Tool findings with no house rule pass through as `EXT-VL-<rule>` (Verible)
 or `EXT-VLTR-<CODE>` (Verilator) at SHOULD. The common ones:
@@ -103,9 +103,12 @@ or `EXT-VLTR-<CODE>` (Verilator) at SHOULD. The common ones:
   `--ignore EXT-VLTR-MODMISSING` silences it.
 - `EXT-VLTR-UNUSEDPARAM` is not reported for package constants: their users
   live in other files, so "unused" says nothing when a package is checked.
-- `EXT-VLTR-DECLFILENAME`: file and design-unit names differ (STR-001).
-- `EXT-VLTR-PINCONNECTEMPTY`: an output connected as `.q_o()`. Fine when
-  deliberate (PRT-004); otherwise connect it.
+- `EXT-VLTR-ERROR` (MUST): the design did not elaborate -- an undeclared
+  name, a port that does not exist. Fix it first; the rest of the report is
+  incomplete until it is gone.
+
+An output left open as `.q_o()` is PRT-004's explicit no-connect and is not
+reported; a port missing from the instance is (PRT-004).
 
 FMT-002 without `[fix available]` means Verible cannot format the file at
 all (its layout does not converge); lay that region out by hand.
@@ -127,7 +130,7 @@ module phy_if #(
 ) (
     ...
 );
-    /* verilator lint_off UNUSED */
+    // verilator lint_off UNUSEDSIGNAL
     logic [7:0] spare_q;  // Reserved for the next revision
-    /* verilator lint_on UNUSED */
+    // verilator lint_on UNUSEDSIGNAL
 ```

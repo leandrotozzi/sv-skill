@@ -27,7 +27,8 @@ VERILATOR_OUT = """\
                        ... For warning description see https://verilator.org/warn/LATCH?v=5.052
 %Warning-DECLFILENAME: ks.sv:7:9: Filename 'ks' does not match PACKAGE name: 'ks_pkg'
 %Error-MODMISSING: ks.sv:55:9: Cannot find file containing module: 'ks_buf'
-%Error: Exiting due to 1 error(s)
+%Error: ks.sv:6:12: Signal definition not found, and implicit disabled with `default_nettype: 'b_ou'
+%Error: Exiting due to 2 error(s)
 """  # noqa: E501
 
 
@@ -51,9 +52,19 @@ def test_parse_verible_lint_keeps_message_without_tags():
 def test_parse_verilator_maps_codes_and_passes_unknown_through():
     assert _brief(ext.parse_verilator(VERILATOR_OUT, RULES)) == [
         ("ks.sv", 12, 5, "LNG-006", "MUST"),
-        ("ks.sv", 7, 9, "EXT-VLTR-DECLFILENAME", "SHOULD"),
+        ("ks.sv", 7, 9, "STR-001", "MUST"),
+        # A submodule outside the file list is expected when checking a subset.
         ("ks.sv", 55, 9, "EXT-VLTR-MODMISSING", "SHOULD"),
+        # An error without a code is an elaboration failure: never dropped, never soft.
+        ("ks.sv", 6, 12, "EXT-VLTR-ERROR", "MUST"),
     ]
+
+
+def test_parse_verible_lint_reports_its_own_syntax_errors():
+    """pyslang already accepted the file, so this is Verible's parser, not the author's bug."""
+    (d,) = ext.parse_verible_lint('vbad.sv:3:1-9: syntax error at token "endmodule"\n', RULES)
+    assert (d.rule, d.severity, d.line) == ("EXT-VL-syntax", "SHOULD", 3)
+    assert "not checked" in d.message
 
 
 # --- real tools ---------------------------------------------------------------
@@ -94,6 +105,47 @@ def test_verilator_lint_reports_latch(tmp_path):
         "    always_comb begin\n        if (a_i) q_o = 1'b1;\n    end\nendmodule\n"
     )
     assert "LNG-006" in {d.rule for d in ext.verilator_lint([str(f)], RULES)}
+
+
+@needs_verilator
+def test_verilator_elaboration_error_is_a_must(tmp_path):
+    f = tmp_path / "typo.sv"
+    f.write_text(
+        "`default_nettype none\nmodule typo (\n    input  logic a_i,\n    output logic b_o\n);\n"
+        "    assign b_ou = a_i;\nendmodule\n`resetall\n"
+    )
+    assert ("EXT-VLTR-ERROR", "MUST", 6) in {
+        (d.rule, d.severity, d.line) for d in ext.verilator_lint([str(f)], RULES)
+    }
+
+
+def test_verilator_failure_without_a_located_error_is_reported(tmp_path, monkeypatch):
+    f = tmp_path / "m.sv"
+    f.write_text("module m;\nendmodule\n")
+    monkeypatch.setattr(ext, "_run", _fake_run(1, "%Error: Internal Error: something broke\n"))
+    (d,) = ext.verilator_lint([str(f)], RULES)
+    assert (d.path, d.rule, d.severity) == (str(f), "EXT-VLTR-ERROR", "MUST")
+    assert "Internal Error" in d.message
+
+
+@needs_verilator
+def test_verilator_synthesis_warnings_map_to_house_rules(tmp_path):
+    f = tmp_path / "bugs.sv"
+    f.write_text(
+        "module bugs (\n    input  logic [7:0] a_i,\n    input  logic [1:0] s_i,\n"
+        "    output logic [3:0] n_o,\n    output logic l_o,\n    output logic c_o,\n"
+        "    output logic u_o\n);\n    logic und, spare;\n    assign n_o = a_i;\n"
+        "    assign l_o = und;\n    always_comb begin\n        c_o = 1'b0;\n"
+        "        case (s_i)\n            2'b00: c_o = 1'b1;\n            2'b01: c_o = 1'b0;\n"
+        "        endcase\n    end\n    always_comb begin\n        casex (s_i)\n"
+        "            2'b1x: u_o = 1'b1;\n            default: u_o = a_i[9];\n        endcase\n"
+        "    end\n    sub u_sub (.a_i(a_i[0]), .o_o());\nendmodule\n"
+        "module sub (input logic a_i, input logic b_i, output logic o_o);\n"
+        "    assign o_o = a_i & b_i;\nendmodule\n"
+    )
+    rules = {d.rule for d in ext.verilator_lint([str(f)], RULES)}
+    assert {"PRT-004", "STR-001", "LNG-015", "LNG-016", "LNG-017", "LNG-007", "LNG-009"} <= rules
+    assert not {r for r in rules if r.startswith("EXT-")}, rules  # `.o_o()` is PRT-004's no-connect
 
 
 def test_missing_tool_raises(monkeypatch):
