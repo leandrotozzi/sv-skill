@@ -184,3 +184,19 @@ def test_format_failure_message_is_short(monkeypatch):
 def test_ci_pins_the_same_verible_as_the_code():
     ci = (Path(__file__).parents[1] / ".github" / "workflows" / "ci.yml").read_text()
     assert f"VERIBLE: {ext.KNOWN_GOOD_VERIBLE_VERSION}" in ci
+
+
+@needs_verilator
+def test_package_constants_are_not_unused_when_linted_alone(tmp_path):
+    pkg = tmp_path / "cfg_pkg.sv"
+    pkg.write_text(
+        "package cfg_pkg;\n    localparam int unsigned Depth = 4;  // Entries\nendpackage\n"
+    )
+    mod = tmp_path / "m.sv"
+    mod.write_text(
+        "module m #(\n    parameter int unsigned Spare = 1  // Unused on purpose\n) (\n"
+        "    input logic a_i,\n    output logic b_o\n);\n    assign b_o = a_i;\nendmodule\n"
+    )
+    rules = [(Path(d.path).name, d.rule) for d in ext.verilator_lint([str(pkg), str(mod)], RULES)]
+    assert ("cfg_pkg.sv", "EXT-VLTR-UNUSEDPARAM") not in rules
+    assert ("m.sv", "EXT-VLTR-UNUSEDPARAM") in rules  # a module's unused parameter still counts

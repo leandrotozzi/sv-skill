@@ -26,6 +26,7 @@ VERIBLE_LINT_RE = re.compile(
     r"^(?P<path>.+?):(?P<line>\d+):(?P<col>\d+)(?:-\d+)?: (?P<msg>.*?)"
     r"(?: \[Style: [^\]]*\])? \[(?P<rule>[a-z0-9-]+)\]$"
 )
+PACKAGE_RE = re.compile(r"^\s*package\s+\w+\s*;", re.MULTILINE)
 VERILATOR_RE = re.compile(
     r"^%(?:Warning|Error)-(?P<code>[A-Z0-9_]+): (?P<path>.+?):(?P<line>\d+):(?P<col>\d+): "
     r"(?P<msg>.*)$"
@@ -92,10 +93,14 @@ def verilator_lint(
     args += [f"-I{d}" for d in dirs] + paths
     # Verilator also lints submodules it finds on its own; report only what was asked.
     asked = {Path(p).resolve() for p in paths}
+    # A package's constants are used by modules elsewhere in the design, so
+    # "unused" means nothing when the package is linted without them.
+    packages = {Path(p).resolve() for p in paths if PACKAGE_RE.search(Path(p).read_text())}
     return [
         d
         for d in parse_verilator(_run("verilator", args).stderr, rules)
-        if Path(d.path).resolve() in asked
+        if (path := Path(d.path).resolve()) in asked
+        and not (path in packages and d.rule == "EXT-VLTR-UNUSEDPARAM")
     ]
 
 
