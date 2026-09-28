@@ -99,7 +99,10 @@ Tool findings with no house rule pass through as `EXT-VL-<rule>` (Verible)
 or `EXT-VLTR-<CODE>` (Verilator) at SHOULD. The common ones:
 
 - `EXT-VLTR-MODMISSING`: a submodule's file was not on the command line.
-  Pass all the design's files together.
+  Pass all the design's files together; when checking one file on purpose,
+  `--ignore EXT-VLTR-MODMISSING` silences it.
+- `EXT-VLTR-UNUSEDPARAM` is not reported for package constants: their users
+  live in other files, so "unused" says nothing when a package is checked.
 - `EXT-VLTR-DECLFILENAME`: file and design-unit names differ (STR-001).
 - `EXT-VLTR-PINCONNECTEMPTY`: an output connected as `.q_o()`. Fine when
   deliberate (PRT-004); otherwise connect it.
