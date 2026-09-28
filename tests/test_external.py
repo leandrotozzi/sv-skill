@@ -308,5 +308,6 @@ def test_yosys_finds_a_combinational_loop(tmp_path):
 @needs_yosys
 def test_yosys_passes_the_templates():
     assets = Path(__file__).parents[1] / "skill" / "systemverilog-rtl" / "assets"
-    files = [str(assets / "fsm_pkg.sv"), str(assets / "fsm.sv"), str(assets / "skeleton.sv")]
+    # Glob order puts fsm.sv before the package it uses; Yosys must read packages first.
+    files = [str(assets / "fsm.sv"), str(assets / "fsm_pkg.sv"), str(assets / "skeleton.sv")]
     assert ext.yosys_check(files, RULES, [str(assets)]) == []

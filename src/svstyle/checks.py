@@ -287,6 +287,9 @@ def check_constructs(ctx: _Ctx, text: str, src: Source) -> None:
             what = m.group(1) or m.group(2)
             msg = f"`{what}` directive: simulation and synthesis would see different logic"
             ctx.emit(rule="synthesis_directives", line=no, message=msg)
+    for line in src.initial_lines:
+        msg = "`initial` in RTL: synthesis ignores it; give state its value from reset"
+        ctx.emit(rule="initial_block", line=line, message=msg)
     for line in src.file_imports:
         msg = "file-scope import leaks into every unit; import in the module header"
         ctx.emit(rule="import_scope", line=line, message=msg)

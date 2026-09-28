@@ -43,6 +43,7 @@ SNIPPETS = {
     "LNG-001": ("m.sv", mod("    wire x;\n    assign x = a_i;\n    assign b_o = x;")),
     "SYN-001": ("m.sv", mod("    always_comb begin\n        b_o = 1'b0;\n        case (a_i)  // synopsys full_case\n"
                             "            1'b1: b_o = 1'b1;\n            default: b_o = 1'b0;\n        endcase\n    end")),
+    "SYN-006": ("m.sv", mod("    logic x;\n    initial begin\n        x = 1'b0;\n    end\n    assign b_o = x & a_i;")),
     "SYN-005": ("m.sv", mod("    logic x, y;\n    assign x = y ^ a_i;\n    assign y = x;\n    assign b_o = y;")),
     "RST-001": ("m.sv", mod("    logic x_q;\n    always_ff @(posedge clk_i) begin\n        if (rst_ni) begin\n"
                             "            x_q <= 1'b0;\n        end else begin\n            x_q <= a_i;\n        end\n"

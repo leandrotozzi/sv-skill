@@ -12,13 +12,12 @@ from the syntax tree; the invariant here makes sure nothing else changed.
 """
 
 import difflib
-import re
 from collections.abc import Sequence
 from functools import cache
 
 from .checks import PLACEHOLDER, run_checks
 from .external import verible_format
-from .parse import ParseError, parse, raw_tokens
+from .parse import DIRECTIVE_LINE_RE, ParseError, parse, raw_tokens
 from .rules import Rule
 
 # (tokens before, tokens after) for every token edit a fix may make.
@@ -39,8 +38,6 @@ ALLOWED_EDITS = (
 
 MAX_PASSES = 4  # each pass only adds structure; real code settles in two
 INSERTED = frozenset(tok for old, new in ALLOWED_EDITS if not old for tok in new)
-
-DIRECTIVE_LINE_RE = re.compile(r"^[ \t]*`(ifdef|ifndef|elsif|else|endif)\b[ \t]*(\w*)(.*)$")
 
 
 class InvariantError(Exception):

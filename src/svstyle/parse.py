@@ -68,11 +68,28 @@ class Source:
     # while `logic x = a;` is only an initial value. Wires the tree cannot see
     # (macros, disabled `ifdef` text) are never listed.
     safe_wires: set[int] = field(default_factory=set)
+    # `initial` blocks written in this file, outside macros and `ifdef regions.
+    initial_lines: list[int] = field(default_factory=list)
     # Token-rewriting fixes for code the formatter cannot touch: (offset, text, cut).
     rewrites: list[tuple[int, str, int]] = field(default_factory=list)
 
 
 EDGE_RE = re.compile(r"\b(posedge|negedge)\s+(\w+)")
+DIRECTIVE_LINE_RE = re.compile(r"^[ \t]*`(ifdef|ifndef|elsif|else|endif)\b[ \t]*(\w*)(.*)$")
+
+
+def conditional_lines(text: str) -> set[int]:
+    """1-based lines inside any `ifdef / `ifndef region, directives included."""
+    out, depth = set(), 0
+    for no, ln in enumerate(text.splitlines(), 1):
+        m = DIRECTIVE_LINE_RE.match(ln)
+        if m and m.group(1) in ("ifdef", "ifndef"):
+            depth += 1
+        if depth:
+            out.add(no)
+        if m and m.group(1) == "endif":
+            depth = max(depth - 1, 0)
+    return out
 
 
 def raw_tokens(text: str) -> list[tuple[TokenKind, str, int]]:
@@ -136,6 +153,7 @@ class _Walker:
         self.anchors: list[Anchor] = []
         self.non_ansi: list[tuple[str, int]] = []
         self.src = Source(text, self.anchors, self.non_ansi)
+        self.guarded = conditional_lines(text)
 
     def run(self) -> Source:
         self.walk(self.root, split_list=False)
@@ -180,6 +198,10 @@ class _Walker:
                 self.src.safe_wires.add(self.offset(h.netType))
         elif k == K.AlwaysBlock:
             self.legacy_always(node)
+        elif k == K.InitialBlock:
+            line = self.line(node.getFirstToken())
+            if line not in self.guarded:
+                self.src.initial_lines.append(line)
         elif k == K.GenerateRegion:
             for tok in (node.keyword, node.endgenerate):
                 self.delete_line_or_token(tok)

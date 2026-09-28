@@ -1175,6 +1175,26 @@ sources = ["Verilator UNUSEDSIGNAL", "house style"]
 tool = "verilator"
 rule = ["UNUSEDSIGNAL", "UNUSEDGENVAR"]
 
+[[rule]]
+id        = "LNG-018"
+title     = "Signed arithmetic is declared, never mixed"
+severity  = "MUST"
+category  = "LNG"
+statement = "A signal that holds a two's-complement value is declared `signed`, and an expression that mixes it with unsigned operands converts them explicitly with `$signed()` / `$unsigned()`."
+rationale = "IEEE 1800 evaluates an expression as signed only when every operand is signed: one unsigned operand -- a port, a part-select, a sized literal like `4'd1` -- silently makes the whole expression unsigned, so a negative value compares as a large positive one and a right shift fills with zeros. The code reads correctly and simulates wrongly only for negative inputs, which are the ones a directed test forgets."
+good = """
+logic signed [7:0] offset_i;
+logic signed [8:0] sum;
+assign sum = $signed({1'b0, base_i}) + offset_i;   // Both operands signed
+"""
+bad = """
+logic signed [7:0] offset_i;
+assign sum = base_i + offset_i;                    // base_i unsigned: all unsigned
+"""
+sources = ["IEEE 1800-2017 §11.8.1 (expression type rules)", "house style"]
+[rule.enforcement]
+tool = "review"
+
 # ===========================================================================
 # SYN -- synthesis and portability
 # ===========================================================================
@@ -1289,6 +1309,26 @@ sources = ["Yosys check", "house style"]
 [rule.enforcement]
 tool = "yosys"
 rule = "logic-loop"
+
+[[rule]]
+id        = "SYN-006"
+title     = "No `initial` blocks in synthesizable RTL"
+severity  = "SHOULD"
+category  = "SYN"
+statement = "Synthesizable RTL gives state its starting value through reset, not an `initial` block. Simulation-only code that needs one sits under `` `ifndef SYNTHESIS``, and elaboration-time checks go through `` `ASSERT_INIT`` or a generate-time `$error`."
+rationale = "ASIC synthesis ignores `initial` blocks, so a design that relies on one simulates from a value the silicon never has, and the first sign is a chip that does not come out of power-on the way the testbench did. FPGA flows do honour initial values for registers, which is why this is a SHOULD: a deliberate FPGA-only use carries a waiver saying so."
+good = """
+always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+        count_q <= '0;       // Starting value from reset
+"""
+bad = """
+initial count_q = '0;    // Ignored by ASIC synthesis
+"""
+sources = ["IEEE 1800-2017 §9.2.1 (initial procedures)", "house style"]
+[rule.enforcement]
+tool = "svstyle"
+rule = "initial_block"
 
 # ===========================================================================
 # RST -- reset and clocking

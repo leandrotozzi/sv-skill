@@ -76,6 +76,7 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 - **LNG-015** · MUST · Both sides of an assignment and the operands of an operator have the same width, or the code states the conversion with a cast (`W'(x)`), a replication or an explicit zero-extension; every part- and bit-select lies within the declared range.
 - **LNG-016** · MUST · No signal is read without being driven; an input that is intentionally constant is tied off explicitly where it is declared or connected.
 - **LNG-017** · SHOULD · A declared signal is read somewhere; a signal or input bit that is deliberately unused carries a comment and a scoped Verilator waiver.
+- **LNG-018** · MUST · A signal that holds a two's-complement value is declared `signed`, and an expression that mixes it with unsigned operands converts them explicitly with `$signed()` / `$unsigned()`.
 
 ## SYN — Synthesis and portability
 
@@ -84,6 +85,7 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 - **SYN-003** · SHOULD · Intentional priority is written as an `if`/`else if` chain; a `case` statement is reserved for logic whose arms are genuinely mutually exclusive.
 - **SYN-004** · MUST · A module does not instantiate itself, directly or through a cycle.
 - **SYN-005** · MUST · No signal depends combinationally on itself: every feedback path passes through a flop.
+- **SYN-006** · SHOULD · Synthesizable RTL gives state its starting value through reset, not an `initial` block. Simulation-only code that needs one sits under `` `ifndef SYNTHESIS``, and elaboration-time checks go through `` `ASSERT_INIT`` or a generate-time `$error`.
 
 ## RST — Reset and clocking
 

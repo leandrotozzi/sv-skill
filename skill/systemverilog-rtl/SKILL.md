@@ -65,7 +65,7 @@ alone and why.
 
 ```sh
 svstyle fix   rtl/*.sv     # Verible formatting + anything insertable
-svstyle check rtl/*.sv     # svstyle + Verible lint + Verilator, one report
+svstyle check --synth rtl/*.sv  # svstyle + Verible lint + Verilator + Yosys, one report
 ```
 
 Pass every file of the design in one call: Verilator needs the submodules

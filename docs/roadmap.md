@@ -56,9 +56,15 @@ through today. Each item names the finding and the fix.
 
 ## M5 — Missing rules for clean synthesis
 
-- [ ] **9.** Combinational loops, signed/unsigned mixing and width extension,
+- [x] **9.** Combinational loops, signed/unsigned mixing and width extension,
   default-`'x` policy, `initial` in RTL, memory inference, unused/undriven
-  signals.
+  signals. Done: SYN-005 loops (Yosys, `--synth`), LNG-015 widths/selects,
+  LNG-016 undriven, LNG-017 unused (Verilator), LNG-018 signed mixing
+  (review: no tool reports it), SYN-006 `initial` (svstyle, SHOULD).
+  Not added: a default-`'x` rule (practice genuinely differs; X-optimism is
+  a verification-flow decision) and a memory-inference rule (RST-004 plus the
+  NAM-004 memory exemption already cover the style side; an inferred-RAM
+  eval covers the rest, item 16).
 
 ## M6 — `fix` for legacy code
 

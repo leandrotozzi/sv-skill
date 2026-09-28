@@ -10,8 +10,8 @@ heading, e.g. `### DOC-003`, instead of loading the whole file.
 - PRT — Ports and connections: PRT-001 … PRT-007
 - NAM — Naming: NAM-001 … NAM-010
 - FMT — Formatting and layout: FMT-001 … FMT-005
-- LNG — Language features: LNG-001 … LNG-017
-- SYN — Synthesis and portability: SYN-001 … SYN-005
+- LNG — Language features: LNG-001 … LNG-018
+- SYN — Synthesis and portability: SYN-001 … SYN-006
 - RST — Reset and clocking: RST-001 … RST-005
 - FSM — State machines: FSM-001 … FSM-004
 - CDC — Clock domain crossing: CDC-001 … CDC-006
@@ -1382,6 +1382,31 @@ logic [7:0] parity_q;  // Computed, then never connected to parity_o
 
 **Sources:** Verilator UNUSEDSIGNAL, house style
 
+### LNG-018 (MUST) — Signed arithmetic is declared, never mixed
+
+A signal that holds a two's-complement value is declared `signed`, and an expression that mixes it with unsigned operands converts them explicitly with `$signed()` / `$unsigned()`.
+
+**Why:** IEEE 1800 evaluates an expression as signed only when every operand is signed: one unsigned operand -- a port, a part-select, a sized literal like `4'd1` -- silently makes the whole expression unsigned, so a negative value compares as a large positive one and a right shift fills with zeros. The code reads correctly and simulates wrongly only for negative inputs, which are the ones a directed test forgets.
+
+**Good:**
+
+```systemverilog
+logic signed [7:0] offset_i;
+logic signed [8:0] sum;
+assign sum = $signed({1'b0, base_i}) + offset_i;   // Both operands signed
+```
+
+**Bad:**
+
+```systemverilog
+logic signed [7:0] offset_i;
+assign sum = base_i + offset_i;                    // base_i unsigned: all unsigned
+```
+
+**Enforced by:** review only
+
+**Sources:** IEEE 1800-2017 §11.8.1 (expression type rules), house style
+
 ## SYN — Synthesis and portability
 
 ### SYN-001 (MUST) — `full_case` and `parallel_case` are never used
@@ -1516,6 +1541,30 @@ assign stall   = ready_o & busy_i;
 **Enforced by:** yosys `logic-loop`
 
 **Sources:** Yosys check, house style
+
+### SYN-006 (SHOULD) — No `initial` blocks in synthesizable RTL
+
+Synthesizable RTL gives state its starting value through reset, not an `initial` block. Simulation-only code that needs one sits under `` `ifndef SYNTHESIS``, and elaboration-time checks go through `` `ASSERT_INIT`` or a generate-time `$error`.
+
+**Why:** ASIC synthesis ignores `initial` blocks, so a design that relies on one simulates from a value the silicon never has, and the first sign is a chip that does not come out of power-on the way the testbench did. FPGA flows do honour initial values for registers, which is why this is a SHOULD: a deliberate FPGA-only use carries a waiver saying so.
+
+**Good:**
+
+```systemverilog
+always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+        count_q <= '0;       // Starting value from reset
+```
+
+**Bad:**
+
+```systemverilog
+initial count_q = '0;    // Ignored by ASIC synthesis
+```
+
+**Enforced by:** svstyle `initial_block`
+
+**Sources:** IEEE 1800-2017 §9.2.1 (initial procedures), house style
 
 ## RST — Reset and clocking
 

@@ -190,6 +190,8 @@ def yosys_check(
     paths: list[str], rules: list[Rule], include_dirs: Sequence[str] = ()
 ) -> list[Diag]:
     dirs = dict.fromkeys([*include_dirs, *(str(Path(p).parent) for p in paths)])
+    # Yosys resolves `pkg::name` at read time, so packages go first.
+    paths = sorted(paths, key=lambda p: not PACKAGE_RE.search(Path(p).read_text()))
     read = "read_verilog -sv " + " ".join([f"-I{d}" for d in dirs] + paths)
     res = _run("yosys", ["-q", "-p", f"{read}; hierarchy; proc; check"])
     return parse_yosys(res.stdout + res.stderr, rules, paths[0])

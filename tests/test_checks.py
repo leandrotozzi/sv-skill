@@ -368,3 +368,29 @@ def test_scan_reset_groups_with_the_test_interface():
         "    input  logic             scan_rst_ni  // DFT scan reset\n",
     )
     assert "PRT-002" not in {d.rule for d in _check(text)}
+
+
+# --- SYN-006: initial blocks -------------------------------------------------------
+
+
+def test_initial_block_in_rtl():
+    text = _edit(
+        "    // Capture the payload.",
+        "    initial begin\n        q_q = '0;\n    end\n\n    // Capture the payload.",
+    )
+    assert ("SYN-006", 20) in _found(text)
+
+
+def test_initial_block_under_a_guard_or_from_a_macro_is_fine():
+    guarded = _edit(
+        "    // Capture the payload.",
+        '`ifndef SYNTHESIS\n    initial begin\n        $display("sim");\n    end\n'
+        "`endif  // SYNTHESIS\n\n"
+        "    // Capture the payload.",
+    )
+    macro = _edit(
+        "    // Capture the payload.",
+        "`define CHECK initial begin end\n    `CHECK\n\n    // Capture the payload.",
+    )
+    for text in (guarded, macro):
+        assert "SYN-006" not in {d.rule for d in _check(text)}
