@@ -79,7 +79,7 @@ def test_non_ansi_module_reported():
 def test_macro_anchor_not_fixable():
     text = "`define DECL logic x;\nmodule m;\n    `DECL\nendmodule\n"
     (a,) = parse(text).anchors
-    assert (a.name, a.fixable) == ("x", False)
+    assert (a.name, a.fixable) == ("`DECL", False)  # what the author wrote, not the expansion
 
 
 def test_directive_in_port_list_makes_ports_unfixable():
@@ -123,7 +123,7 @@ def test_include_resolves_next_to_the_file_and_on_include_dirs(tmp_path):
         '`include "foo.svh"\n`include "bar.svh"\nmodule m;\n    `FOO(a)\n    `BAR(b)\nendmodule\n'
     )
     src = parse(f.read_text(), str(f), include_dirs=[str(tmp_path / "b")])
-    assert [a.name for a in src.anchors] == ["a", "b"]
+    assert [a.name for a in src.anchors] == ["`FOO", "`BAR"]
 
 
 def test_missing_include_hints_at_include_dirs(tmp_path):

@@ -164,6 +164,10 @@ class _Walker:
     def trailing(
         self, node: SyntaxNode, kind: str, name: str, split_list: bool, detail: str = ""
     ) -> None:
+        first = node.getFirstToken()
+        if self.sm.isMacroLoc(first.location):
+            # The names only exist in the expansion; report what the author wrote.
+            name = "`" + self.sm.getMacroName(first.location)
         line = self.line(node.getLastToken())
         i = self.last_on_line[line]
         last = self.toks[i]
