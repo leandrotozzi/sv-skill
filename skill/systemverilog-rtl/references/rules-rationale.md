@@ -11,7 +11,7 @@ heading, e.g. `### DOC-003`, instead of loading the whole file.
 - NAM — Naming: NAM-001 … NAM-010
 - FMT — Formatting and layout: FMT-001 … FMT-005
 - LNG — Language features: LNG-001 … LNG-017
-- SYN — Synthesis and portability: SYN-001 … SYN-004
+- SYN — Synthesis and portability: SYN-001 … SYN-005
 - RST — Reset and clocking: RST-001 … RST-005
 - FSM — State machines: FSM-001 … FSM-004
 - CDC — Clock domain crossing: CDC-001 … CDC-006
@@ -1066,7 +1066,7 @@ always_comb data_d = data_i;
 always_comb if (hold_i) data_d = data_q;
 ```
 
-**Enforced by:** verilator `MULTIDRIVEN`
+**Enforced by:** verilator `MULTIDRIVEN`; also yosys `multiple-drivers`
 
 **Sources:** Cummings SNUG-2000 guideline #6
 
@@ -1354,7 +1354,7 @@ logic busy_q;  // Declared, never assigned
 assign busy_o = busy_q;
 ```
 
-**Enforced by:** verilator `UNDRIVEN`
+**Enforced by:** verilator `UNDRIVEN`; also yosys `no-driver`
 
 **Sources:** Verilator UNDRIVEN, house style
 
@@ -1493,6 +1493,29 @@ module tree #(parameter int N = 8) ();
 **Enforced by:** review only
 
 **Sources:** lowRISC §Generate Constructs
+
+### SYN-005 (MUST) — No combinational loops
+
+No signal depends combinationally on itself: every feedback path passes through a flop.
+
+**Why:** A combinational loop has no stable value to settle to, or several; it oscillates or latches depending on gate delays that neither simulation nor static timing analysis models. RTL simulation usually shows a plausible value or a delta-cycle limit, and the synthesis tool breaks the loop wherever it likes. The usual source is two always_comb blocks, or a ready/valid pair, that each read what the other drives.
+
+**Good:**
+
+```systemverilog
+assign ready_o = ~full_q;          // Depends only on a flop
+```
+
+**Bad:**
+
+```systemverilog
+assign ready_o = valid_i & ~stall; // stall is computed from ready_o
+assign stall   = ready_o & busy_i;
+```
+
+**Enforced by:** yosys `logic-loop`
+
+**Sources:** Yosys check, house style
 
 ## RST — Reset and clocking
 

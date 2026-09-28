@@ -123,8 +123,9 @@ list against the code you wrote:
 
 ## Done means
 
-- `svstyle check` exits 0 on every file of the design (VER-003); SHOULD
-  findings are allowed but each one is a deliberate choice.
+- `svstyle check --synth` exits 0 on every file of the design (VER-003);
+  SHOULD findings are allowed but each one is a deliberate choice. Drop
+  `--synth` only if Yosys is not installed, and say so.
 - No `// TODO: describe` is left: `grep -rn "TODO: describe" rtl/` is empty.
 - The judgement list above has been walked, and anything that departs from
   it carries a DOC-009 comment.

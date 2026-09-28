@@ -235,6 +235,8 @@ def _cmd_check(args, rules: list) -> int:
             lambda: external.verible_lint(parsed, rules),
             lambda: external.verilator_lint(parsed, rules, list(includes)),
         )
+        if args.synth:
+            tools += (lambda: external.yosys_check(parsed, rules, list(includes)),)
         for tool in tools:
             try:
                 resolved = {str(Path(p).resolve()): t for p, t in texts.items()}
@@ -375,6 +377,7 @@ def main(argv: list[str] | None = None) -> int:
     _add_inputs(p)
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument("--no-external", action="store_true", help="skip Verible and Verilator")
+    p.add_argument("--synth", action="store_true", help="also run Yosys: loops, drivers")
     p.add_argument("--select", metavar="IDS", help="only these rule IDs/prefixes, comma-separated")
     p.add_argument("--ignore", metavar="IDS", help="drop these rule IDs/prefixes, comma-separated")
 

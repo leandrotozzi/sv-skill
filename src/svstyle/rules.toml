@@ -902,6 +902,8 @@ sources = ["Cummings SNUG-2000 guideline #6"]
 [rule.enforcement]
 tool = "verilator"
 rule = "MULTIDRIVEN"
+[rule.also]
+yosys = ["multiple-drivers"]
 
 [[rule]]
 id        = "LNG-006"
@@ -1150,6 +1152,8 @@ sources = ["Verilator UNDRIVEN", "house style"]
 [rule.enforcement]
 tool = "verilator"
 rule = "UNDRIVEN"
+[rule.also]
+yosys = ["no-driver"]
 
 [[rule]]
 id        = "LNG-017"
@@ -1266,6 +1270,25 @@ module tree #(parameter int N = 8) ();
 sources = ["lowRISC §Generate Constructs"]
 [rule.enforcement]
 tool = "review"
+
+[[rule]]
+id        = "SYN-005"
+title     = "No combinational loops"
+severity  = "MUST"
+category  = "SYN"
+statement = "No signal depends combinationally on itself: every feedback path passes through a flop."
+rationale = "A combinational loop has no stable value to settle to, or several; it oscillates or latches depending on gate delays that neither simulation nor static timing analysis models. RTL simulation usually shows a plausible value or a delta-cycle limit, and the synthesis tool breaks the loop wherever it likes. The usual source is two always_comb blocks, or a ready/valid pair, that each read what the other drives."
+good = """
+assign ready_o = ~full_q;          // Depends only on a flop
+"""
+bad = """
+assign ready_o = valid_i & ~stall; // stall is computed from ready_o
+assign stall   = ready_o & busy_i;
+"""
+sources = ["Yosys check", "house style"]
+[rule.enforcement]
+tool = "yosys"
+rule = "logic-loop"
 
 # ===========================================================================
 # RST -- reset and clocking

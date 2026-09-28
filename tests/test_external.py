@@ -262,3 +262,51 @@ def test_package_constants_are_not_unused_when_linted_alone(tmp_path):
     rules = [(Path(d.path).name, d.rule) for d in ext.verilator_lint([str(pkg), str(mod)], RULES)]
     assert ("cfg_pkg.sv", "EXT-VLTR-UNUSEDPARAM") not in rules
     assert ("m.sv", "EXT-VLTR-UNUSEDPARAM") in rules  # a module's unused parameter still counts
+
+
+# --- Yosys: check --synth ---------------------------------------------------------
+
+needs_yosys = pytest.mark.skipif(not shutil.which("yosys"), reason="yosys missing")
+
+YOSYS_OUT = """\
+Warning: found logic loop in module loop:
+    cell $xor$loop.sv:7$1 ($xor) source: loop.sv:7.16-7.23
+      A[0] --> Y[0]
+Warning: multiple conflicting drivers for loop.\\z_o:
+    port Y[0] of cell $and$loop.sv:11$2 ($and) source: loop.sv:11.12-11.20
+Warning: Wire loop.\\u is used but has no driver.
+Warning: something new
+"""
+
+
+def test_parse_yosys_maps_and_locates(tmp_path):
+    assert _brief(ext.parse_yosys(YOSYS_OUT, RULES, "loop.sv")) == [
+        ("loop.sv", 7, 16, "SYN-005", "MUST"),
+        ("loop.sv", 11, 12, "LNG-005", "MUST"),
+        ("loop.sv", 1, 1, "LNG-016", "MUST"),
+        ("loop.sv", 1, 1, "EXT-YOSYS-warning", "SHOULD"),
+    ]
+
+
+def test_parse_yosys_read_error_is_a_should():
+    """Yosys reads less SystemVerilog than slang: its refusal is not the author's bug."""
+    (d,) = ext.parse_yosys("gold.v:24: ERROR: syntax error, unexpected '~'\n", RULES, "gold.v")
+    assert (d.path, d.line, d.rule, d.severity) == ("gold.v", 24, "EXT-YOSYS-read", "SHOULD")
+    assert "not checked" in d.message
+
+
+@needs_yosys
+def test_yosys_finds_a_combinational_loop(tmp_path):
+    f = tmp_path / "loop.sv"
+    f.write_text(
+        "module loop (\n    input  logic a_i,\n    output logic y_o\n);\n    logic x, y;\n"
+        "    assign x = y ^ a_i;\n    assign y = x;\n    assign y_o = y;\nendmodule\n"
+    )
+    assert ("SYN-005", 6) in {(d.rule, d.line) for d in ext.yosys_check([str(f)], RULES)}
+
+
+@needs_yosys
+def test_yosys_passes_the_templates():
+    assets = Path(__file__).parents[1] / "skill" / "systemverilog-rtl" / "assets"
+    files = [str(assets / "fsm_pkg.sv"), str(assets / "fsm.sv"), str(assets / "skeleton.sv")]
+    assert ext.yosys_check(files, RULES, [str(assets)]) == []

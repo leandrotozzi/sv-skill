@@ -16,8 +16,8 @@ from svstyle.cli import main
 from svstyle.rules import load_rules
 
 pytestmark = pytest.mark.skipif(
-    not (shutil.which("verible-verilog-lint") and shutil.which("verilator")),
-    reason="needs Verible and Verilator",
+    not all(map(shutil.which, ("verible-verilog-lint", "verilator", "yosys"))),
+    reason="needs Verible, Verilator and Yosys",
 )
 
 PORTS = (
@@ -43,6 +43,7 @@ SNIPPETS = {
     "LNG-001": ("m.sv", mod("    wire x;\n    assign x = a_i;\n    assign b_o = x;")),
     "SYN-001": ("m.sv", mod("    always_comb begin\n        b_o = 1'b0;\n        case (a_i)  // synopsys full_case\n"
                             "            1'b1: b_o = 1'b1;\n            default: b_o = 1'b0;\n        endcase\n    end")),
+    "SYN-005": ("m.sv", mod("    logic x, y;\n    assign x = y ^ a_i;\n    assign y = x;\n    assign b_o = y;")),
     "RST-001": ("m.sv", mod("    logic x_q;\n    always_ff @(posedge clk_i) begin\n        if (rst_ni) begin\n"
                             "            x_q <= 1'b0;\n        end else begin\n            x_q <= a_i;\n        end\n"
                             "    end\n    assign b_o = x_q;")),
@@ -123,6 +124,6 @@ def test_rule_fires_end_to_end(rid, tmp_path, monkeypatch, capsys):
     name, text = SNIPPETS[rid]
     monkeypatch.chdir(tmp_path)  # Verilator resolves nothing outside the snippet
     (tmp_path / name).write_text(text)
-    main(["check", "--json", name])
+    main(["check", "--json", "--synth", name])
     found = {d["rule"] for d in json.loads(capsys.readouterr().out)["diagnostics"]}
     assert rid in found, sorted(found)

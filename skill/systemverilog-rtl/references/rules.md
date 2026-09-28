@@ -83,6 +83,7 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 - **SYN-002** · SHOULD · Use `unique case` with a `default` as the normal form. `priority case` states intentional overlap; plain `case` is used where neither claim holds.
 - **SYN-003** · SHOULD · Intentional priority is written as an `if`/`else if` chain; a `case` statement is reserved for logic whose arms are genuinely mutually exclusive.
 - **SYN-004** · MUST · A module does not instantiate itself, directly or through a cycle.
+- **SYN-005** · MUST · No signal depends combinationally on itself: every feedback path passes through a flop.
 
 ## RST — Reset and clocking
 

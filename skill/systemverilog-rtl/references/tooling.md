@@ -38,7 +38,7 @@ DOC-001 reports it as a SHOULD. An unknown key or a wrong type is an error
 
 ```sh
 svstyle check [FILES|DIRS] [-f LIST] [-F LIST] [-I DIR]... [--json] [--no-external]
-              [--select IDS] [--ignore IDS]
+              [--synth] [--select IDS] [--ignore IDS]
 svstyle fix   [FILES|DIRS] [-f LIST] [-F LIST] [-I DIR]... [--json] [--diff]
 svstyle rules [--id ID] [--unmapped]
 ```
@@ -48,6 +48,11 @@ svstyle rules [--id ID] [--unmapped]
 - `-I DIR` adds an `` `include`` search directory (repeatable); a file's own
   directory is always searched. Verilator gets the same directories.
 - `--no-external` runs only svstyle's own checks (fast; no Verible/Verilator).
+- `--synth` also runs Yosys (`read_verilog -sv; hierarchy; proc; check`):
+  combinational loops (SYN-005), conflicting drivers. Yosys reads less
+  SystemVerilog than the other tools; a file it cannot read is reported as
+  `EXT-YOSYS-read` (SHOULD), meaning synthesis was not checked, not that the
+  code is wrong.
 - A directory stands for every `*.sv` below it.
 - `-f LIST` / `-F LIST` read a Verilator/VCS filelist: source paths,
   `+incdir+DIR`, nested `-f`/`-F`, `$VAR`s. `-f` paths are relative to the

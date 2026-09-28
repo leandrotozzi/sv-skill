@@ -260,3 +260,17 @@ def test_config_select_ignore_and_include(capsys, tmp_path):
     assert code == 0 and out.strip().endswith("0 findings")  # include resolved, DOC-003 ignored
     code, out, _ = _run(capsys, "check", "--no-external", "--select", "DOC", p)
     assert code == 1  # a CLI flag overrides the file
+
+
+@pytest.mark.skipif(not shutil.which("yosys"), reason="yosys missing")
+def test_check_synth_reports_a_combinational_loop(capsys, tmp_path):
+    p = tmp_path / "loop.sv"
+    p.write_text(
+        "module loop (\n    input  logic a_i,\n    output logic y_o\n);\n    logic x, y;\n"
+        "    assign x = y ^ a_i;\n    assign y = x;\n    assign y_o = y;\nendmodule\n"
+    )
+    rules = lambda *argv: {  # noqa: E731
+        d["rule"] for d in json.loads(_run(capsys, "check", "--json", *argv, p)[1])["diagnostics"]
+    }
+    assert "SYN-005" not in rules()  # opt-in: synthesis is the slow part
+    assert "SYN-005" in rules("--synth")

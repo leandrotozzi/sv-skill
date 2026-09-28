@@ -33,9 +33,9 @@ CATEGORIES = {
 SEVERITIES = ("MUST", "SHOULD", "MAY")
 
 # Who enforces a rule. `review` means no tool can: the skill and a human carry it.
-TOOLS = ("verible-format", "verible-lint", "verilator", "svstyle", "review")
+TOOLS = ("verible-format", "verible-lint", "verilator", "yosys", "svstyle", "review")
 # Tools that report diagnostics by name, so can back up a rule another tool owns.
-ALSO_TOOLS = ("verible-lint", "verilator", "svstyle")
+ALSO_TOOLS = ("verible-lint", "verilator", "yosys", "svstyle")
 
 _REQUIRED = ("id", "title", "severity", "category", "statement", "rationale", "sources")
 

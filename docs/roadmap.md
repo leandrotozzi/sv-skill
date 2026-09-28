@@ -81,7 +81,7 @@ through today. Each item names the finding and the fix.
   (`// svstyle: waive DOC-004 <reason>`), as DOC-009 requires. Covers
   Verible and Verilator findings too; a waiver without a reason is ignored.
 - [x] **14.** `fix --diff` exits non-zero when it would change a file.
-- [ ] **15.** Optional `check --synth` (Yosys `hierarchy -check; proc;
+- [x] **15.** Optional `check --synth` (Yosys `hierarchy -check; proc;
   check -assert`).
 
 ## M8 — Evals

@@ -170,3 +170,55 @@ def _diag(m: re.Match, rule: str, severity: str, fixable: bool = False) -> Diag:
         m.group("path"), int(m.group("line")), int(m.group("col")), rule, severity,
         m.group("msg"), fixable=fixable,
     )  # fmt: skip
+
+
+# --- Yosys: `check --synth` -----------------------------------------------------
+# Verilator --lint-only does not look for combinational loops; synthesis does.
+# Yosys's own SystemVerilog frontend reads less than slang, so a file it cannot
+# read is reported as unchecked (SHOULD), never as the author's bug.
+
+YOSYS_WARNINGS = {
+    "found logic loop": "logic-loop",
+    "multiple conflicting drivers": "multiple-drivers",
+    "used but has no driver": "no-driver",
+}
+YOSYS_SRC_RE = re.compile(r"source: (?P<path>[^:\s]+):(?P<line>\d+)\.(?P<col>\d+)")
+YOSYS_ERROR_RE = re.compile(r"^(?P<path>[^:\s]+):(?P<line>\d+): ERROR: (?P<msg>.*)$")
+
+
+def yosys_check(
+    paths: list[str], rules: list[Rule], include_dirs: Sequence[str] = ()
+) -> list[Diag]:
+    dirs = dict.fromkeys([*include_dirs, *(str(Path(p).parent) for p in paths)])
+    read = "read_verilog -sv " + " ".join([f"-I{d}" for d in dirs] + paths)
+    res = _run("yosys", ["-q", "-p", f"{read}; hierarchy; proc; check"])
+    return parse_yosys(res.stdout + res.stderr, rules, paths[0])
+
+
+def parse_yosys(output: str, rules: list[Rule], fallback: str) -> list[Diag]:
+    index = tool_index(rules, "yosys")
+    out: list[Diag] = []
+    lines = output.splitlines()
+    for i, line in enumerate(lines):
+        if m := YOSYS_ERROR_RE.match(line):
+            msg = f"Yosys cannot read this; synthesis was not checked: {m.group('msg')}"
+            out.append(
+                Diag(m.group("path"), int(m.group("line")), 1, "EXT-YOSYS-read", "SHOULD", msg)
+            )
+            continue
+        if not line.startswith("Warning: "):
+            continue
+        msg = line[len("Warning: ") :].rstrip(":")
+        name = next((n for key, n in YOSYS_WARNINGS.items() if key in msg), "warning")
+        # The cells that make up the finding follow, each with its source location.
+        path, ln, col = fallback, 1, 1
+        for follow in lines[i + 1 :]:
+            if follow.startswith("Warning: "):
+                break
+            if src := YOSYS_SRC_RE.search(follow):
+                path, ln, col = src.group("path"), int(src.group("line")), int(src.group("col"))
+                break
+        rule = index.get(name)
+        rid, sev = (rule.id, rule.severity) if rule else ("EXT-YOSYS-" + name, "SHOULD")
+        out.append(Diag(path, ln, col, rid, sev, msg))
+    return out

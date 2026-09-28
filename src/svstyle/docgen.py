@@ -16,6 +16,7 @@ TOOL_LABEL = {
     "verible-format": "verible format",
     "verible-lint": "verible lint",
     "verilator": "verilator",
+    "yosys": "yosys",
     "svstyle": "svstyle",
     "review": "review only",
 }
