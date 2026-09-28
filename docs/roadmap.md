@@ -70,12 +70,12 @@ through today. Each item names the finding and the fix.
 
 ## M7 — CLI UX
 
-- [ ] **11.** Directories and `-f files.f` filelists as inputs.
-- [ ] **12.** `.svstyle.toml`: `select`, `ignore`, `include`.
+- [x] **11.** Directories and `-f files.f` filelists as inputs.
+- [x] **12.** `.svstyle.toml`: `select`, `ignore`, `include`.
 - [x] **13.** Inline waiver for svstyle-owned rules
   (`// svstyle: waive DOC-004 <reason>`), as DOC-009 requires. Covers
   Verible and Verilator findings too; a waiver without a reason is ignored.
-- [ ] **14.** `fix --diff` exits non-zero when it would change a file.
+- [x] **14.** `fix --diff` exits non-zero when it would change a file.
 - [ ] **15.** Optional `check --synth` (Yosys `hierarchy -check; proc;
   check -assert`).
 

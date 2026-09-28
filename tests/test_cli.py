@@ -141,7 +141,8 @@ def test_fix_diff_does_not_write(capsys, sv):
     text = CLEAN.replace("rst_ni,  // Asynchronous reset, active-low", "rst_ni,")
     p = sv(text)
     code, out, _ = _run(capsys, "fix", "--diff", p)
-    assert code == 0 and "+    input  logic             rst_ni,  // TODO: describe" in out
+    # Non-zero when a file would change, so `fix --diff` gates CI like `ruff format --diff`.
+    assert code == 1 and "+    input  logic             rst_ni,  // TODO: describe" in out
     assert p.read_text() == text
 
 
@@ -198,3 +199,64 @@ def test_bad_config_exits_2(capsys, tmp_path):
     p.write_text(CLEAN)
     code, _, err = _run(capsys, "check", "--no-external", p)
     assert code == 2 and ".svstyle.toml" in err
+
+
+@needs_verible
+def test_fix_diff_on_a_clean_file_exits_0(capsys, sv):
+    assert _run(capsys, "fix", "--diff", sv())[0] == 0
+
+
+# --- inputs: directories and filelists ------------------------------------------
+
+
+def test_a_directory_expands_to_its_sv_files(capsys, tmp_path):
+    (tmp_path / "rtl" / "sub").mkdir(parents=True)
+    (tmp_path / "rtl" / "sub" / "reg_byte.sv").write_text(CLEAN)
+    (tmp_path / "rtl" / "notes.txt").write_text("not RTL")
+    code, out, _ = _run(capsys, "check", "--no-external", "--json", tmp_path / "rtl")
+    assert code == 0 and json.loads(out)["ok"]
+
+
+def test_filelist_brings_files_incdirs_and_nested_lists(capsys, tmp_path):
+    inc = tmp_path / "inc"
+    inc.mkdir()
+    (inc / "defs.svh").write_text("`define WIDTH 8\n")
+    (tmp_path / "reg_byte.sv").write_text(
+        CLEAN.replace("`default_nettype none\n", '`default_nettype none\n`include "defs.svh"\n')
+    )
+    (tmp_path / "inner.f").write_text("// nested list\nreg_byte.sv\n")
+    # -F: paths inside are relative to the list, as in Verilator and VCS.
+    (tmp_path / "top.f").write_text("+incdir+$INC_DIR\n-F inner.f\n+define+X=1\n")
+    import os
+
+    os.environ["INC_DIR"] = str(inc)
+    try:
+        code, out, err = _run(capsys, "check", "--no-external", "-F", tmp_path / "top.f")
+    finally:
+        del os.environ["INC_DIR"]
+    assert code == 0, err
+    assert out.strip().endswith("0 findings")
+
+
+def test_no_inputs_is_an_error(capsys):
+    with pytest.raises(SystemExit):
+        main(["check"])
+
+
+# --- .svstyle.toml: select / ignore / include -------------------------------------
+
+
+def test_config_select_ignore_and_include(capsys, tmp_path):
+    (tmp_path / "inc").mkdir()
+    (tmp_path / "inc" / "defs.svh").write_text("`define WIDTH 8\n")
+    (tmp_path / ".svstyle.toml").write_text('ignore = ["DOC-003"]\ninclude = ["inc"]\n')
+    p = tmp_path / "reg_byte.sv"
+    p.write_text(
+        CLEAN.replace("rst_ni,  // Asynchronous reset, active-low", "rst_ni,").replace(
+            "`default_nettype none\n", '`default_nettype none\n`include "defs.svh"\n'
+        )
+    )
+    code, out, _ = _run(capsys, "check", "--no-external", p)
+    assert code == 0 and out.strip().endswith("0 findings")  # include resolved, DOC-003 ignored
+    code, out, _ = _run(capsys, "check", "--no-external", "--select", "DOC", p)
+    assert code == 1  # a CLI flag overrides the file

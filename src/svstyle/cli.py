@@ -8,6 +8,7 @@ svstyle broke its own invariant and wrote nothing.
 import argparse
 import difflib
 import json
+import os
 import re
 import sys
 from dataclasses import asdict
@@ -168,15 +169,19 @@ def _keep(rule: str, select: str | None, ignore: str | None) -> bool:
     return not (ignore and rule.startswith(tuple(ignore.split(","))))
 
 
-def _report(args, diags: list, errors: list[str], code: int, extra: dict | None = None) -> int:
-    diags = sorted(
-        (
-            d
-            for d in diags
-            if _keep(d.rule, getattr(args, "select", None), getattr(args, "ignore", None))
-        ),
-        key=lambda d: (d.path, d.line, d.col, d.rule),
-    )
+def _report(
+    args, diags: list, errors: list[str], code: int, configs: dict, extra: dict | None = None
+) -> int:
+    cli = (getattr(args, "select", None), getattr(args, "ignore", None))
+
+    def keep(d) -> bool:
+        # A selection on the command line replaces the file's, as in ruff.
+        if any(cli):
+            return _keep(d.rule, *cli)
+        cfg = configs.get(str(Path(d.path).resolve()), {})
+        return _keep(d.rule, ",".join(cfg.get("select", [])), ",".join(cfg.get("ignore", [])))
+
+    diags = sorted(filter(keep, diags), key=lambda d: (d.path, d.line, d.col, d.rule))
     summary = {s: sum(d.severity == s for d in diags) for s in ("MUST", "SHOULD", "MAY")}
     if summary["MUST"]:
         code = max(code, 1)
@@ -204,15 +209,18 @@ def _report(args, diags: list, errors: list[str], code: int, extra: dict | None 
 
 
 def _cmd_check(args, rules: list) -> int:
-    diags, errors, code, texts = [], [], 0, {}
-    for path in map(str, args.files):
+    diags, errors, code, texts, configs = [], [], 0, {}, {}
+    includes = dict.fromkeys(args.include)
+    for path in args.files:
         text = _read(path, errors)
         if text is None:
             code = max(code, 2)
             continue
         try:
-            company = load_config(path).get("company", PLACEHOLDER)
-            diags += run_checks(text, path, rules, args.include, company)
+            cfg = configs[str(Path(path).resolve())] = load_config(path)
+            inc = [*args.include, *cfg.get("include", [])]
+            includes.update(dict.fromkeys(inc))
+            diags += run_checks(text, path, rules, inc, cfg.get("company", PLACEHOLDER))
             texts[path] = text
         except ConfigError as exc:
             errors.append(str(exc))
@@ -226,7 +234,7 @@ def _cmd_check(args, rules: list) -> int:
         tools = (
             lambda: external.verible_verify(parsed, rules),
             lambda: external.verible_lint(parsed, rules),
-            lambda: external.verilator_lint(parsed, rules, args.include),
+            lambda: external.verilator_lint(parsed, rules, list(includes)),
         )
         for tool in tools:
             try:
@@ -236,7 +244,7 @@ def _cmd_check(args, rules: list) -> int:
                     diags += found if text is None else apply_waivers(found, text)
             except external.ToolMissing as exc:
                 print(f"warning: {exc}; its rules were not checked", file=sys.stderr)
-    return _report(args, diags, errors, code)
+    return _report(args, diags, errors, code, configs)
 
 
 def _by_path(diags: list) -> dict[str, list]:
@@ -247,16 +255,18 @@ def _by_path(diags: list) -> dict[str, list]:
 
 
 def _cmd_fix(args, rules: list) -> int:
-    diags, errors, code, changed = [], [], 0, 0
+    diags, errors, code, changed, configs = [], [], 0, 0, {}
     _warn_verible_drift()
-    for path in map(str, args.files):
+    for path in args.files:
         text = _read(path, errors)
         if text is None:
             code = max(code, 2)
             continue
         try:
-            company = load_config(path).get("company", PLACEHOLDER)
-            out = fix_text(text, path, rules, args.include, company)
+            cfg = configs[str(Path(path).resolve())] = load_config(path)
+            inc = [*args.include, *cfg.get("include", [])]
+            company = cfg.get("company", PLACEHOLDER)
+            out = fix_text(text, path, rules, inc, company)
         except ConfigError as exc:
             errors.append(str(exc))
             code = max(code, 2)
@@ -290,10 +300,62 @@ def _cmd_fix(args, rules: list) -> int:
                 )
             else:
                 Path(path).write_text(out, encoding="utf-8")
-        diags += run_checks(out, path, rules, args.include, company)  # left for the author
+        diags += run_checks(out, path, rules, inc, company)  # left for the author
+    if args.diff and changed:
+        code = max(code, 1)  # a pending change fails CI, like `ruff format --diff`
     if not args.json:
         print(f"{'would fix' if args.diff else 'fixed'} {changed} file(s)")
-    return _report(args, diags, errors, code, {"files_changed": changed})
+    return _report(args, diags, errors, code, configs, {"files_changed": changed})
+
+
+def _add_inputs(p: argparse.ArgumentParser) -> None:
+    p.add_argument("files", nargs="*", type=Path, help="files, or directories to search for *.sv")
+    p.add_argument(
+        "-f",
+        dest="filelists",
+        metavar="FILE",
+        action="append",
+        default=[],
+        type=lambda f: (f, False),
+        help="filelist; paths relative to the cwd",
+    )
+    p.add_argument(
+        "-F",
+        dest="filelists",
+        metavar="FILE",
+        action="append",
+        type=lambda f: (f, True),
+        help="filelist; paths relative to the list",
+    )
+    p.add_argument("-I", "--include", metavar="DIR", action="append", default=[],
+                   help="search DIR for `include files (repeatable)")  # fmt: skip
+
+
+def _expand_inputs(args) -> None:
+    """Directories become their *.sv files; filelists add files and +incdir+ dirs."""
+    files: list[str] = []
+    for f in args.files:
+        files += sorted(map(str, f.rglob("*.sv"))) if f.is_dir() else [str(f)]
+    for f, local in args.filelists:
+        _read_filelist(Path(f), local, files, args.include)
+    args.files = list(dict.fromkeys(files))
+
+
+def _read_filelist(path: Path, local: bool, files: list[str], includes: list[str]) -> None:
+    """The subset of the Verilator/VCS filelist syntax that names sources and includes.
+
+    `-f` paths are relative to the cwd, `-F` paths to the list; `$VAR` expands;
+    `//` comments and other simulator options (`+define+`, `-timescale`) are skipped.
+    """
+    base = path.parent if local else Path()
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = os.path.expandvars(raw.split("//", 1)[0]).strip()
+        if line.startswith("+incdir+"):
+            includes += [str(base / d) for d in line[len("+incdir+") :].split("+") if d]
+        elif line[:3] in ("-f ", "-F "):
+            _read_filelist(base / line[3:].strip(), line[1] == "F", files, includes)
+        elif line and not line.startswith(("-", "+")):
+            files.append(str(base / line))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -311,22 +373,25 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--toml", metavar="PATH", type=Path, help="read rules from PATH")
 
     p = sub.add_parser("check", help="report style violations (svstyle, Verible, Verilator)")
-    p.add_argument("files", nargs="+", type=Path)
-    p.add_argument("-I", "--include", metavar="DIR", action="append", default=[],
-                   help="search DIR for `include files (repeatable)")  # fmt: skip
+    _add_inputs(p)
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument("--no-external", action="store_true", help="skip Verible and Verilator")
     p.add_argument("--select", metavar="IDS", help="only these rule IDs/prefixes, comma-separated")
     p.add_argument("--ignore", metavar="IDS", help="drop these rule IDs/prefixes, comma-separated")
 
     p = sub.add_parser("fix", help="format with Verible and insert missing comments/header")
-    p.add_argument("files", nargs="+", type=Path)
-    p.add_argument("-I", "--include", metavar="DIR", action="append", default=[],
-                   help="search DIR for `include files (repeatable)")  # fmt: skip
+    _add_inputs(p)
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument("--diff", action="store_true", help="print the diff instead of writing")
 
     args = parser.parse_args(argv)
+    if args.cmd in ("check", "fix"):
+        try:
+            _expand_inputs(args)
+        except OSError as exc:
+            parser.error(f"{exc.filename}: {exc.strerror}")
+        if not args.files:
+            parser.error("no input files: pass FILES, a directory, or -f/-F FILELIST")
 
     try:
         rules = load_rules(getattr(args, "toml", None) or RULES_TOML)

@@ -22,19 +22,24 @@ be idempotent.
 so one file at the repository root covers the whole tree:
 
 ```toml
-company = "ACME Corp"   # the copyright holder in every file header
+company = "ACME Corp"      # the copyright holder in every file header
+select  = ["DOC", "LNG"]   # optional: only these rule IDs/prefixes
+ignore  = ["DOC-005"]      # optional: drop these
+include = ["rtl/inc"]      # optional: `include dirs, relative to this file
 ```
 
 With it, `fix` writes new headers with that company and replaces the
-`<Company>` placeholder in existing ones. Without it the placeholder stays and
+`<Company>` placeholder in existing ones. `--select`/`--ignore` on the
+command line replace the file's selection. Without it the placeholder stays and
 DOC-001 reports it as a SHOULD. An unknown key or a wrong type is an error
 (exit 2), so a typo never silently disables the setting.
 
 ## Commands
 
 ```sh
-svstyle check FILES [-I DIR]... [--json] [--no-external] [--select IDS] [--ignore IDS]
-svstyle fix   FILES [-I DIR]... [--json] [--diff]
+svstyle check [FILES|DIRS] [-f LIST] [-F LIST] [-I DIR]... [--json] [--no-external]
+              [--select IDS] [--ignore IDS]
+svstyle fix   [FILES|DIRS] [-f LIST] [-F LIST] [-I DIR]... [--json] [--diff]
 svstyle rules [--id ID] [--unmapped]
 ```
 
@@ -43,7 +48,12 @@ svstyle rules [--id ID] [--unmapped]
 - `-I DIR` adds an `` `include`` search directory (repeatable); a file's own
   directory is always searched. Verilator gets the same directories.
 - `--no-external` runs only svstyle's own checks (fast; no Verible/Verilator).
-- `fix --diff` prints the change instead of writing it.
+- A directory stands for every `*.sv` below it.
+- `-f LIST` / `-F LIST` read a Verilator/VCS filelist: source paths,
+  `+incdir+DIR`, nested `-f`/`-F`, `$VAR`s. `-f` paths are relative to the
+  working directory, `-F` paths to the list. Other options are skipped.
+- `fix --diff` prints the change instead of writing it, and exits 1 when
+  any file would change, so it can gate CI.
 - `rules --id PRT-003` prints one rule in full; `--unmapped` lists the rules
   that need human judgement.
 

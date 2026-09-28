@@ -22,7 +22,7 @@ from .rules import Diag, Rule, tool_index
 # and DOC-001 warns until it is replaced.
 PLACEHOLDER = "<Company>"
 CONFIG_NAME = ".svstyle.toml"
-CONFIG_KEYS = {"company": str}
+CONFIG_KEYS = {"company": str, "select": list, "ignore": list, "include": list}
 
 
 class ConfigError(Exception):
@@ -45,6 +45,11 @@ def load_config(path: str | Path) -> dict:
                     )
                 if not isinstance(value, CONFIG_KEYS[key]):
                     raise ConfigError(f"{cfg}: {key} must be a {CONFIG_KEYS[key].__name__}")
+                if isinstance(value, list) and not all(isinstance(v, str) for v in value):
+                    raise ConfigError(f"{cfg}: {key} must be a list of strings")
+            # Include dirs are written relative to the config, like ruff's paths.
+            if "include" in data:
+                data["include"] = [str(d / inc) for inc in data["include"]]
             return data
     return {}
 
