@@ -71,7 +71,10 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
             if "TODO: describe" in ln]  # fmt: skip
     check("No `// TODO: describe` placeholder left", not todo, ", ".join(todo) or "none")
 
-    vl = run(["verilator", "--lint-only", "-Wall", "-Wno-MULTITOP", *files], out)
+    # PINCONNECTEMPTY: `.q_o()` is PRT-004's explicit no-connect, as in svstyle.
+    vl = run(
+        ["verilator", "--lint-only", "-Wall", "-Wno-MULTITOP", "-Wno-PINCONNECTEMPTY", *files], out
+    )
     warns = [ln for ln in vl.stderr.splitlines() if re.match(r"%(Warning|Error)", ln)]
     check("verilator --lint-only -Wall is clean", not warns, "\n".join(warns[:8]) or "clean")
 
@@ -111,7 +114,15 @@ def equiv(out: Path, files: list[str], spec: dict) -> tuple[bool, str]:
     )
     tb = EVALS / spec["tb"]
     sources = [str(work / "ref.v"), *(str(out / f) for f in files), str(tb)]
-    flags = ["--binary", "--timing", "-Wno-lint", "-Wno-style", "-Mdir", str(work / "obj")]
+    flags = [
+        "--binary",
+        "--timing",
+        "-Wno-lint",
+        "-Wno-style",
+        "-Mdir",
+        str(work / "obj"),
+        f"-I{out}",
+    ]
     build = run(["verilator", *flags, "--top-module", tb.stem, *sources], work)
     if build.returncode:
         return False, "testbench does not build: " + build.stderr.strip()[-400:]
@@ -140,4 +151,4 @@ def main(iteration: Path) -> None:
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    main(Path(sys.argv[1]).resolve())  # the equivalence build runs in another directory
