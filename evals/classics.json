@@ -1,0 +1,105 @@
+{
+  "skill_name": "systemverilog-rtl",
+  "evals": [
+    {
+      "id": 101,
+      "name": "seq-detect",
+      "prompt": "Write a Moore FSM in SystemVerilog, seq_detect.sv, that detects the bit pattern 1011 on a serial input, overlaps allowed (1011011 detects twice). One bit per clock. Ports: clk_i, rst_ni (asynchronous, active low), bit_i, detect_o. detect_o is a Moore output: it is 1 during the cycle after the clock edge that sampled the final 1 of the pattern, for exactly one cycle unless the next bits complete another overlapping match. Reset clears it.",
+      "expected_output": "seq_detect.sv: Moore FSM, overlapping detection, passes svstyle, Verilator -Wall, Yosys; matches the reference cycle for cycle.",
+      "files": [],
+      "checks": [
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/seq_detect_tb.sv", "ref": "files/classics/seq_detect.sv", "module": "seq_detect"}}
+      ]
+    },
+    {
+      "id": 102,
+      "name": "updown-counter",
+      "prompt": "Write an up/down counter in SystemVerilog, updown_counter.sv. Parameter Width (default 8). Ports: clk_i, rst_ni (asynchronous, active low), en_i, load_i, load_val_i[Width-1:0], up_i, count_o[Width-1:0]. Every clock: if load_i, count becomes load_val_i; else if en_i, count goes up by one when up_i is 1 and down by one when it is 0, wrapping modulo 2**Width. count_o is the register itself (it changes the cycle after the inputs); reset to 0.",
+      "expected_output": "updown_counter.sv: load has priority over enable, wraps, registered output; matches the reference cycle for cycle.",
+      "files": [],
+      "checks": [
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/updown_counter_tb.sv", "ref": "files/classics/updown_counter.sv", "module": "updown_counter"}}
+      ]
+    },
+    {
+      "id": 103,
+      "name": "fir",
+      "prompt": "Write a transposed-form FIR filter in SystemVerilog, fir.sv. Parameters: DataWidth = 16, CoeffWidth = 16, NumTaps = 8, and Coeffs, a packed vector of NumTaps*CoeffWidth bits where tap k is Coeffs[k*CoeffWidth +: CoeffWidth]; default taps 0..7 are the signed values -512, 1024, 3072, 8192, 6144, 2048, 512, -256. Samples and coefficients are signed two's complement. Ports: clk_i, rst_ni (asynchronous, active low), valid_i, data_i[DataWidth-1:0], valid_o, data_o[OutWidth-1:0] with OutWidth = DataWidth + CoeffWidth + $clog2(NumTaps), full precision, no rounding. The filter advances only on valid_i. When sample x[n] is accepted, the next cycle has valid_o = 1 and data_o = sum over k of Coeffs[k] * x[n-k], with samples before reset taken as 0; valid_o is 0 in the other cycles and data_o may hold any value then.",
+      "expected_output": "fir.sv: transposed form, exact full-precision output one cycle after each valid sample; matches the reference whenever valid_o is 1.",
+      "files": [],
+      "checks": [
+        {"text": "Matches the reference model on every valid output", "equiv_tb": {"tb": "files/classics/fir_tb.sv", "ref": "files/classics/fir.sv", "module": "fir"}}
+      ]
+    },
+    {
+      "id": 104,
+      "name": "fxp-add-sat",
+      "prompt": "Write a saturating fixed-point adder in SystemVerilog, fxp_add_sat.sv. Parameters IntBits = 4 and FracBits = 12; numbers are signed two's complement Q(IntBits).(FracBits), Width = IntBits + FracBits bits including the sign. Ports: clk_i, rst_ni (asynchronous, active low), a_i[Width-1:0], b_i[Width-1:0], sum_o[Width-1:0], sat_o. One cycle after the inputs, sum_o is a + b, clamped to the most positive or most negative representable value on overflow, and sat_o is 1 exactly when clamping happened. Both outputs are registered and reset to 0.",
+      "expected_output": "fxp_add_sat.sv: registered saturating signed add with flag; matches the reference cycle for cycle.",
+      "files": [],
+      "checks": [
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/fxp_add_sat_tb.sv", "ref": "files/classics/fxp_add_sat.sv", "module": "fxp_add_sat"}}
+      ]
+    },
+    {
+      "id": 105,
+      "name": "fxp-mul",
+      "prompt": "Write a fixed-point multiplier in SystemVerilog, fxp_mul.sv. Parameters IntBits = 1 and FracBits = 15; operands and result are signed two's complement Q(IntBits).(FracBits), Width = IntBits + FracBits bits including the sign. Ports: clk_i, rst_ni (asynchronous, active low), a_i[Width-1:0], b_i[Width-1:0], prod_o[Width-1:0], sat_o. Take the exact product, round to nearest with ties toward plus infinity (add 2**(FracBits-1), then arithmetic shift right by FracBits), then saturate to the representable range; sat_o is 1 exactly when saturation changed the value. Both outputs are registered, available one cycle after the inputs, and reset to 0.",
+      "expected_output": "fxp_mul.sv: registered Q1.15 multiply, round-half-up, saturation with flag; matches the reference cycle for cycle.",
+      "files": [],
+      "checks": [
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/fxp_mul_tb.sv", "ref": "files/classics/fxp_mul.sv", "module": "fxp_mul"}}
+      ]
+    },
+    {
+      "id": 106,
+      "name": "rr-arbiter",
+      "prompt": "Write a round-robin arbiter in SystemVerilog, rr_arbiter.sv. Parameter NumReq (default 4). Ports: clk_i, rst_ni (asynchronous, active low), req_i[NumReq-1:0], gnt_o[NumReq-1:0]. gnt_o is combinational: one-hot, the first requester at or after the current priority index (wrapping around), or all zeros when nobody requests. The priority index is a register: after reset it is 0; in every cycle where some request is granted to index i, it becomes (i+1) mod NumReq for the next cycle; otherwise it keeps its value.",
+      "expected_output": "rr_arbiter.sv: combinational one-hot grant, registered rotating priority; matches the reference cycle for cycle.",
+      "files": [],
+      "checks": [
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/rr_arbiter_tb.sv", "ref": "files/classics/rr_arbiter.sv", "module": "rr_arbiter"}}
+      ]
+    },
+    {
+      "id": 107,
+      "name": "cordic",
+      "prompt": "Write a pipelined CORDIC in SystemVerilog, cordic.sv, that computes sine and cosine (rotation mode). Ports: clk_i, rst_ni (asynchronous, active low), valid_i, angle_i[15:0], valid_o, cos_o[15:0], sin_o[15:0]. angle_i is a signed angle in radians, Q3.13 (1 LSB = 2**-13 rad), always within [-pi/2, +pi/2]. cos_o and sin_o are signed Q2.14 (1.0 = 16384) and already include the CORDIC gain correction, so they approximate cos and sin of the angle; the error must stay within 8 LSB. It accepts one angle per cycle, results come out in input order with valid_o, and the latency is fixed and at most 20 cycles. Choose the number of iterations and the internal widths yourself.",
+      "expected_output": "cordic.sv: fully pipelined rotation-mode CORDIC with gain pre-compensation; every result within 8 LSB of the exact value, one per cycle, in order.",
+      "files": [],
+      "checks": [
+        {"text": "Every result within 8 LSB, in order, full throughput, latency at most 20", "equiv_tb": {"tb": "files/classics/cordic_tb.sv"}}
+      ]
+    },
+    {
+      "id": 108,
+      "name": "crc32",
+      "prompt": "Write a byte-parallel CRC-32 generator in SystemVerilog, crc32.sv, for the IEEE 802.3 CRC (polynomial 0x04C11DB7, reflected input and output, initial value 0xFFFFFFFF, final XOR 0xFFFFFFFF; the CRC of the ASCII bytes \"123456789\" is 0xCBF43926). Ports: clk_i, rst_ni (asynchronous, active low), init_i, valid_i, data_i[7:0], crc_o[31:0]. One byte per cycle. A register holds the running CRC state; reset and init_i set it to 0xFFFFFFFF (init_i wins over valid_i, and that byte is dropped); valid_i folds data_i into it. crc_o is the state XOR 0xFFFFFFFF, so it shows the CRC of the bytes accepted so far, updated the cycle after each byte.",
+      "expected_output": "crc32.sv: one-byte-per-cycle reflected CRC-32; matches the reference cycle for cycle and gives 0xCBF43926 for \"123456789\".",
+      "files": [],
+      "checks": [
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/crc32_tb.sv", "ref": "files/classics/crc32.sv", "module": "crc32"}}
+      ]
+    },
+    {
+      "id": 109,
+      "name": "divider",
+      "prompt": "Write a sequential unsigned integer divider in SystemVerilog, divider.sv, radix 2 (one quotient bit per cycle). Parameter Width (default 16). Ports: clk_i, rst_ni (asynchronous, active low), start_i, dividend_i[Width-1:0], divisor_i[Width-1:0], busy_o, done_o, quotient_o[Width-1:0], remainder_o[Width-1:0]. A start_i while not busy captures the operands and sets busy_o; start_i while busy is ignored. done_o is a one-cycle pulse, at most Width + 2 cycles after start, in the same cycle busy_o falls; from then quotient_o and remainder_o hold the result until the next start. Dividing by zero gives quotient all ones and remainder equal to the dividend.",
+      "expected_output": "divider.sv: radix-2 sequential divider with start/busy/done handshake, held results, defined divide-by-zero; every random and corner division correct within Width+2 cycles.",
+      "files": [],
+      "checks": [
+        {"text": "Every division correct, done within Width+2 cycles, start ignored while busy", "equiv_tb": {"tb": "files/classics/divider_tb.sv"}}
+      ]
+    },
+    {
+      "id": 110,
+      "name": "uart-rx",
+      "prompt": "Write a UART receiver in SystemVerilog, uart_rx.sv, 8N1 (one start bit, 8 data bits LSB first, one stop bit, idle high). Parameter ClksPerBit (default 16). Ports: clk_i, rst_ni (asynchronous, active low), rx_i (asynchronous to clk_i), valid_o, data_o[7:0], frame_err_o. Synchronise rx_i before use. Sample each bit near its middle; a start bit that is no longer low at its middle is a glitch and is ignored. For each frame, after sampling the stop bit, pulse valid_o for one cycle with data_o holding the byte if the stop bit is 1, or pulse frame_err_o for one cycle instead if it is 0. Then wait for rx to be high before looking for the next start bit.",
+      "expected_output": "uart_rx.sv: synchronised input, mid-bit sampling, glitch rejection, valid/frame-error pulses; receives every byte of back-to-back and spaced frames, flags framing errors, ignores glitches.",
+      "files": [],
+      "checks": [
+        {"text": "Receives every byte, flags framing errors, ignores start glitches", "equiv_tb": {"tb": "files/classics/uart_rx_tb.sv"}}
+      ]
+    }
+  ]
+}

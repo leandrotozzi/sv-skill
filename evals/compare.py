@@ -6,8 +6,9 @@
 
     uv run evals/compare.py skill/systemverilog-rtl-workspace/iteration-N
 
-Writes <iteration>/compare.html: one self-contained page (Pygments highlighting
-inlined, no network) with each eval's prompt, grades and the RTL of both runs.
+Writes <iteration>/compare/: index.html (scores, cost and time of every eval)
+and one self-contained page per eval (Pygments highlighting inlined, no
+network) with its prompt, grades, cost and the RTL of both runs.
 """
 
 # ruff: noqa: E501  (the page template is HTML/CSS, kept one rule per line)
@@ -31,11 +32,13 @@ def rtl_files(out: Path) -> list[Path]:
     return sorted(files, key=lambda p: (p.suffix == ".svh", not p.stem.endswith("_pkg"), p.name))
 
 
-def run_block(cfg_dir: Path, fmt: HtmlFormatter) -> tuple[str, str]:
+def run_block(cfg_dir: Path, fmt: HtmlFormatter) -> tuple[str, str, dict]:
     run = cfg_dir / "run-1"
     grading = json.loads((run / "grading.json").read_text())
     s = grading["summary"]
     score = f"{s['passed']}/{s['total']}"
+    cost_file = run / "cost.json"
+    cost = json.loads(cost_file.read_text()) if cost_file.exists() else {}
     fails = "".join(
         f"<li><b>{html.escape(e['text'])}</b><pre class='ev'>{html.escape(e['evidence'])}</pre></li>"
         for e in grading["expectations"]
@@ -53,38 +56,79 @@ def run_block(cfg_dir: Path, fmt: HtmlFormatter) -> tuple[str, str]:
             f"<details open><summary>{html.escape(f.name)} <span class='muted'>· {lines} líneas</span>"
             f"</summary>{code}</details>"
         )
-    return score, "".join(parts)
+    return score, "".join(parts), cost
+
+
+def money(cost: dict) -> str:
+    return f"≈${cost['usd']:.2f}" if cost else "–"
+
+
+def minutes(cost: dict) -> str:
+    return f"{cost['wall_s'] / 60:.1f} min" if cost else "–"
 
 
 def main(iteration: Path) -> None:
     fmt = HtmlFormatter(linenos="table", cssclass="hl")
     evals = sorted(p for p in iteration.glob("eval-*") if p.is_dir())
-    nav, sections = [], []
+    metas = {ev: json.loads((ev / "eval_metadata.json").read_text()) for ev in evals}
+    evals.sort(key=lambda ev: metas[ev]["eval_id"])
+    rows, pages, totals = [], {}, {cfg: {"usd": 0.0, "wall_s": 0.0} for cfg in CONFIGS}
     for ev in evals:
-        meta = json.loads((ev / "eval_metadata.json").read_text())
+        meta = metas[ev]
         name = meta["eval_name"]
-        cols, scores = [], {}
+        cols, scores, costs = [], {}, {}
         for cfg in CONFIGS:
-            scores[cfg], body = run_block(ev / cfg, fmt)
+            scores[cfg], body, costs[cfg] = run_block(ev / cfg, fmt)
+            for k in totals[cfg]:
+                totals[cfg][k] += costs[cfg].get(k, 0)
+            c = costs[cfg]
+            stats = (f"<p class='stats'>{money(c)} · {minutes(c)} · {c['turns']} turnos · "
+                     f"{c['tokens']['output']:,} tokens de salida</p>") if c else ""  # fmt: skip
             cols.append(
                 f"<div class='col'><h3>{LABEL[cfg]} <span class='score {cfg}'>{scores[cfg]}</span></h3>"
-                f"{body}</div>"
+                f"{stats}{body}</div>"
             )
-        nav.append(
-            f"<a href='#{name}'><span>{meta['eval_id']}. {html.escape(name)}</span>"
-            f"<span class='muted'>{scores['with_skill']} vs {scores['without_skill']}</span></a>"
+        cells = "".join(
+            f"<td>{scores[cfg]}</td><td>{money(costs[cfg])}</td><td>{minutes(costs[cfg])}</td>"
+            for cfg in CONFIGS
         )
-        sections.append(
-            f"<section id='{name}'><h2>{meta['eval_id']}. {html.escape(name)}</h2>"
+        rows.append(f"<tr><td><a href='{name}.html'>{meta['eval_id']}. {html.escape(name)}</a></td>{cells}</tr>")
+        pages[name] = (
+            f"<section><h2>{meta['eval_id']}. {html.escape(name)}</h2>"
             f"<p class='prompt'>{html.escape(meta['prompt'])}</p><div class='cols'>{''.join(cols)}</div></section>"
         )
+    nav = "<a href='index.html'><b>Resumen</b></a>" + "".join(
+        f"<a href='{name}.html'>{html.escape(name)}</a>" for name in pages
+    )
+    head = "".join(f"<th colspan='3'>{LABEL[cfg]}</th>" for cfg in CONFIGS)
+    sub = "<th>chequeos</th><th>costo</th><th>tiempo</th>" * len(CONFIGS)
+    foot = "".join(
+        f"<td></td><td>${totals[cfg]['usd']:.2f}</td><td>{totals[cfg]['wall_s'] / 60:.1f} min</td>"
+        for cfg in CONFIGS
+    )
+    index = (
+        f"<section><h2>Resumen · {html.escape(iteration.name)}</h2>"
+        f"<table class='sum'><thead><tr><th></th>{head}</tr><tr><th>ejemplo</th>{sub}</tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody><tfoot><tr><td>total</td>{foot}</tr></tfoot></table>"
+        "<p class='prompt'>Costo a precio de Claude Opus 5.5. Entrada y caché son exactos, de las "
+        "transcripciones; la salida (razonamiento incluido) se estima por el crecimiento del contexto, "
+        "porque Claude Code registra el uso al empezar cada mensaje. Tiempo: primer a último evento "
+        "de cada corrida.</p></section>"
+    )
+    out = iteration / "compare"
+    out.mkdir(exist_ok=True)
+    for name, body in {"index": index, **pages}.items():
+        (out / f"{name}.html").write_text(page(iteration.name, name, nav, body), encoding="utf-8")
+    print(f"wrote {out}/index.html and {len(pages)} pages")
 
+
+def page(iteration: str, title: str, nav: str, body: str) -> str:
     light = HtmlFormatter(style="default").get_style_defs(".hl")
     dark = HtmlFormatter(style="github-dark").get_style_defs(".hl")
-    page = f"""<!doctype html>
+    return f"""<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Evals: con y sin skill</title>
+<title>{html.escape(title)} · con y sin skill</title>
 <style>
 :root {{ --bg:#fbfbfc; --fg:#1c2230; --dim:#6e7684; --line:#e5e7eb; --card:#fff;
   --ok:#0e7c58; --bad:#c0392b; --accent:#0a6e96; --codebg:#f6f8fa; }}
@@ -109,6 +153,12 @@ h3 {{ margin:0 0 8px; display:flex; justify-content:space-between; align-items:c
 .score {{ font-size:.85rem; padding:2px 8px; border-radius:99px; color:#fff; }}
 .score.with_skill {{ background:var(--ok); }} .score.without_skill {{ background:var(--bad); }}
 .muted {{ color:var(--dim); font-weight:normal; }}
+.stats {{ margin:0 0 8px; color:var(--dim); font-size:.85rem; }}
+.sum {{ border-collapse:collapse; background:var(--card); }}
+.sum th, .sum td {{ border:1px solid var(--line); padding:6px 10px; text-align:right; }}
+.sum td:first-child, .sum th:first-child {{ text-align:left; }}
+.sum a {{ color:var(--accent); }}
+.sum tfoot {{ font-weight:600; }}
 .allok {{ color:var(--ok); margin:0 0 8px; }}
 .fails {{ margin:0 0 8px; padding-left:18px; font-size:.85rem; }}
 .fails li {{ margin-bottom:6px; }}
@@ -126,13 +176,10 @@ summary {{ cursor:pointer; font-family:ui-monospace,Menlo,monospace; font-size:.
 @media (max-width: 760px) {{ nav {{ position:static; width:auto; border-right:0;
   border-bottom:1px solid var(--line); }} main {{ margin-left:0; padding:16px; }} }}
 </style></head><body>
-<nav><h1>Evals · {html.escape(iteration.name)}</h1>{"".join(nav)}</nav>
-<main>{"".join(sections)}</main>
+<nav><h1>Evals · {html.escape(iteration)}</h1>{nav}</nav>
+<main>{body}</main>
 </body></html>
 """
-    out = iteration / "compare.html"
-    out.write_text(page, encoding="utf-8")
-    print(f"wrote {out}")
 
 
 if __name__ == "__main__":

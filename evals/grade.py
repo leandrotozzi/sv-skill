@@ -15,7 +15,9 @@ from pathlib import Path
 
 EVALS = Path(__file__).parent
 CHECKS = {
-    e["id"]: e.get("checks", []) for e in json.loads((EVALS / "evals.json").read_text())["evals"]
+    e["id"]: e.get("checks", [])
+    for f in ("evals.json", "classics.json")
+    for e in json.loads((EVALS / f).read_text())["evals"]
 }
 
 
@@ -104,16 +106,20 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
 
 
 def equiv(out: Path, files: list[str], spec: dict) -> tuple[bool, str]:
-    """Simulate the original (renamed <module>_ref) against the output with a shared testbench."""
+    """Simulate the output with a self-checking testbench, against the original
+    (renamed <module>_ref) when the spec names one."""
     work = out.parent / "equiv"
     shutil.rmtree(work, ignore_errors=True)
     work.mkdir()
-    ref = (EVALS / spec["ref"]).read_text()
-    (work / "ref.v").write_text(
-        re.sub(rf"\bmodule\s+{spec['module']}\b", f"module {spec['module']}_ref", ref)
-    )
+    sources = [*(str(out / f) for f in files)]
+    if "ref" in spec:
+        ref = (EVALS / spec["ref"]).read_text()
+        (work / "ref.v").write_text(
+            re.sub(rf"\bmodule\s+{spec['module']}\b", f"module {spec['module']}_ref", ref)
+        )
+        sources.insert(0, str(work / "ref.v"))
     tb = EVALS / spec["tb"]
-    sources = [str(work / "ref.v"), *(str(out / f) for f in files), str(tb)]
+    sources.append(str(tb))
     flags = [
         "--binary",
         "--timing",
