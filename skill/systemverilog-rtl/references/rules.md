@@ -10,7 +10,7 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 - **DOC-001** · MUST · Every `.sv` and `.svh` file begins with the copyright line, the all-rights-reserved line, and a `Description:` block that says what the file does. `[fix]`
 - **DOC-002** · SHOULD · The `Description:` block says what the module does and names its non-obvious constraints; it is not the module name restated.
 - **DOC-003** · MUST · Each port declaration ends with a `//` comment describing the signal. `[fix]`
-- **DOC-004** · MUST · Each parameter, localparam, signal and net declaration statement ends with a `//` comment. Enumeration members are exempt. `[fix]`
+- **DOC-004** · MUST · Each parameter, localparam, signal and net declaration statement ends with a `//` comment. A declaration spread over several lines, or one whose comment would not fit trailing within 100 columns, may carry it on the line directly above instead. Enumeration members are exempt. `[fix]`
 - **DOC-005** · MUST · A one-line `//` comment sits on the line above every `always_ff`, `always_comb` and `always_latch` block, saying what the block computes. `[fix]`
 - **DOC-006** · MUST · A one-line `//` comment sits on the line above every module instantiation, saying what the instance is for in this design. `[fix]`
 - **DOC-007** · MUST · A comment on its own line describes the code that follows; a comment on a line with code describes that line. Use `//`, not `/* */`.

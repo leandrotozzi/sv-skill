@@ -87,6 +87,24 @@ def test_param_and_signal_without_comment():
     assert _found(text) == [("DOC-004", 11), ("DOC-004", 18)]
 
 
+def test_multiline_declaration_may_carry_its_comment_above():
+    # A default value spread over lines has no single end to trail a comment on.
+    text = _edit(
+        "    logic [Width-1:0] q_q;  // First-stage register",
+        "    // First-stage register\n    logic [Width-1:0] q_q = {\n        Width'(0)\n    };",
+    )
+    assert _found(text) == []
+    # One line still needs it trailing: above is only for what does not fit.
+    text = _edit(
+        "    logic [Width-1:0] q_q;  // First-stage register",
+        "    // First-stage register\n    logic [Width-1:0] q_q;",
+    )
+    assert _found(text) == [("DOC-004", 19)]
+    # One line that its comment would push past 100 columns may also carry it above.
+    long = "    // " + "x" * 80 + "\n    logic [Width-1:0] q_q;"
+    assert _found(_edit("    logic [Width-1:0] q_q;  // First-stage register", long)) == []
+
+
 def test_anchor_in_macro_is_reported_but_not_fixable():
     text = _edit(
         "    logic [Width-1:0] q_q;", "`define DECL logic x;\n    `DECL\n    logic [Width-1:0] q_q;"

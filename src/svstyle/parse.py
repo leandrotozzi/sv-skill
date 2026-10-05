@@ -36,6 +36,9 @@ CONNECTION_STYLE = {
 }
 
 
+COLUMN_LIMIT = 100  # Verible's --column_limit and line-length (FMT-002)
+
+
 class ParseError(Exception):
     """The file does not parse; `svstyle` refuses to touch it (exit 3)."""
 
@@ -349,6 +352,15 @@ class _Walker:
                     comment = tr.getRawText()
                 if tr.kind != TriviaKind.Whitespace:
                     break
+        if comment is None:
+            # A declaration spread over several lines has no one end to trail, and
+            # one whose comment would not fit trailing within the column limit
+            # (FMT-002) cannot carry it there: the line above will do for both.
+            is_first = first.location == self.toks[0].location
+            above = _comment_above(_trivia(first), is_first=is_first)
+            width = len(self.text.splitlines()[line - 1].rstrip())
+            if above and (self.line(first) != line or width + 2 + len(above) > COLUMN_LIMIT):
+                comment = above
         fixable = not (split_list or self.in_macro(node))
         end = self.offset(last) + len(last.rawText)
         prev = self.anchors[-1] if self.anchors else None

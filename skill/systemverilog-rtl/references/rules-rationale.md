@@ -103,7 +103,7 @@ output logic        ready_o
 
 ### DOC-004 (MUST) — Every declaration carries a trailing comment
 
-Each parameter, localparam, signal and net declaration statement ends with a `//` comment. Enumeration members are exempt.
+Each parameter, localparam, signal and net declaration statement ends with a `//` comment. A declaration spread over several lines, or one whose comment would not fit trailing within 100 columns, may carry it on the line directly above instead. Enumeration members are exempt.
 
 **Why:** A declaration is where a signal's purpose can be stated once instead of re-derived at every use. Enum members are exempt because their meaning belongs on the FSM case arm that acts on them, which is where lowRISC puts it -- commenting both places guarantees the two drift apart.
 
