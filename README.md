@@ -27,11 +27,49 @@ uv run pytest
 uv run svstyle --help
 ```
 
-## Install as a tool
+## Install
+
+The CLI, editable so it tracks the repo:
 
 ```sh
-uvx --from /path/to/sv-skill svstyle check rtl/*.sv
+uv tool install --editable /path/to/sv-skill
 ```
 
+The skill, as a symlink so the skill can find the repo (and `svstyle`) from
+its real path:
+
+```sh
+ln -s /path/to/sv-skill/skill/systemverilog-rtl ~/.claude/skills/systemverilog-rtl
+```
+
+Claude Code then loads it for any SystemVerilog request ("design a 2-flop
+synchroniser", "review this FIFO"), no need to name it.
+
 External tools used when present: `verible-verilog-format` / `verible-verilog-lint`
-(pinned `v0.0-3946`), `verilator`. `svstyle check --no-external` skips them.
+(pinned `v0.0-3946`), `verilator`, and `yosys` for `--synth`.
+`svstyle check --no-external` skips them; `fix` needs Verible.
+
+## Usage
+
+```sh
+svstyle check rtl/                # report; exit 1 on any MUST finding
+svstyle fix rtl/ --diff           # show what fix would change; exit 1 if anything
+svstyle fix rtl/                  # format, add header/comments, modernise legacy code
+svstyle check rtl/ --synth        # also run Yosys (combinational loops)
+svstyle rules --id PRT-003        # one rule in full
+```
+
+```
+rtl/fifo.sv:14:1: DOC-003 `rst_ni` has no trailing // comment [fix available]
+2 findings (MUST 1, SHOULD 1)
+```
+
+Per-project `select` / `ignore` / `include` go in `.svstyle.toml`; a finding is
+waived inline with `// svstyle: waive DOC-004 <reason>`.
+
+More:
+
+- [`tooling.md`](skill/systemverilog-rtl/references/tooling.md) — every
+  option, JSON output, exit codes, which tool enforces which rule, waivers.
+- [`style-guide.html`](docs/style-guide.html) — all rules with rationale
+  (generated from `rules.toml`).
