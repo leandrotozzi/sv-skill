@@ -30,6 +30,7 @@ def run_cost(lines: list[dict]) -> dict:
     minus that turn's tool results; a message without thinking counts its
     visible text and tool input. Characters / 3.5 approximate tokens."""
     msgs: list[dict] = []
+    checks = 0  # `svstyle check` runs: 1 means the style closed in one pass
     for d in lines:
         if d.get("type") == "assistant" and "usage" in d.get("message", {}):
             m = d["message"]
@@ -42,6 +43,7 @@ def run_cost(lines: list[dict]) -> dict:
                     msgs[-1]["vis"] += len(b["text"])
                 elif b["type"] == "tool_use":
                     msgs[-1]["vis"] += _chars(b["input"])
+                    checks += "svstyle check" in str(b["input"].get("command", ""))
         elif d.get("type") == "user" and msgs and isinstance(d["message"]["content"], list):
             for b in d["message"]["content"]:
                 if b.get("type") == "tool_result":
@@ -66,6 +68,7 @@ def run_cost(lines: list[dict]) -> dict:
     wall = (max(stamps) - min(stamps)).total_seconds() if stamps else 0.0
     return {
         "turns": len(msgs),
+        "svstyle_checks": checks,
         "tokens": tok,
         "usd": round(sum(tok[k] * PRICE[k] for k in PRICE) / 1e6, 4),
         "usd_output": round(tok["output"] * PRICE["output"] / 1e6, 4),

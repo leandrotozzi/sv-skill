@@ -83,6 +83,7 @@ def main(iteration: Path) -> None:
                 totals[cfg][k] += costs[cfg].get(k, 0)
             c = costs[cfg]
             stats = (f"<p class='stats'>{money(c)} · {minutes(c)} · {c['turns']} turnos · "
+                     f"{c.get('svstyle_checks', 0)} × svstyle check · "
                      f"{c['tokens']['output']:,} tokens de salida</p>") if c else ""  # fmt: skip
             cols.append(
                 f"<div class='col'><h3>{LABEL[cfg]} <span class='score {cfg}'>{scores[cfg]}</span></h3>"
