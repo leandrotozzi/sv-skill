@@ -274,3 +274,8 @@ def test_check_synth_reports_a_combinational_loop(capsys, tmp_path):
     }
     assert "SYN-005" not in rules()  # opt-in: synthesis is the slow part
     assert "SYN-005" in rules("--synth")
+    # A project that synthesises with Yosys says so once, in its config.
+    (tmp_path / ".svstyle.toml").write_text('synth = "yosys"\n')
+    assert "SYN-005" in rules()
+    (tmp_path / ".svstyle.toml").write_text('synth = "vivado"\n')
+    assert "SYN-005" not in rules()

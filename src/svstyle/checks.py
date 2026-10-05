@@ -22,7 +22,7 @@ from .rules import Diag, Rule, tool_index
 # and DOC-001 warns until it is replaced.
 PLACEHOLDER = "<Company>"
 CONFIG_NAME = ".svstyle.toml"
-CONFIG_KEYS = {"company": str, "select": list, "ignore": list, "include": list}
+CONFIG_KEYS = {"company": str, "select": list, "ignore": list, "include": list, "synth": str}
 
 
 class ConfigError(Exception):

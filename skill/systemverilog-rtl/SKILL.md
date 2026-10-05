@@ -15,6 +15,12 @@ reviewer spends time on the design, not on whitespace and naming.
 Read `references/rules.md` (one line per rule). It is short on
 purpose: every rule you break there is a finding you will have to fix later.
 
+Then check the synthesis tool: the `synth` key in the nearest
+`.svstyle.toml` (no file or no key means `yosys`). If it is `yosys`, also
+read `references/synth-yosys.md`, the SystemVerilog subset Yosys reads;
+code outside it is a parse error and an extra round. Any other value: skip
+that file.
+
 Start from the closest template in `assets/` rather than a blank file. Each
 already passes `svstyle check`, so you inherit a correct header, port order,
 reset style and comment layout:
@@ -68,6 +74,9 @@ svstyle fix   rtl/*.sv     # Verible formatting + anything insertable
 svstyle check --synth rtl/*.sv  # svstyle + Verible lint + Verilator + Yosys, one report
 ```
 
+With `synth = "yosys"` in `.svstyle.toml`, plain `svstyle check` runs Yosys
+too; with another tool there, drop `--synth`.
+
 Pass every file of the design in one call: Verilator needs the submodules
 to elaborate, and checking a lone file that instantiates others reports
 `EXT-VLTR-MODMISSING`. If the code `` `include``s files from another
@@ -113,9 +122,7 @@ list against the code you wrote:
 - **Naming** (NAM-009): whole-word names; a signal outside the default
   clock domain carries its domain's prefix.
 - **Structure** (STR-003, STR-004): declarations next to the logic that
-  drives them; no package import cycles. If the flow includes Yosys,
-  reference package items as `pkg::Name` rather than importing in the
-  header: open-source Yosys cannot parse an import there.
+  drives them; no package import cycles.
 - **Departures** (DOC-009): if the design genuinely needs to break a rule,
   waive it where it happens with the reason in the same comment:
   `// svstyle: waive RST-001 DSP blocks need a synchronous reset` on the
@@ -125,7 +132,8 @@ list against the code you wrote:
 
 - `svstyle check --synth` exits 0 on every file of the design (VER-003);
   SHOULD findings are allowed but each one is a deliberate choice. Drop
-  `--synth` only if Yosys is not installed, and say so.
+  `--synth` only if the project synthesises with another tool or Yosys is
+  not installed, and say so.
 - No `// TODO: describe` is left: `grep -rn "TODO: describe" rtl/` is empty.
 - The judgement list above has been walked, and anything that departs from
   it carries a DOC-009 comment.

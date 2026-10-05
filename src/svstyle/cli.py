@@ -235,7 +235,8 @@ def _cmd_check(args, rules: list) -> int:
             lambda: external.verible_lint(parsed, rules),
             lambda: external.verilator_lint(parsed, rules, list(includes)),
         )
-        if args.synth:
+        # `synth = "yosys"` in the project config makes Yosys part of every check.
+        if args.synth or any(c.get("synth") == "yosys" for c in configs.values()):
             tools += (lambda: external.yosys_check(parsed, rules, list(includes)),)
         for tool in tools:
             try:

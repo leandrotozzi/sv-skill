@@ -26,10 +26,13 @@ company = "ACME Corp"      # the copyright holder in every file header
 select  = ["DOC", "LNG"]   # optional: only these rule IDs/prefixes
 ignore  = ["DOC-005"]      # optional: drop these
 include = ["rtl/inc"]      # optional: `include dirs, relative to this file
+synth   = "yosys"          # optional: the synthesis tool; "yosys" runs Yosys on every check
 ```
 
 With it, `fix` writes new headers with that company and replaces the
-`<Company>` placeholder in existing ones. `--select`/`--ignore` on the
+`<Company>` placeholder in existing ones. `synth = "yosys"` makes plain
+`check` behave like `check --synth`; any other value names a tool svstyle
+does not run, and tells the skill not to load `synth-yosys.md`. `--select`/`--ignore` on the
 command line replace the file's selection. Without it the placeholder stays and
 DOC-001 reports it as a SHOULD. An unknown key or a wrong type is an error
 (exit 2), so a typo never silently disables the setting.
