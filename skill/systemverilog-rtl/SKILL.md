@@ -51,7 +51,11 @@ is missing -- it is not a comment. So write every comment yourself, as you go:
   otherwise the placeholder stays and is reported as a SHOULD.
 - **Trailing comment on every port, parameter and declaration** (DOC-003/004):
   what the signal means, when it is valid, what it is relative to. Not its
-  type or direction -- the declaration already says that.
+  type or direction -- the declaration already says that. A declaration
+  that spans several lines, or whose comment would not fit within 100
+  columns, takes it on the line directly above instead.
+- **Size every intermediate signal to the bits you use** (LNG-017): a sized
+  cast `W'(expr)` instead of a wider temporary whose top bit is never read.
 - **A comment line above every `always_*` block and every instance**
   (DOC-005/006): what the block computes, or why the design needs the instance.
 - **A comment above each FSM case arm** (DOC-008), not on the enum.
