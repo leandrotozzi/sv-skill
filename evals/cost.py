@@ -3,7 +3,8 @@
     uv run python evals/cost.py skill/systemverilog-rtl-workspace/<iteration> [TRANSCRIPT_DIR...]
 
 A transcript belongs to a run when its first prompt names the run's
-`<eval>/<config>/outputs` path. Writes `<eval>/<config>/run-1/cost.json`.
+`<eval>/<config>/[run-N/]outputs` path. Writes `<eval>/<config>/run-N/cost.json`
+(run-1 when the path has no run).
 Input and cache cost are exact; output (incl. thinking) is an estimate.
 TRANSCRIPT_DIR defaults to every `*/subagents` of this project's sessions.
 """
@@ -86,19 +87,22 @@ def first_prompt(lines: list[dict]) -> str:
 
 def main(iteration: Path, dirs: list[Path]) -> None:
     files = [f for d in dirs for f in d.glob("*.jsonl")]
-    cfg = r"/(eval-[\w-]+)/(with_skill|without_skill)/outputs"
+    cfg = r"/(eval-[\w-]+)/(with_skill|without_skill)/(run-\d+/)?outputs"
     pat = re.compile(re.escape(iteration.name) + cfg)
     for f in files:
         lines = [json.loads(ln) for ln in f.read_text().splitlines() if ln.strip()]
         m = pat.search(first_prompt(lines))
         if not m:
             continue
-        run = iteration / m[1] / m[2] / "run-1"
+        run = iteration / m[1] / m[2] / (m[3] or "run-1/").rstrip("/")
         run.mkdir(parents=True, exist_ok=True)
         cost = {**run_cost(lines), "transcript": str(f)}
         (run / "cost.json").write_text(json.dumps(cost, indent=2))
         c = cost
-        print(f"{m[1]:28} {m[2]:14} ${c['usd']:7.3f} {c['wall_s']:7.0f}s {c['turns']:4} turns")
+        print(
+            f"{m[1]:28} {m[2]:14} {run.name:6} ${c['usd']:7.3f} {c['wall_s']:7.0f}s"
+            f" {c['turns']:4} turns"
+        )
 
 
 if __name__ == "__main__":

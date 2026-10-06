@@ -13,6 +13,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from svstyle.checks import waivers
+
 EVALS = Path(__file__).parent
 CHECKS = {
     e["id"]: e.get("checks", [])
@@ -77,7 +79,13 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
     vl = run(
         ["verilator", "--lint-only", "-Wall", "-Wno-MULTITOP", "-Wno-PINCONNECTEMPTY", *files], out
     )
-    warns = [ln for ln in vl.stderr.splitlines() if re.match(r"%(Warning|Error)", ln)]
+    # A line the author waived for svstyle (DOC-009) is waived here too.
+    waived = {f"{f}:{n}:" for f in files for n in waivers((out / f).read_text())}
+    warns = [
+        ln for ln in vl.stderr.splitlines()
+        if re.match(r"%(Warning|Error)", ln) and not ln.startswith("%Error: Exiting due to")
+        and not any(w in ln for w in waived)
+    ]  # fmt: skip
     check("verilator --lint-only -Wall is clean", not warns, "\n".join(warns[:8]) or "clean")
 
     ys = run(["yosys", "-q", "-p", f"read_verilog -sv {' '.join(files)}; synth -auto-top"], out)
