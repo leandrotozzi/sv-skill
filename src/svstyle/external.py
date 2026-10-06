@@ -40,6 +40,8 @@ FIXED_BY_FIX = {
     "always-comb",
 }  # fmt: skip
 NOT_NBA_RE = re.compile(r"^(\w+) should be driven by a nonblocking assignment")
+# Verible wants a bare name on the left; `s_q.field <=` is a field of a `_q` flop.
+FIELD_OF_Q_RE = re.compile(r"^\w+_q(\.\w+)+ Should be a simple reference")
 PACKAGE_RE = re.compile(r"^\s*package\s+\w+\s*;", re.MULTILINE)
 # The code is optional: elaboration errors (an undeclared name under
 # `default_nettype none) print as a bare `%Error:`.
@@ -100,7 +102,12 @@ def verible_verify(paths: list[str], rules: list[Rule]) -> list[Diag]:
 def verible_lint(paths: list[str], rules: list[Rule]) -> list[Diag]:
     res = _run("verible-verilog-lint", [f"--rules_config={LINT_CONFIG}", *paths])
     diags = parse_verible_lint(res.stdout + res.stderr, rules)  # findings go to stderr
-    return [d for d in diags if not _optional_register(d)]
+    return [
+        d
+        for d in diags
+        if not _optional_register(d)
+        and not (d.rule == "NAM-004" and FIELD_OF_Q_RE.match(d.message))
+    ]
 
 
 def _optional_register(d: Diag) -> bool:

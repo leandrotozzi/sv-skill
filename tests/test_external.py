@@ -358,6 +358,15 @@ def test_nam004_only_asks_that_flops_are_named_q(tmp_path, stmt, flagged):
         ),
         # A _q that is never a flop is still a lie.
         ("assign x_q = a_i;\n assign x_o = x_q;", True),
+        # A struct flop written one field at a time is still `_q`; a non-`_q` one is not.
+        *(
+            (
+                f"typedef struct packed {{ logic f; }} s_t;\n s_t {s};\n"
+                f" always_ff @(posedge clk_i) begin\n {s}.f <= a_i;\n end",
+                flagged,
+            )
+            for s, flagged in (("s_q", False), ("s", True))
+        ),
     ],
 )
 def test_nam004_accepts_registered_outputs_and_optional_registers(tmp_path, body, flagged):
