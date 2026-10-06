@@ -1,3 +1,4 @@
+import re
 import shutil
 from pathlib import Path
 
@@ -47,10 +48,23 @@ def test_golden(src):
     assert fix_text(src.read_text(), src.name, RULES) == (FIX / "expected" / src.name).read_text()
 
 
+# Messy layouts fix must also settle in one pass: retabbed, two-space, trailing
+# blanks, alignment squashed, comments stripped (so fix writes its TODOs).
+MESS = {
+    "as-is": lambda t: t,
+    "tabs": lambda t: re.sub(r"^((?:    )+)", lambda m: "\t" * (len(m[1]) // 4), t, flags=re.M),
+    "two": lambda t: re.sub(r"^((?:    )+)", lambda m: "  " * (len(m[1]) // 4), t, flags=re.M),
+    "trail": lambda t: t.replace("\n", "   \n").rstrip("\n "),
+    "squash": lambda t: re.sub(r" {2,}(?=\S)", " ", t),
+    "nocmt": lambda t: re.sub(r" *//(?! svstyle).*$", "", t, flags=re.M),
+}
+
+
 @needs_verible
+@pytest.mark.parametrize("mess", MESS)
 @pytest.mark.parametrize("src", INPUTS, ids=lambda p: p.name)
-def test_idempotent(src):
-    once = fix_text(src.read_text(), src.name, RULES)
+def test_idempotent(src, mess):
+    once = fix_text(MESS[mess](src.read_text()), src.name, RULES)
     assert fix_text(once, src.name, RULES) == once
 
 
