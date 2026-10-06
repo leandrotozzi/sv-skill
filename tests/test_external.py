@@ -324,6 +324,7 @@ def test_yosys_passes_the_templates():
         ("level_sync_q <= level_meta_q;", False),  # synchroniser chain
         ("rdata_q <= mem_q[addr_i];", False),  # registered RAM read
         ("data_q <= a_i & b_i;", False),  # small logic inline is fine
+        ("cs_nq <= a_i;", False),  # active-low flop, NAM-003 suffix order
         ("if (!wr_rst_n) begin\n data_q <= '0;\n end else begin\n data_q <= data_d;\n end", False),
         # What the rule is for: a flop is visibly a flop.
         ("data <= a_i;", True),
@@ -336,7 +337,7 @@ def test_nam004_only_asks_that_flops_are_named_q(tmp_path, stmt, flagged):
         "module m (\n    input logic clk_i,\n    input logic data_i,\n    input logic in_data_i,\n"
         "    input logic a_i,\n    input logic b_i,\n    input logic wr_rst_n,\n"
         "    input logic [1:0] addr_i\n);\n"
-        "    logic data_q, data_q2, data_d, data, skid_data_q, rdata_q;\n"
+        "    logic data_q, data_q2, data_d, data, skid_data_q, rdata_q, cs_nq;\n"
         "    logic level_sync_q, level_meta_q;\n    logic mem_q[4];\n"
         f"    always_ff @(posedge clk_i) begin\n        {stmt}\n    end\nendmodule\n"
     )
