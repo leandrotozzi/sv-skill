@@ -17,6 +17,7 @@ check-edit-check. Verified on Yosys 0.66.
 | `return x;` in a function | assign the function name: `f = x;` |
 | a constant table as an array: `localparam logic [7:0] T [4] = '{...}` or `localparam logic [3:0][7:0] T = ...` | a flat vector sliced by index, `localparam logic [31:0] T = {...}; ... T[i*8 +: 8]`, or a function with a `case` |
 | `import pkg::*;` in the module header or body | `pkg::Name` at each use; package types, enums, structs and functions all work that way |
+| a struct assignment pattern, `s = '{f: a, g: b}` or `'{a, b}` | a concatenation in field order, `s = {a, b};`, or assign the whole struct from a typed `_d` built field by field |
 | `a inside {1, 2}` | `(a == 1) \|\| (a == 2)`, or a `case` |
 | `foreach (a[i])` | `for (int i = 0; i < $bits(a); i++)` |
 | `break` / `continue` | a `found` flag in the loop condition or the body |

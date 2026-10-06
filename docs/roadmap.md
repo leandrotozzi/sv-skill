@@ -140,6 +140,18 @@ closes the style, with no second LLM round.
 | 3 | DOC-004 accepts the comment above a multi-line or overlong declaration; LNG-017 note | 7/10 |
 | 4 | `fix` moves a lone comment above a short declaration to its end; rounding idiom | **10/10** |
 
+Round 5 adds five variants (`lzc` combinational with no clock, `debounce-bank`
+two modules and a generate loop from a Spanish prompt, `csr-block` with a
+company name, `alu-pkg` enum and packed-struct ports from a package, `lfsr`
+restricted parameter), with skill only: 5/5 correct and every check passed;
+style closed in the first `fix` + `check` 4/5, about $0.33 and 80 s per block.
+`csr-block` created `.svstyle.toml`, so its header names the company. The
+miss, `alu-pkg`, found two gaps, both fixed: Yosys rejects struct assignment
+patterns (`'{f: a}`, `'{a, b}`; now in `synth-yosys.md`), and Verible's
+NAM-004 flagged a struct flop written field by field (`s_q.f <=`; now
+accepted). Rerun of `alu-pkg` after both fixes: one `check`, 10/10, so 5/5.
+`lzc` carries no `ASSERT_KNOWN`: the macros need a clock.
+
 Left open: a single comment above two declarations still leaves the second
 with a `TODO` (no mechanical fix without inventing text); `<Company>` stays a
 SHOULD until the project has a `.svstyle.toml`.
