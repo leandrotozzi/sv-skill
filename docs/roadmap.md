@@ -171,3 +171,13 @@ reset checklist in `SKILL.md` now says to reset full/ready flags to their
 blocking value; rerun 10/10, so 10/10. `grade.py`'s `yosys_memory` check no
 longer fails a design because a small side array (a prefetch buffer) became
 flops; a `$mem` cell is enough.
+
+Round 7 closes the three MUSTs that cost an extra `check` in round 6:
+`assets/sync_ff.sv`, a synchroniser rank (`NumFlops` 2 or 3, also the reset
+synchroniser with `d_i` tied to 1), replaces the hand-written reset
+synchronisers that tripped NAM-004 and RST-005; NAM-004 accepts `_nq`, the
+active-low flop name NAM-003 asks for (`cs_nq`); and the skill says to keep
+each `` `ASSERT`` within 100 columns, since Verible neither wraps nor keeps a
+split macro argument. Reruns of `async-fifo`, `spi-master` and
+`axis-downsizer`: 10/10 each, one `check` each, so the style closed in the
+first `check` 9/10; `axil-regs` ran a second `check` after a clean first.
