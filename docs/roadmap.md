@@ -199,3 +199,22 @@ in `SKILL.md` or `synth-yosys.md`, as do where the reset synchroniser goes
 and how to copy the assets. `grade.py`'s Verilator check now honours
 `svstyle: waive` lines, which it failed `axil-regs` run 1 for; `cost.py`
 reads `run-N/outputs`.
+
+Round 9 (2026-10-06): the same 75 runs with the round-8 skill (about $33,
+140 s per run). Correct 74/75; first `check` clean 72/75, up from 61/75. No
+LNG-017, `EXT-VLTR-CMPCONST` or misplaced reset synchroniser left. The miss,
+`lfsr` run 3, asserted a nonzero seed the spec allows; `SKILL.md` now says
+not to assert against legal inputs. The three unclean first checks were all
+`sort8`: twice Yosys on a two-dimensional packed array declared inside a
+generate or `begin` block (it fails even when read only in that block, so
+the old "read from another iteration" line missed it; `synth-yosys.md` now
+says so), once LNG-015 on a `localparam` set from a slice.
+
+Rather than keep finding Yosys gaps one eval at a time, `evals/yosys-probes/`
+now holds 148 one-construct probes drawn from the Yosys manual, its parser
+and the sv-tests results, each proved against a plain-Verilog reference with
+`sat`; `run.sh` reruns them on a new Yosys. `synth-yosys.md` is rewritten
+from them. Four constructs synthesise wrong with no message: an indexed
+typedef of two or more packed dimensions, a packed array of packed structs,
+`unique case` without `default` after a default assignment, and a
+module-level variable with a non-constant initializer.

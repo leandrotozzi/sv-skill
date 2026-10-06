@@ -68,7 +68,9 @@ is missing -- it is not a comment. So write every comment yourself, as you go:
   `// svstyle: waive LNG-017 <why>` on its own line above the port.
 - **No assertion the type already guarantees**: `count_q <= CountMax - 1` on
   a `$clog2(CountMax)`-bit counter is constant when `CountMax` is a power of
-  two, and Verilator reports it (`EXT-VLTR-CMPCONST`).
+  two, and Verilator reports it (`EXT-VLTR-CMPCONST`). Nor one that forbids
+  an input the spec allows (a zero seed, a back-to-back start): it fires on
+  legal use. Write down a hazard the spec permits in the description instead.
 - **A comment line above every `always_*` block and every instance**
   (DOC-005/006): what the block computes, or why the design needs the instance.
 - **A comment above each FSM case arm** (DOC-008), not on the enum.
@@ -136,7 +138,9 @@ list against the code you wrote:
   interface; packed structs rather than interfaces as ports; ready/valid
   naming that says which protocol it is.
 - **Case statements** (SYN-002, SYN-003): `unique case` + `default`;
-  priority as `if`/`else if`.
+  priority as `if`/`else if`. The `default` is not optional: without it
+  synthesis may treat the case as `full_case` and drop the assignment
+  before it, silently.
 - **Parameters** (GEN-003): a parameter with restricted values gets an
   elaboration-time check, as the templates show.
 - **Assertions** (VER-001/002): `` `ASSERT_KNOWN`` on every output, plus
