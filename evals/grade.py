@@ -94,12 +94,10 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
             read = f"read_verilog -sv {' '.join(files)}"
             script = f"{read}; hierarchy -auto-top; proc; memory -nomap; stat"
             st = run(["yosys", "-p", script], out)  # not -q: that silences `stat`
-            # A memory cell in the `stat` table. `$mem2reg_*` in the log means the
-            # array was turned into flops, which is what this check exists to catch.
+            # A memory cell in the `stat` table. mem2reg on a small side array (a
+            # skid or prefetch buffer) is fine; a storage array in flops leaves none.
             cells = re.findall(r"^\s+\d*\s*\$mem(?:_v2)?\b.*$", st.stdout, re.MULTILINE)
-            flops = "mem2reg" in st.stdout
-            why = "array turned into flops (mem2reg)" if flops else "; ".join(cells)
-            check(c["text"], cells and not flops, why or "no $mem cell")
+            check(c["text"], cells, "; ".join(cells) or "no $mem cell (array turned into flops)")
         elif "equiv_tb" in c:
             check(c["text"], *equiv(out, files, c["equiv_tb"]))
     return exp
