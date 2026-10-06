@@ -255,6 +255,56 @@
       "checks": [
         {"text": "Every signed product correct at Width 8 (exhaustive) and 16, done within Width/2+2 cycles, start ignored while busy, result held", "equiv_tb": {"tb": "files/classics/booth_mul_tb.sv"}}
       ]
+    },
+    {
+      "id": 126,
+      "name": "isqrt",
+      "prompt": "Write a sequential integer square root in SystemVerilog, isqrt.sv. Parameter Width (default 16, even and at least 4; any other value must fail at elaboration). Ports: clk_i, rst_ni (asynchronous, active low), start_i, x_i[Width-1:0] (unsigned), busy_o, done_o, root_o[Width/2-1:0], rem_o[Width/2:0]. root_o is floor(sqrt(x_i)) and rem_o is x_i - root_o*root_o. A start_i while not busy captures x_i and sets busy_o; start_i while busy is ignored. done_o is a one-cycle pulse, at most Width/2 + 2 cycles after start, in the same cycle busy_o falls; from then root_o and rem_o hold the result until the next start.",
+      "expected_output": "isqrt.sv: sequential digit-by-digit square root with start/busy/done handshake, an elaboration check on Width and held root and remainder; every result correct within Width/2+2 cycles.",
+      "files": [],
+      "checks": [
+        {"text": "Every root and remainder correct at Width 8 (exhaustive) and 16/32 (corners and random), done within Width/2+2 cycles, start ignored while busy, result held", "equiv_tb": {"tb": "files/classics/isqrt_tb.sv"}}
+      ]
+    },
+    {
+      "id": 127,
+      "name": "cic-decim",
+      "prompt": "Write a CIC decimation filter in SystemVerilog, cic_decim.sv. Parameters: Stages (default 3, 1 to 5), Rate (default 8, a power of two from 2 to 64) and InWidth (default 12); any other Stages or Rate must fail at elaboration. Ports: clk_i, rst_ni (asynchronous, active low), valid_i, data_i[InWidth-1:0], valid_o, data_o[OutWidth-1:0], where OutWidth = InWidth + Stages*$clog2(Rate); data_i and data_o are signed two's complement. Differential delay is 1. Each accepted input x[n] (n = 1, 2, ... counting valid_i cycles since reset) runs through Stages integrators, each i[n] = i[n-1] + (its input at n), all starting at 0. After every Rate-th accepted input (n = k*Rate) the last integrator's value d[k] goes through Stages combs, each c[k] = (its input at k) - (its input at k-1) with the value at k = 0 taken as 0, and data_o shows the result with a one-cycle valid_o pulse, within 4 cycles of that input. data_o holds between pulses. valid_i may be high on any cycle, including back to back.",
+      "expected_output": "cic_decim.sv: N-stage CIC decimator with wrap-around integrators, a decimated comb section, an elaboration check on Stages and Rate and exact output width; every output matches the arithmetic model.",
+      "files": [],
+      "checks": [
+        {"text": "Every output sample matches the CIC model (Stages 1/3/5, Rate 2/8/64, back-to-back and sparse valid_i), one valid_o per Rate inputs within 4 cycles, data_o held", "equiv_tb": {"tb": "files/classics/cic_decim_tb.sv"}}
+      ]
+    },
+    {
+      "id": 128,
+      "name": "pwm-bank",
+      "prompt": "Write a multi-channel PWM generator in SystemVerilog, pwm_bank.sv. Parameters Channels (default 4, at least 1) and Width (default 8, 2 to 16). Ports: clk_i, rst_ni (asynchronous, active low), load_i, period_i[Width-1:0], duty_i[Channels*Width-1:0] (channel c at duty_i[c*Width +: Width]), pwm_o[Channels-1:0], sync_o. A counter cnt runs 0, 1, ..., P, 0, 1, ... where P is the active period, so one PWM period lasts P+1 cycles. load_i stores period_i and duty_i as a pending set (a later load overwrites it). The active period and duties take the pending set in the cycle the counter wraps from P to 0, and only if a load happened since the last wrap (including a load in the wrap cycle itself); otherwise they keep their value. pwm_o[c] is high while cnt < D[c], the channel's active duty (so D[c] = 0 is always low and D[c] > P is always high); sync_o is high while cnt == 0. Both outputs are functions of registered state only, no input reaches them combinationally. Reset clears the counter, the active and pending sets and the pending flag.",
+      "expected_output": "pwm_bank.sv: shared-counter PWM bank with pending/active double buffering that swaps at the period wrap, registered-state outputs and per-channel duty compare; cycle-exact against the model.",
+      "files": [],
+      "checks": [
+        {"text": "pwm_o and sync_o match the model on every cycle (Channels 1/4, Width 4/8, loads at random times including the wrap cycle, period 0)", "equiv_tb": {"tb": "files/classics/pwm_bank_tb.sv"}}
+      ]
+    },
+    {
+      "id": 129,
+      "name": "bin2bcd",
+      "prompt": "Write a sequential binary-to-BCD converter in SystemVerilog, bin2bcd.sv, using the shift-and-add-3 (double dabble) algorithm. Parameter Width (default 16, 4 to 32; any other value must fail at elaboration). Let Digits be the number of decimal digits of 2**Width - 1 (Width 4 gives 2, 10 gives 4, 16 gives 5, 32 gives 10). Ports: clk_i, rst_ni (asynchronous, active low), start_i, bin_i[Width-1:0] (unsigned), busy_o, done_o, bcd_o[4*Digits-1:0], digit 0 (the units) in bcd_o[3:0]. A start_i while not busy captures bin_i and sets busy_o; start_i while busy is ignored. done_o is a one-cycle pulse, at most Width + 2 cycles after start, in the same cycle busy_o falls; from then bcd_o holds the result until the next start.",
+      "expected_output": "bin2bcd.sv: sequential double dabble with Digits computed from Width at elaboration, start/busy/done handshake and held BCD result; every conversion correct within Width+2 cycles.",
+      "files": [],
+      "checks": [
+        {"text": "Every conversion correct at Width 4/10 (exhaustive), 16 and 32 (corners and random), done within Width+2 cycles, start ignored while busy, result held", "equiv_tb": {"tb": "files/classics/bin2bcd_tb.sv"}}
+      ]
+    },
+    {
+      "id": 130,
+      "name": "barrel-shift",
+      "prompt": "Write a combinational barrel shifter in SystemVerilog, barrel_shift.sv. Parameter Width (default 32, a power of two from 2 to 64; any other value must fail at elaboration). Ports: data_i[Width-1:0], amt_i[$clog2(Width)-1:0], op_i[1:0], data_o[Width-1:0]. op_i selects 0: logical left shift, 1: logical right shift, 2: arithmetic right shift (data_i signed), 3: rotate right. Build it as $clog2(Width) stages, stage s shifting or rotating by 2**s when amt_i[s] is set, not as a single shift operator. No clock.",
+      "expected_output": "barrel_shift.sv: log2(Width)-stage combinational shifter/rotator with four operations and an elaboration check on Width; every result matches the operator model.",
+      "files": [],
+      "checks": [
+        {"text": "Every op and amount correct at Width 2/8 (exhaustive) and 32/64 (random), purely combinational", "equiv_tb": {"tb": "files/classics/barrel_shift_tb.sv"}}
+      ]
     }
   ]
 }
