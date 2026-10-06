@@ -181,3 +181,21 @@ each `` `ASSERT`` within 100 columns, since Verible neither wraps nor keeps a
 split macro argument. Reruns of `async-fifo`, `spi-master` and
 `axis-downsizer`: 10/10 each, one `check` each, so the style closed in the
 first `check` 9/10; `axil-regs` ran a second `check` after a clean first.
+
+Round 8 (2026-10-06): all 25 blocks, three fresh runs each with the round-7
+skill (75 runs, about $32, 150 s per run). Correct 74/75; the miss,
+`cordic` run 3, put a reset synchroniser inside a single-clock block and
+dropped the first inputs after reset (`uart-rx` did the same twice and passed
+only because its testbench waits). The first `check` that ran on the files
+was clean 61/75. The raw count of `check` calls says 42/75, but it counts a
+first call that failed on a wrong relative path to `assets/` (the extra
+`run-N/` level) and clean re-checks before finishing. The 14 misses fall in
+four groups: LNG-017 unused bits (ignored address bits, a last-stage
+register nobody reads, an `int` index slicing a narrow vector), Yosys
+(`-W'(x)` read as a negative cast; a generate-local signal read from another
+iteration), `EXT-VLTR-CMPCONST` on an assertion a power-of-two counter
+already guarantees, and LNG-015 index widths. All but LNG-015 now have a line
+in `SKILL.md` or `synth-yosys.md`, as do where the reset synchroniser goes
+and how to copy the assets. `grade.py`'s Verilator check now honours
+`svstyle: waive` lines, which it failed `axil-regs` run 1 for; `cost.py`
+reads `run-N/outputs`.
