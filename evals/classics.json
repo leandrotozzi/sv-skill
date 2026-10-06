@@ -100,6 +100,58 @@
       "checks": [
         {"text": "Receives every byte, flags framing errors, ignores start glitches", "equiv_tb": {"tb": "files/classics/uart_rx_tb.sv"}}
       ]
+    },
+    {
+      "id": 111,
+      "name": "lzc",
+      "prompt": "Write a leading-zero counter in SystemVerilog, lzc.sv. Parameter Width (default 16), which must be a power of two and at least 2. Ports: data_i[Width-1:0], cnt_o[$clog2(Width):0], zero_o. It is purely combinational: no clock, no reset, no registers. cnt_o is the number of consecutive zero bits starting from the most significant bit of data_i (Width when data_i is all zeros), and zero_o is 1 exactly when data_i is all zeros.",
+      "expected_output": "lzc.sv: combinational leading-zero count, parameter check on Width; correct for every 16-bit input and for random 32-bit inputs.",
+      "files": [],
+      "checks": [
+        {"text": "Correct count and zero flag for every input (Width 16 exhaustive, Width 32 random)", "equiv_tb": {"tb": "files/classics/lzc_tb.sv"}}
+      ]
+    },
+    {
+      "id": 112,
+      "name": "debounce-bank",
+      "prompt": "necesito un debouncer en systemverilog para botones. hace dos modulos: debounce.sv con un debounce de un bit, y debounce_bank.sv que instancia NumBits copias con un generate. Parametros de debounce_bank: NumBits (default 8) y CountMax (default 4, minimo 2), que pasa a cada debounce. Puertos de debounce_bank: clk_i, rst_ni (asincronico, activo bajo), in_i[NumBits-1:0] (ya sincronizado a clk_i), out_o[NumBits-1:0]. Cada bit de out_o es un registro que arranca en 0 al reset y toma el valor de su bit de in_i en el flanco de clock en que in_i lleva CountMax flancos seguidos distinto de out_o; cualquier flanco en que son iguales reinicia la cuenta de ese bit.",
+      "expected_output": "debounce.sv + debounce_bank.sv: one-bit debouncer instanced per bit with a labelled generate loop; matches the reference cycle for cycle.",
+      "files": [],
+      "checks": [
+        {"text": "A separate one-bit debounce module exists", "present": "module\\s+debounce\\s*[#(]"},
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/debounce_bank_tb.sv", "ref": "files/classics/debounce_bank.sv", "module": "debounce_bank"}}
+      ]
+    },
+    {
+      "id": 113,
+      "name": "csr-block",
+      "prompt": "Write a small register block in SystemVerilog, csr_block.sv, for our company, Acme Silicon. Ports: clk_i, rst_ni (asynchronous, active low), req_i, we_i, addr_i[3:0], wdata_i[31:0], rdata_o[31:0], event_i[7:0], irq_o. addr_i is a byte address; addr_i[3:2] selects one of four 32-bit registers and addr_i[1:0] is ignored. 0x0 CTRL: bits 7:0 are an interrupt enable mask, read/write; other bits read 0. 0x4 STATUS: bits 7:0 are sticky event flags; each cycle every bit set in event_i sets its flag; a write clears the flags whose wdata_i bit is 1 (write-1-to-clear); when an event and a clear hit the same bit in the same cycle, the event wins; other bits read 0. 0x8 COUNT: 32-bit read-only count of the cycles in which any event_i bit is 1, wrapping; writes are ignored. 0xC SCRATCH: 32 bits, read/write. A write happens when req_i and we_i are 1. A read is req_i with we_i = 0: rdata_o is a register that, on the next cycle, holds the addressed register's value as it was in the read cycle; it keeps its value otherwise. irq_o is 1 whenever any STATUS flag with its CTRL enable bit set is 1. Every register, rdata_o included, resets to 0.",
+      "expected_output": "csr_block.sv: RW/W1C/RO registers, registered read data, irq from flops only; header carries the company name; matches the reference cycle for cycle.",
+      "files": [],
+      "checks": [
+        {"text": "The header names the company (DOC-001, via .svstyle.toml)", "present": "Copyright[^\\n]*Acme Silicon"},
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/csr_block_tb.sv", "ref": "files/classics/csr_block.sv", "module": "csr_block"}}
+      ]
+    },
+    {
+      "id": 114,
+      "name": "alu-pkg",
+      "prompt": "Write a registered 32-bit ALU in SystemVerilog as two files. alu_pkg.sv: package alu_pkg with typedef enum logic [2:0] alu_op_e {OpAdd = 0, OpSub = 1, OpAnd = 2, OpOr = 3, OpXor = 4, OpSll = 5, OpSrl = 6, OpSra = 7}; a packed struct alu_req_t with fields op (alu_op_e), a [31:0], b [31:0]; and a packed struct alu_rsp_t with fields result [31:0] and zero. alu.sv: module alu with ports clk_i, rst_ni (asynchronous, active low), valid_i, req_i (alu_req_t), valid_o, rsp_o (alu_rsp_t). Shifts use b[4:0]; OpSra is an arithmetic shift of a. One cycle after a request with valid_i = 1, valid_o is 1 and rsp_o holds its result, with zero = 1 exactly when the result is 0; valid_o is 0 otherwise and rsp_o may then hold any value.",
+      "expected_output": "alu_pkg.sv + alu.sv: enum and packed-struct ports from a package, one-cycle registered result; every valid result matches the model.",
+      "files": [],
+      "checks": [
+        {"text": "Every valid result correct, one cycle after its request", "equiv_tb": {"tb": "files/classics/alu_tb.sv"}}
+      ]
+    },
+    {
+      "id": 115,
+      "name": "lfsr",
+      "prompt": "Write a PRBS generator in SystemVerilog, lfsr.sv, for the ITU-T O.150 sequences. Parameter Order, one of 7, 15, 23 or 31 (default 7); any other value must fail at elaboration. The polynomials are x^7+x^6+1, x^15+x^14+1, x^23+x^18+1 and x^31+x^28+1. Ports: clk_i, rst_ni (asynchronous, active low), en_i, load_i, seed_i[Order-1:0], state_o[Order-1:0], bit_o. state_o is a Fibonacci shift register that resets to all ones. Each cycle: if load_i, it takes seed_i (load wins over en_i); else if en_i, it shifts left by one and the new bit 0 is state_o[Order-1] XOR state_o[t-1], where x^t is the polynomial's middle term; otherwise it holds. bit_o is state_o[Order-1].",
+      "expected_output": "lfsr.sv: parameter-selected taps with an elaboration check on Order; matches the reference at Order 7 and 31 cycle for cycle.",
+      "files": [],
+      "checks": [
+        {"text": "Matches the reference model at Order 7 and 31, cycle for cycle", "equiv_tb": {"tb": "files/classics/lfsr_tb.sv", "ref": "files/classics/lfsr.sv", "module": "lfsr"}}
+      ]
     }
   ]
 }
