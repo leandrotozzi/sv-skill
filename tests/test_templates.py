@@ -23,7 +23,7 @@ needs_tools = pytest.mark.skipif(
 
 def test_there_are_templates():
     assert {p.name for p in TEMPLATES} == {
-        "skeleton.sv", "fsm.sv", "fsm_pkg.sv", "assert_macros.svh"
+        "skeleton.sv", "fsm.sv", "fsm_pkg.sv", "sync_ff.sv", "assert_macros.svh"
     }  # fmt: skip
 
 
