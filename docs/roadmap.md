@@ -122,3 +122,24 @@ through today. Each item names the finding and the fix.
   fails on design, not style.
 - **Configurable header template: not needed.** `company` in
   `.svstyle.toml` is the only per-project setting anyone has asked for.
+
+## Classic designs, one-pass style (2026-10-05)
+
+Ten classic blocks (`evals/classics.json`: FSM, counter, FIR, fixed-point
+add/mul, arbiter, CORDIC, CRC-32, divider, UART RX), each with a reference
+model or self-checking testbench validated against planted bugs. Opus 5.5,
+one run per configuration. Functionally correct 10/10 with and without the
+skill; the skill's value is the house style, at about +$0.08 and +20 s per
+block. Goal: the RTL the skill writes is close enough that one `svstyle fix`
+closes the style, with no second LLM round.
+
+| Round | Change | Style closed in the first `fix` + `check` |
+|---|---|---|
+| 1 | -- | 6/10 |
+| 2 | `references/synth-yosys.md`, loaded when `synth = "yosys"` | 8/10 |
+| 3 | DOC-004 accepts the comment above a multi-line or overlong declaration; LNG-017 note | 7/10 |
+| 4 | `fix` moves a lone comment above a short declaration to its end; rounding idiom | **10/10** |
+
+Left open: a single comment above two declarations still leaves the second
+with a `TODO` (no mechanical fix without inventing text); `<Company>` stays a
+SHOULD until the project has a `.svstyle.toml`.
