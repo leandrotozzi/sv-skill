@@ -223,7 +223,7 @@ def parse_yosys(output: str, rules: list[Rule], fallback: str) -> list[Diag]:
         if m := YOSYS_ERROR_RE.match(line):
             msg = f"Yosys cannot read this; synthesis was not checked: {m.group('msg')}"
             out.append(
-                Diag(m.group("path"), int(m.group("line")), 1, "EXT-YOSYS-read", "SHOULD", msg)
+                Diag(m.group("path"), int(m.group("line")), 1, "EXT-YOSYS-read", "MUST", msg)
             )
             continue
         if not line.startswith("Warning: "):

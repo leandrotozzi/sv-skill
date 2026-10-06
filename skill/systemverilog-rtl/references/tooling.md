@@ -54,8 +54,8 @@ svstyle rules [--id ID] [--unmapped]
 - `--synth` also runs Yosys (`read_verilog -sv; hierarchy; proc; check`):
   combinational loops (SYN-005), conflicting drivers. Yosys reads less
   SystemVerilog than the other tools; a file it cannot read is reported as
-  `EXT-YOSYS-read` (SHOULD), meaning synthesis was not checked, not that the
-  code is wrong.
+  `EXT-YOSYS-read` (MUST): synthesis was not checked, so `check` fails until
+  the code is in the subset Yosys reads (`synth-yosys.md`).
 - A directory stands for every `*.sv` below it.
 - `-f LIST` / `-F LIST` read a Verilator/VCS filelist: source paths,
   `+incdir+DIR`, nested `-f`/`-F`, `$VAR`s. `-f` paths are relative to the

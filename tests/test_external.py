@@ -288,10 +288,10 @@ def test_parse_yosys_maps_and_locates(tmp_path):
     ]
 
 
-def test_parse_yosys_read_error_is_a_should():
-    """Yosys reads less SystemVerilog than slang: its refusal is not the author's bug."""
+def test_parse_yosys_read_error_is_a_must():
+    """Yosys runs only when the project synthesises with it: a file it cannot read does not ship."""
     (d,) = ext.parse_yosys("gold.v:24: ERROR: syntax error, unexpected '~'\n", RULES, "gold.v")
-    assert (d.path, d.line, d.rule, d.severity) == ("gold.v", 24, "EXT-YOSYS-read", "SHOULD")
+    assert (d.path, d.line, d.rule, d.severity) == ("gold.v", 24, "EXT-YOSYS-read", "MUST")
     assert "not checked" in d.message
 
 
