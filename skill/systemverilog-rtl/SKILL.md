@@ -23,7 +23,8 @@ that file.
 
 Start from the closest template in `assets/` rather than a blank file. Each
 already passes `svstyle check`, so you inherit a correct header, port order,
-reset style and comment layout:
+reset style and comment layout. `assets/` sits next to this SKILL.md; copy
+from it by absolute path, not one relative to the project:
 
 | Template | Use it for |
 |---|---|
@@ -60,7 +61,14 @@ is missing -- it is not a comment. So write every comment yourself, as you go:
   one expression, cast to the result width: `y = W'((x + Half) >>> Frac);`
   rather than `x_round = x + Half; y = x_round[...];`, whose dropped bits are
   unused. The same for a carry or guard bit you only test: keep it in the
-  expression, not in a named wider signal.
+  expression, not in a named wider signal. Nor a register nobody reads (the
+  angle of a last pipeline stage), or an `int` loop index used to slice a
+  narrow vector: give the index its own sized variable. Port bits the spec
+  says to ignore (`addr_i[1:0]`) get their waiver when you write the port:
+  `// svstyle: waive LNG-017 <why>` on its own line above the port.
+- **No assertion the type already guarantees**: `count_q <= CountMax - 1` on
+  a `$clog2(CountMax)`-bit counter is constant when `CountMax` is a power of
+  two, and Verilator reports it (`EXT-VLTR-CMPCONST`).
 - **A comment line above every `always_*` block and every instance**
   (DOC-005/006): what the block computes, or why the design needs the instance.
 - **A comment above each FSM case arm** (DOC-008), not on the enum.
@@ -111,9 +119,12 @@ list against the code you wrote:
 - **Reset** (RST-002..004): reset control (state, counters, valids), leave
   datapath unreset; a reset entering a clock domain goes through a reset
   synchroniser, one per domain: an instance of `assets/sync_ff.sv` with
-  `.d_i(1'b1)`. The synchronised reset releases a few cycles
-  after the input, so an interface that accepts transfers must refuse them
-  until then: reset `full`/`ready` flags to the blocking value (full = 1,
+  `.d_i(1'b1)`. It sits where the reset enters the domain: the top level, or
+  a block that itself spans clocks (an async FIFO). A single-clock block takes
+  `rst_ni` already synchronised to `clk_i` and adds none; one inside it would
+  drop the inputs of the first cycles after reset. Where there is one, the
+  synchronised reset releases a few cycles after the input, so an interface
+  that accepts transfers must refuse them until then: reset `full`/`ready` flags to the blocking value (full = 1,
   ready = 0), not to the idle one.
 - **Clock-domain crossings** (CDC-001..006): two flops for a single bit (an
   instance of `assets/sync_ff.sv`), registered in the source domain first;

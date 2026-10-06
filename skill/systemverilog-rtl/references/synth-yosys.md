@@ -25,6 +25,8 @@ check-edit-check. Verified on Yosys 0.66.
 | `automatic logic t = a;` inside an `always` block | `logic t;` at the top of the block, then `t = a;` |
 | streaming `{<<{a}}` | a `for` loop that reverses the bits |
 | `parameter type T = ...` | a width parameter |
+| a unary minus right before a sized cast, `-W'(x)` (read as a cast of size `-W`: "Static cast with zero or negative size") | `-(W'(x))` |
+| a signal declared inside a generate block and read from another iteration, `gen_s[s-1].lay` ("Failed to detect width of signal access") | one signal at module level indexed by stage, `logic [N-1:0][7:0] lay;` |
 
 ## Parses, but warns
 
