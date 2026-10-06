@@ -155,3 +155,19 @@ accepted). Rerun of `alu-pkg` after both fixes: one `check`, 10/10, so 5/5.
 Left open: a single comment above two declarations still leaves the second
 with a `TODO` (no mechanical fix without inventing text); `<Company>` stays a
 SHOULD until the project has a `.svstyle.toml`.
+
+Round 6 (2026-10-06) adds ten harder blocks, skill only, each graded by a
+self-checking testbench validated against five to nine planted bugs:
+`async-fifo` (Gray pointers, unrelated clocks), `fwft-fifo` (BRAM with a
+registered read, full throughput), `axil-regs` (AXI4-Lite slave),
+`spi-master` (all four modes), `axis-downsizer` (32 to 8 with tkeep),
+`pkt-arbiter` (round-robin per packet), `secded` (72,64), `fp32-mul` (RNE,
+flush to zero), `sort8` (pipelined network), `booth-mul` (radix 4). First
+pass: 9/10 correct, style closed in one `check` 6/10 (the extra rounds were
+SHOULDs), about $0.53 and 165 s per block. The miss, `async-fifo`, came from
+the skill itself: RST-002's reset synchroniser releases two cycles after the
+input, and `wfull_o` reset to 0 accepted writes the FIFO then dropped. The
+reset checklist in `SKILL.md` now says to reset full/ready flags to their
+blocking value; rerun 10/10, so 10/10. `grade.py`'s `yosys_memory` check no
+longer fails a design because a small side array (a prefetch buffer) became
+flops; a `$mem` cell is enough.
