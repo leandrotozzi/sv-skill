@@ -109,7 +109,10 @@ list against the code you wrote:
 
 - **Reset** (RST-002..004): reset control (state, counters, valids), leave
   datapath unreset; a reset entering a clock domain goes through a reset
-  synchroniser, one per domain.
+  synchroniser, one per domain. The synchronised reset releases a few cycles
+  after the input, so an interface that accepts transfers must refuse them
+  until then: reset `full`/`ready` flags to the blocking value (full = 1,
+  ready = 0), not to the idle one.
 - **Clock-domain crossings** (CDC-001..006): two flops for a single bit,
   registered in the source domain first; never a synchroniser per bit of a
   bus -- use a handshake, Gray code or an async FIFO; crossings live in a
