@@ -61,6 +61,21 @@ def test_clean_file_is_untouched():
 
 
 @needs_verible
+def test_comment_above_a_short_declaration_moves_to_its_end():
+    # A one-line comment written above a declaration that fits is moved, not
+    # answered with a TODO: the author already wrote it.
+    clean = (FIX / "input" / "clean.sv").read_text()
+    decl = "    logic [Width-1:0] q_q;  // First-stage register\n"
+    assert clean.count(decl) == 1
+    text = clean.replace(decl, "    // First-stage register\n    logic [Width-1:0] q_q;\n")
+    assert fix_text(text, "reg_byte.sv", RULES) == clean
+    # A block of comment lines describes more than the line below: left alone.
+    block = "    // Stage one.\n    // First-stage register\n    logic [Width-1:0] q_q;\n"
+    text = clean.replace(decl, block)
+    assert "TODO: describe" in fix_text(text, "reg_byte.sv", RULES)
+
+
+@needs_verible
 def test_fixed_file_has_no_fixable_findings_left():
     src = FIX / "input" / "kitchen_sink.sv"
     out = fix_text(src.read_text(), src.name, RULES)

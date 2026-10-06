@@ -52,6 +52,9 @@ class Anchor:
     offset: int  # insertion point: end of line's last token, or start of the line above-anchors use
     detail: str = ""  # instances: named | ordered | wildcard | mixed; ports: continued
     fixable: bool = True  # False inside macro expansions or preprocessor-split port lists
+    # A lone `//` line directly above a declaration that fits on its line with it:
+    # (start offset, length) of that line, and the comment, for `fix` to move.
+    above: tuple[int, int, str] | None = None
 
 
 @dataclass
@@ -345,7 +348,7 @@ class _Walker:
         line = self.line(node.getLastToken())
         i = self.last_on_line[line]
         last = self.toks[i]
-        comment = None
+        comment, moved = None, None
         if i + 1 < len(self.toks):
             for tr in _trivia(self.toks[i + 1]):
                 if tr.kind == TriviaKind.LineComment:
@@ -361,6 +364,8 @@ class _Walker:
             width = len(self.text.splitlines()[line - 1].rstrip())
             if above and (self.line(first) != line or width + 2 + len(above) > COLUMN_LIMIT):
                 comment = above
+            elif above and "svstyle:" not in above:
+                moved = self._lone_line_above(first, above)
         fixable = not (split_list or self.in_macro(node))
         end = self.offset(last) + len(last.rawText)
         prev = self.anchors[-1] if self.anchors else None
@@ -370,7 +375,17 @@ class _Walker:
             fixable = fixable and prev.fixable
             detail = prev.detail
             self.anchors.pop()
-        self.anchors.append(Anchor(kind, name, line, comment, end, detail, fixable))
+            moved = None  # one comment line, two declarations: let the author decide
+        self.anchors.append(Anchor(kind, name, line, comment, end, detail, fixable, moved))
+
+    def _lone_line_above(self, first, comment: str) -> tuple[int, int, str] | None:
+        """The comment's own line, if no other comment line sits right above it."""
+        start = self.text.rfind("\n", 0, self.offset(first)) + 1  # this line
+        top = self.text.rfind("\n", 0, max(start - 1, 0)) + 1  # the comment's line
+        if self.text[top:start].strip() != comment:
+            return None
+        prev = self.text[self.text.rfind("\n", 0, max(top - 1, 0)) + 1 : top]
+        return None if prev.lstrip().startswith("//") else (top, start - top, comment)
 
     def above(self, node: SyntaxNode, kind: str, name: str, detail: str = "") -> None:
         first = node.getFirstToken()

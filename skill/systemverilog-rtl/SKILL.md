@@ -51,11 +51,15 @@ is missing -- it is not a comment. So write every comment yourself, as you go:
   otherwise the placeholder stays and is reported as a SHOULD.
 - **Trailing comment on every port, parameter and declaration** (DOC-003/004):
   what the signal means, when it is valid, what it is relative to. Not its
-  type or direction -- the declaration already says that. A declaration
-  that spans several lines, or whose comment would not fit within 100
-  columns, takes it on the line directly above instead.
-- **Size every intermediate signal to the bits you use** (LNG-017): a sized
-  cast `W'(expr)` instead of a wider temporary whose top bit is never read.
+  type or direction -- the declaration already says that. One comment per
+  declaration, at its end; `svstyle fix` moves a lone comment written on the
+  line above to the end when it fits. Only a declaration that spans several
+  lines, or whose comment would not fit within 100 columns, keeps it above.
+- **No temporary with bits you never read** (LNG-017). Round or truncate in
+  one expression, cast to the result width: `y = W'((x + Half) >>> Frac);`
+  rather than `x_round = x + Half; y = x_round[...];`, whose dropped bits are
+  unused. The same for a carry or guard bit you only test: keep it in the
+  expression, not in a named wider signal.
 - **A comment line above every `always_*` block and every instance**
   (DOC-005/006): what the block computes, or why the design needs the instance.
 - **A comment above each FSM case arm** (DOC-008), not on the enum.

@@ -9,16 +9,26 @@ SPEC.loader.exec_module(cost)
 
 
 def _msg(mid, ts, ctx, content):
-    usage = {"input_tokens": 10, "cache_read_input_tokens": ctx - 110, "output_tokens": 1,
-             "cache_creation_input_tokens": 100,
-             "cache_creation": {"ephemeral_5m_input_tokens": 100, "ephemeral_1h_input_tokens": 0}}
-    return {"type": "assistant", "timestamp": ts,
-            "message": {"id": mid, "usage": usage, "content": content}}
+    usage = {
+        "input_tokens": 10,
+        "cache_read_input_tokens": ctx - 110,
+        "output_tokens": 1,
+        "cache_creation_input_tokens": 100,
+        "cache_creation": {"ephemeral_5m_input_tokens": 100, "ephemeral_1h_input_tokens": 0},
+    }
+    return {
+        "type": "assistant",
+        "timestamp": ts,
+        "message": {"id": mid, "usage": usage, "content": content},
+    }
 
 
 def _result(chars):
-    return {"type": "user", "timestamp": "2026-10-05T10:00:30Z",
-            "message": {"content": [{"type": "tool_result", "content": "x" * chars}]}}
+    return {
+        "type": "user",
+        "timestamp": "2026-10-05T10:00:30Z",
+        "message": {"content": [{"type": "tool_result", "content": "x" * chars}]},
+    }
 
 
 def test_streamed_message_counted_once_and_output_estimated():

@@ -109,7 +109,8 @@ def _fix_once(
     text: str, path: str, rules: list[Rule], include_dirs: Sequence[str], company: str
 ) -> str:
     formatted = verible_format(text)
-    fixes = [d.fix for d in run_checks(formatted, path, rules, include_dirs, company) if d.fix]
+    found = [d.fix for d in run_checks(formatted, path, rules, include_dirs, company) if d.fix]
+    fixes = [f for fix in found for f in (fix if isinstance(fix, list) else [fix])]
     fixes += parse(formatted, path, include_dirs).rewrites + endif_labels(formatted)
     fixes = [(off, ins, cut[0] if cut else 0) for off, ins, *cut in fixes]
     out = formatted

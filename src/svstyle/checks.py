@@ -4,7 +4,8 @@ Each check reports under its tool-side rule name (`rule="port_comment"`),
 mapped to the house rule ID through rules.toml; `svstyle rules --check` greps
 for those names, so a rule without an implementation here fails CI.
 Autofixable findings carry `fix = (offset, text)` to insert, or
-`(offset, text, n)` to replace n characters (only ever inside a comment).
+`(offset, text, n)` to replace n characters (only ever inside a comment), or a
+list of those applied together (moving a comment).
 """
 
 import re
@@ -204,6 +205,10 @@ def check_comments(ctx: _Ctx, src: Source) -> None:
         if a.comment is not None:
             continue
         trailing = (a.offset, TODO_TRAILING) if a.fixable else None
+        if a.fixable and a.above:
+            # The comment is there, one line too high: move it to the end.
+            start, length, text = a.above
+            trailing = [(start, "", length), (a.offset, "  " + text)]
         above = (a.offset, TODO_ABOVE) if a.fixable else None
         missing = f"`{a.name}` has no trailing // comment"
         if a.kind == "port":
