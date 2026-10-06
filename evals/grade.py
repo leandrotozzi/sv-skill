@@ -131,6 +131,7 @@ def equiv(out: Path, files: list[str], spec: dict) -> tuple[bool, str]:
         "--timing",
         "-Wno-lint",
         "-Wno-style",
+        "-Wno-fatal",  # lint is its own check; a warning such as UNOPTFLAT is no wrong behaviour
         "-Mdir",
         str(work / "obj"),
         f"-I{out}",
