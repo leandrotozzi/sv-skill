@@ -29,6 +29,7 @@ reset style and comment layout:
 |---|---|
 | `assets/skeleton.sv` | any module: registered stage, parameter check, reset vs. datapath flops |
 | `assets/fsm.sv` + `assets/fsm_pkg.sv` | a state machine: `typedef enum` state, `state_q`/`state_d`, commented case arms, registered outputs |
+| `assets/sync_ff.sv` | a synchroniser rank (`NumFlops` 2 or 3) for a one-bit level, or a reset synchroniser with `d_i` tied to 1; copy it next to the RTL and instance it, do not rewrite it |
 | `assets/assert_macros.svh` | `` `ASSERT``, `` `ASSERT_KNOWN``, `` `ASSERT_INIT`` (VER-001); both templates include it |
 
 Rename the module and the file together (STR-001: the basename is the
@@ -109,14 +110,15 @@ list against the code you wrote:
 
 - **Reset** (RST-002..004): reset control (state, counters, valids), leave
   datapath unreset; a reset entering a clock domain goes through a reset
-  synchroniser, one per domain. The synchronised reset releases a few cycles
+  synchroniser, one per domain: an instance of `assets/sync_ff.sv` with
+  `.d_i(1'b1)`. The synchronised reset releases a few cycles
   after the input, so an interface that accepts transfers must refuse them
   until then: reset `full`/`ready` flags to the blocking value (full = 1,
   ready = 0), not to the idle one.
-- **Clock-domain crossings** (CDC-001..006): two flops for a single bit,
-  registered in the source domain first; never a synchroniser per bit of a
-  bus -- use a handshake, Gray code or an async FIFO; crossings live in a
-  module whose only job is the crossing.
+- **Clock-domain crossings** (CDC-001..006): two flops for a single bit (an
+  instance of `assets/sync_ff.sv`), registered in the source domain first;
+  never a synchroniser per bit of a bus -- use a handshake, Gray code or an
+  async FIFO; crossings live in a module whose only job is the crossing.
 - **FSMs** (FSM-001..004): `typedef enum` state, one FSM per module, no
   combinational outputs across the module boundary.
 - **Ports** (PRT-006, PRT-007): the rest of the port list grouped by
@@ -129,8 +131,12 @@ list against the code you wrote:
 - **Assertions** (VER-001/002): `` `ASSERT_KNOWN`` on every output, plus
   `` `ASSERT`` for the protocol rules the design relies on. If the project
   has no assertion macros of its own, copy `assets/assert_macros.svh` next
-  to the RTL; it compiles to nothing under synthesis.
-- **Naming** (NAM-009): whole-word names; a signal outside the default
+  to the RTL; it compiles to nothing under synthesis. Verible never wraps a
+  macro argument, and rejoins one you split, so keep each `` `ASSERT`` within
+  100 columns: name a long condition with a commented `logic`, or split the
+  check into several assertions.
+- **Naming** (NAM-003, NAM-009): an active-low flop is `<name>_nq`
+  (`cs_nq`, driving `cs_no`); whole-word names; a signal outside the default
   clock domain carries its domain's prefix.
 - **Structure** (STR-003, STR-004): declarations next to the logic that
   drives them; no package import cycles.
