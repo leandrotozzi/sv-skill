@@ -218,3 +218,9 @@ from them. Four constructs synthesise wrong with no message: an indexed
 typedef of two or more packed dimensions, a packed array of packed structs,
 `unique case` without `default` after a default assignment, and a
 module-level variable with a non-constant initializer.
+
+Rerun of `sort8` and `lfsr`, three runs each, with that skill: 6/6 correct.
+`lfsr` documents the zero-seed lock instead of asserting against it (3/3);
+`sort8` hit no Yosys error (0/3, was 2/3) and its first `check` was clean
+2/3. The miss was LNG-015 again, a 3-bit table slice stored in a
+`localparam int`; `SKILL.md` now says to cast it.
