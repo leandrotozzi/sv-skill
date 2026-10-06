@@ -152,6 +152,109 @@
       "checks": [
         {"text": "Matches the reference model at Order 7 and 31, cycle for cycle", "equiv_tb": {"tb": "files/classics/lfsr_tb.sv", "ref": "files/classics/lfsr.sv", "module": "lfsr"}}
       ]
+    },
+    {
+      "id": 116,
+      "name": "async-fifo",
+      "prompt": "Write a dual-clock FIFO in SystemVerilog, async_fifo.sv. Parameters Width (default 8) and Depth (default 16), where Depth must be a power of two and at least 4; any other value must fail at elaboration. Write side: wclk_i, wrst_ni (asynchronous, active low), wvalid_i, wdata_i[Width-1:0], wfull_o. Read side: rclk_i, rrst_ni (asynchronous, active low), rvalid_o, rready_i, rdata_o[Width-1:0]. The two clocks are unrelated. A word is written on a wclk_i edge when wvalid_i is 1 and wfull_o is 0. The read side is first-word-fall-through: rvalid_o is 1 when a word is available and rdata_o then shows it; it is removed on an rclk_i edge where rvalid_o and rready_i are both 1. Cross the pointers between domains as Gray code through two-flop synchronisers. wfull_o and rvalid_o may lag behind the other side by a few cycles of their own clock, but must never let a word be overwritten or read twice, and with the reader stopped the FIFO must accept exactly Depth words before wfull_o rises. Both resets are asserted together, for at least a few cycles of each clock, and empty the FIFO.",
+      "expected_output": "async_fifo.sv: Gray-coded pointers with a wrap bit, two-flop synchronisers each way, an elaboration check on Depth; a self-checking testbench at several clock ratios sees every word once, in order, and exactly Depth words of capacity.",
+      "files": [],
+      "checks": [
+        {"text": "Self-checking testbench at Width 8/Depth 16 and Width 12/Depth 4 over four clock ratios: in-order delivery, no overwrite or double read, capacity exactly Depth, flags settle, reset empties the FIFO", "equiv_tb": {"tb": "files/classics/async_fifo_tb.sv"}}
+      ]
+    },
+    {
+      "id": 117,
+      "name": "fwft-fifo",
+      "prompt": "Write a synchronous FIFO in SystemVerilog, fwft_fifo.sv, whose storage maps to block RAM. Parameters Width (default 32) and Depth (default 512, a power of two, at least 4). Ports: clk_i, rst_ni (asynchronous, active low), in_valid_i, in_ready_o, in_data_i[Width-1:0], out_valid_o, out_ready_i, out_data_o[Width-1:0], count_o[$clog2(Depth):0]. The storage array must have a synchronous (registered) read port and no reset, so synthesis infers a RAM; extra output registers outside it are allowed. A word is accepted on a clock edge where in_valid_i and in_ready_o are 1, and leaves on an edge where out_valid_o and out_ready_i are 1. The output is first-word-fall-through: whenever out_valid_o is 1, out_data_o is the oldest word held. count_o is a register: after each edge it is the number of words accepted minus words that left, so the FIFO holds up to Depth words, and in_ready_o is 1 exactly when count_o < Depth. Reset empties the FIFO. Each word is on the output (out_valid_o 1) no later than the cycle after edge n+3, where n is the edge that accepted it, or the cycle after the edge on which the word ahead of it left, whichever is later; so a word written into an empty FIFO appears at most 3 cycles after the edge that accepted it. With in_valid_i and out_ready_i held at 1, after the first word appears a word leaves on every cycle (full throughput); out_valid_o, once 1, stays 1 until the word leaves.",
+      "expected_output": "fwft_fifo.sv: unreset RAM with a registered read port plus a small prefetch buffer; Yosys infers a memory; count, ready, latency, throughput and data order match the model on every cycle.",
+      "files": [],
+      "checks": [
+        {"text": "The storage maps to a RAM, not flops", "yosys_memory": true},
+        {"text": "Data order, count_o, in_ready_o, latency and throughput as specified, under random traffic", "equiv_tb": {"tb": "files/classics/fwft_fifo_tb.sv"}}
+      ]
+    },
+    {
+      "id": 118,
+      "name": "axil-regs",
+      "prompt": "Write an AXI4-Lite slave register block in SystemVerilog, axil_regs.sv, with 32-bit data and an 8-bit byte address. Ports: clk_i, rst_ni (asynchronous, active low); write address awvalid_i, awready_o, awaddr_i[7:0]; write data wvalid_i, wready_o, wdata_i[31:0], wstrb_i[3:0]; write response bvalid_o, bready_i, bresp_o[1:0]; read address arvalid_i, arready_o, araddr_i[7:0]; read data rvalid_o, rready_i, rdata_o[31:0], rresp_o[1:0]. Address bits 1:0 are ignored. 0x00, 0x04, 0x08: registers REG0..REG2, read/write, reset 0, each byte written only when its wstrb_i bit is 1. 0x0C: ID, read-only, always 0x5EC0_0001; writes to it are ignored and answered OKAY. Any address at or above 0x10 answers SLVERR (2'b10), reads return 0 and writes change nothing; other responses are OKAY (2'b00). Follow the AXI handshake rules: a valid output, once 1, stays 1 with its payload unchanged until the matching ready, and bvalid_o and rvalid_o are 0 during reset; the write address and data may arrive in either order or together. Handle one write and one read at a time: awready_o and wready_o may be held low while a write is in progress (from the first of its address and data being accepted until its response is accepted), and arready_o likewise for a read, but otherwise the slave must not wait for bready_i or rready_i. Reads and writes are independent and may be in flight together; a read that overlaps a write to the same register may return the value before or after that write, and a read issued after a write's response has been accepted sees that write. Each response must be valid within 4 clock cycles after its request is fully presented (arvalid_i high for a read; awvalid_i and wvalid_i both seen high, together or one after the other, for a write) and the previous response of the same direction has been accepted.",
+      "expected_output": "axil_regs.sv: AXI4-Lite slave with independent AW/W capture, byte strobes, read-only ID, SLVERR above 0x10, held B/R payloads; passes a randomized AXI master with stalls, any AW/W order and a mid-run reset.",
+      "files": [],
+      "checks": [
+        {"text": "Correct responses and register contents, AXI handshake rules kept, every response within 4 cycles, under random AW/W order and bready/rready stalls", "equiv_tb": {"tb": "files/classics/axil_regs_tb.sv"}}
+      ]
+    },
+    {
+      "id": 119,
+      "name": "spi-master",
+      "prompt": "Write an SPI master in SystemVerilog, spi_master.sv, for 8-bit transfers, MSB first, all four modes. Parameter ClkDiv (default 4, at least 1): each half period of sclk_o lasts exactly ClkDiv cycles of clk_i. Ports: clk_i, rst_ni (asynchronous, active low), start_i, cpol_i, cpha_i, tx_data_i[7:0], busy_o, done_o, rx_data_o[7:0], sclk_o, mosi_o, miso_i, cs_no. miso_i is synchronous to clk_i (no synchroniser needed); the slave changes it only within the half period after each of its driving edges (for cpha 0 also after cs_no falls) and holds it otherwise. start_i while busy_o is 0 captures cpol_i, cpha_i and tx_data_i and sets busy_o from the next cycle; start_i while busy is ignored. While idle, cs_no is 1 and sclk_o equals the cpol_i value of the last transfer (cpol 0 after reset); after an accepted start sclk_o may move once to the new cpol while cs_no is still 1, and must be at the new cpol by the clk_i edge where cs_no falls. A transfer drops cs_no, waits at least one half period, makes exactly 16 sclk_o edges, waits at least one half period, and raises cs_no; from the start edge to done_o it takes at most 32*ClkDiv + 8 cycles. Mode 0/2 (cpha 0): mosi_o holds bit 7 from cs_no falling, each bit is sampled on the first (leading) edge of its clock and the next bit is driven on the trailing edge. Mode 1/3 (cpha 1): bits are driven on the leading edge and sampled on the trailing edge. mosi_o must be stable in the clk_i cycles just before and just after each sampling edge. sclk_o, mosi_o and cs_no must come straight from flops. Once cs_no is back at 1 (in that cycle or later), done_o pulses for one cycle, busy_o falls in that cycle, and rx_data_o holds the byte read from miso_i until the next done_o.",
+      "expected_output": "spi_master.sv: 8-bit SPI master, all four modes, exact ClkDiv half period, 16 edges per cs_no window, flop outputs, start/busy/done handshake; every transfer correct against a slave model for ClkDiv 1, 2 and 4.",
+      "files": [],
+      "checks": [
+        {"text": "Every transfer correct in all four modes for ClkDiv 1, 2 and 4: edges, timing, mosi/miso bits, handshake", "equiv_tb": {"tb": "files/classics/spi_master_tb.sv"}}
+      ]
+    },
+    {
+      "id": 120,
+      "name": "axis-downsizer",
+      "prompt": "Write an AXI-Stream width converter in SystemVerilog, axis_downsizer.sv, from 32-bit to 8-bit beats. Ports: clk_i, rst_ni (asynchronous, active low), s_tvalid_i, s_tready_o, s_tdata_i[31:0], s_tkeep_i[3:0], s_tlast_i, m_tvalid_o, m_tready_i, m_tdata_o[7:0], m_tlast_o. Each input beat carries up to four bytes, byte k in s_tdata_i[8k +: 8]; s_tkeep_i marks the valid bytes and is always 4'b0001, 4'b0011, 4'b0111 or 4'b1111 (on any beat). The output sends the kept bytes in order, byte 0 first, one per beat; m_tlast_o is 1 on the last kept byte of an input beat with s_tlast_i = 1 and 0 otherwise. Follow the AXI-Stream rules: once m_tvalid_o is 1 it stays 1 with m_tdata_o and m_tlast_o unchanged until m_tready_i. Throughput: with s_tvalid_i and m_tready_i held at 1, an output byte leaves on every cycle, with no gap between input beats. s_tready_o may depend on m_tready_i combinationally, but m_tvalid_o must not depend on s_tvalid_i combinationally. Reset empties the converter: m_tvalid_o is 0 during reset and until a new input beat is accepted.",
+      "expected_output": "axis_downsizer.sv: byte counter or shift register with s_tready_o gated by m_tready_i on the last byte, registered m_tvalid_o; passes the self-checking testbench (byte order, tlast, AXI-Stream stability, full throughput, reset).",
+      "files": [],
+      "checks": [
+        {"text": "Self-checking testbench: bytes and tlast in order, AXI-Stream stability, one byte per cycle, no s_tvalid_i to m_tvalid_o path, reset", "equiv_tb": {"tb": "files/classics/axis_downsizer_tb.sv"}}
+      ]
+    },
+    {
+      "id": 121,
+      "name": "pkt-arbiter",
+      "prompt": "Write a packet arbiter in SystemVerilog, pkt_arbiter.sv, that merges NumIn AXI-Stream inputs into one output. Parameters NumIn (default 4, at least 2) and DataWidth (default 16). Ports: clk_i, rst_ni (asynchronous, active low), s_tvalid_i[NumIn-1:0], s_tready_o[NumIn-1:0], s_tdata_i[NumIn*DataWidth-1:0] (input i at s_tdata_i[i*DataWidth +: DataWidth]), s_tlast_i[NumIn-1:0], m_tvalid_o, m_tready_i, m_tdata_o[DataWidth-1:0], m_tlast_o, m_tid_o[$clog2(NumIn)-1:0]. A packet is a run of beats ending with tlast. Once the first beat of a packet from input i is accepted, only input i is served until its tlast beat has been accepted; its beats leave in order, none lost or duplicated, with m_tid_o = i on each. At most one s_tready_o bit is 1 at a time: inputs not being served have s_tready_o = 0. The next packet goes round-robin to the first input after i (wrapping) that has a valid beat when the choice is made (the choice may be taken up to one cycle late), so an input holding a valid first beat is passed over by at most NumIn-1 packets of other inputs (counting packets whose first beat is accepted while it waits), and while every input is always valid the packets come from i, i+1, i+2, ... in strict rotation. Follow the AXI-Stream rules on the output: once m_tvalid_o is 1 it stays 1 with m_tdata_o, m_tlast_o and m_tid_o unchanged until m_tready_i. Throughput: while the inputs stay valid and m_tready_i stays 1, a beat leaves every cycle within a packet and at most one idle cycle passes between packets. Reset empties the arbiter: m_tvalid_o is 0 while rst_ni is low (the inputs drop their valids during reset).",
+      "expected_output": "pkt_arbiter.sv: round-robin packet arbiter locked per packet, AXI-Stream compliant on both sides; passes the self-checking testbench at NumIn 4 and 3.",
+      "files": [],
+      "checks": [
+        {"text": "Packets stay whole and in order with the right m_tid_o, round-robin within the NumIn-1 starvation bound, AXI-Stream stable output, full throughput, at NumIn 4 and 3", "equiv_tb": {"tb": "files/classics/pkt_arbiter_tb.sv"}}
+      ]
+    },
+    {
+      "id": 122,
+      "name": "secded",
+      "prompt": "Write a SECDED error-correcting code for 64-bit words in SystemVerilog, as two purely combinational modules (no clock, no reset): secded_enc.sv with module secded_enc (data_i[63:0], code_o[71:0]) and secded_dec.sv with module secded_dec (code_i[71:0], data_o[63:0], single_err_o, double_err_o). Use any (72,64) single-error-correcting, double-error-detecting code (extended Hamming or Hsiao), but keep it systematic: code_o[63:0] is data_i unchanged and the 8 check bits are code_o[71:64]. The decoder takes a codeword from secded_enc with zero, one or two flipped bits anywhere in its 72 bits. No flipped bit: data_o is the data, both flags 0. One flipped bit (data or check): data_o is the original data, single_err_o 1, double_err_o 0. Two flipped bits: double_err_o 1, single_err_o 0, data_o is don't care.",
+      "expected_output": "secded_enc.sv + secded_dec.sv: systematic (72,64) SECDED pair; every single flip corrected, every double flip detected, clean words pass through unflagged.",
+      "files": [],
+      "checks": [
+        {"text": "An encoder module secded_enc exists", "present": "module\\s+secded_enc\\b"},
+        {"text": "A decoder module secded_dec exists", "present": "module\\s+secded_dec\\b"},
+        {"text": "Systematic code; every single flip corrected, every double flip flagged, clean words unflagged", "equiv_tb": {"tb": "files/classics/secded_tb.sv"}}
+      ]
+    },
+    {
+      "id": 123,
+      "name": "fp32-mul",
+      "prompt": "Write a pipelined IEEE 754 single-precision multiplier in SystemVerilog, fp32_mul.sv. Ports: clk_i, rst_ni (asynchronous, active low), valid_i, a_i[31:0], b_i[31:0], valid_o, result_o[31:0]. It accepts one multiplication per cycle; results come out in order with valid_o after a fixed latency of 1 to 4 cycles; result_o is don't care when valid_o is 0. Reset empties the pipeline: inputs accepted before reset never produce a valid_o. The sign of every result except NaN is the XOR of the input signs. Subnormal inputs count as zero. Any NaN input, or infinity times zero, gives the quiet NaN 0x7FC00000. Infinity times a nonzero finite or infinity gives infinity. Otherwise round the exact product to 24 significant bits, nearest with ties to even, as if the exponent range were unbounded; if that rounded value is 2**128 or more in magnitude the result is infinity, and if it is below 2**-126 the result is zero (no subnormal outputs).",
+      "expected_output": "fp32_mul.sv: pipelined fp32 multiply, RNE, flush-to-zero in and out, NaN/infinity rules; every result bit-exact, one per cycle, in order, fixed latency 1 to 4.",
+      "files": [],
+      "checks": [
+        {"text": "Every result bit-exact, in order, full throughput, fixed latency 1 to 4", "equiv_tb": {"tb": "files/classics/fp32_mul_tb.sv"}}
+      ]
+    },
+    {
+      "id": 124,
+      "name": "sort8",
+      "prompt": "Write a pipelined sorting network in SystemVerilog, sort8.sv, that sorts eight unsigned keys. Parameter Width (default 16). Ports: clk_i, rst_ni (asynchronous, active low), valid_i, data_i[8*Width-1:0], valid_o, data_o[8*Width-1:0]; key k is at [k*Width +: Width] in both. Build it from compare-exchange elements (a bitonic or odd-even merge network), with a register stage after each layer of the network. It accepts a new set of keys every cycle and gives each sorted set, ascending (key 0 the smallest), with valid_o after a fixed latency of at most 6 cycles; data_o is don't care when valid_o is 0. Reset discards the sets in flight; only the valid pipeline needs a reset.",
+      "expected_output": "sort8.sv: compare-exchange layers with a register stage each and a matching valid pipeline; every valid set comes out sorted ascending after one fixed latency of at most 6 cycles, at Width 16 and 5.",
+      "files": [],
+      "checks": [
+        {"text": "Sorts every set ascending, with a fixed latency of at most 6 cycles and full throughput, at Width 16 and 5", "equiv_tb": {"tb": "files/classics/sort8_tb.sv"}}
+      ]
+    },
+    {
+      "id": 125,
+      "name": "booth-mul",
+      "prompt": "Write a sequential signed multiplier in SystemVerilog, booth_mul.sv, using radix-4 Booth recoding (two multiplier bits per cycle). Parameter Width (default 16, even and at least 4; any other value must fail at elaboration). Ports: clk_i, rst_ni (asynchronous, active low), start_i, a_i[Width-1:0], b_i[Width-1:0], busy_o, done_o, product_o[2*Width-1:0]. Operands and product are signed two's complement. A start_i while not busy captures the operands and sets busy_o; start_i while busy is ignored. done_o is a one-cycle pulse, at most Width/2 + 2 cycles after start, in the same cycle busy_o falls; from then product_o holds a_i * b_i until the next start.",
+      "expected_output": "booth_mul.sv: radix-4 Booth sequential multiplier with start/busy/done handshake, an elaboration check on Width and a held signed product; every product correct (all pairs at Width 8, corners and random at Width 16) within Width/2+2 cycles.",
+      "files": [],
+      "checks": [
+        {"text": "Every signed product correct at Width 8 (exhaustive) and 16, done within Width/2+2 cycles, start ignored while busy, result held", "equiv_tb": {"tb": "files/classics/booth_mul_tb.sv"}}
+      ]
     }
   ]
 }
