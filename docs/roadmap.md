@@ -224,3 +224,18 @@ Rerun of `sort8` and `lfsr`, three runs each, with that skill: 6/6 correct.
 `sort8` hit no Yosys error (0/3, was 2/3) and its first `check` was clean
 2/3. The miss was LNG-015 again, a 3-bit table slice stored in a
 `localparam int`; `SKILL.md` now says to cast it.
+
+Round 10 (2026-10-06): five new blocks, `isqrt`, `cic-decim`, `pwm-bank`,
+`bin2bcd` and `barrel-shift`, each with a testbench validated against 7 to 12
+planted bugs and a second correct design. One run with and one without the
+skill; a failing run gets the CI report back until it passes. All ten were
+correct on the first try. With the skill 4/5 passed in one iteration (6 in
+all; `bin2bcd` left a `TODO: describe` under a three-line comment that
+`check` does not flag), without it 0/5 (13 in all, and two of those runs read
+the repo's rules). One `svstyle fix` on the drafts without the skill passed
+0/5: it cannot write the missing comments. Cost without vs. with: $3.59 vs.
+$2.12, 4.6 M vs. 2.5 M tokens, 25 vs. 11 minutes. Open: `check` should flag a
+`TODO: describe` as MUST, and offers a fix for `input wire logic` that `fix`
+cannot apply (Verible does not parse it). `grade.py` builds the equivalence
+testbench with `-Wno-fatal`, so a warning such as UNOPTFLAT no longer fails a
+correct design.
