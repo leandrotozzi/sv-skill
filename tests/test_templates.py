@@ -100,3 +100,9 @@ def test_templates_pass_full_check_with_only_the_company_placeholder(capsys):
     assert code == 0
     assert {(d["rule"], d["severity"]) for d in doc["diagnostics"]} == {("DOC-001", "SHOULD")}
     assert all(PLACEHOLDER in d["message"] for d in doc["diagnostics"])
+
+
+@pytest.mark.parametrize("path", TEMPLATES, ids=lambda p: p.name)
+def test_template_lines_fit_100_columns(path):
+    # Verible's line-length skips comment-only lines, so check every line here.
+    assert [n for n, ln in enumerate(path.read_text().splitlines(), 1) if len(ln) > 100] == []

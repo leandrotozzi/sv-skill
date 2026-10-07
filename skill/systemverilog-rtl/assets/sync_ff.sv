@@ -5,9 +5,10 @@
 //   Synchroniser rank: NumFlops flops (2, or 3 for a fast destination clock)
 //   that bring an asynchronous level into clk_i's domain. Width bits are
 //   synchronised independently, so use Width > 1 only for unrelated bits or
-//   a Gray-coded pointer, never for a binary bus (CDC-002, CDC-003). As a reset synchroniser (RST-002), tie d_i to
-//   1 and rst_ni to the incoming reset: q_o falls at once and rises NumFlops
-//   clk_i edges after the reset is released.
+//   a Gray-coded pointer, never for a binary bus (CDC-002, CDC-003). As a
+//   reset synchroniser (RST-002), tie d_i to 1 and rst_ni to the incoming
+//   reset: q_o falls at once and rises NumFlops clk_i edges after the reset
+//   is released.
 
 `default_nettype none
 
