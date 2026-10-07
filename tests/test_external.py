@@ -1,4 +1,6 @@
+import re
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -379,3 +381,26 @@ def test_nam004_accepts_registered_outputs_and_optional_registers(tmp_path, body
     )
     found = [d for d in ext.verible_lint([str(f)], RULES) if d.rule == "NAM-004"]
     assert bool(found) is flagged, found
+
+
+@needs_yosys
+def test_yosys_reads_paths_with_spaces(tmp_path):
+    d = tmp_path / "sp ace"
+    d.mkdir()
+    f = d / "loop.sv"
+    f.write_text(
+        "module loop (\n    input  logic a_i,\n    output logic y_o\n);\n    logic x, y;\n"
+        "    assign x = y ^ a_i;\n    assign y = x;\n    assign y_o = y;\nendmodule\n"
+    )
+    assert ("SYN-005", str(f), 6) in {
+        (d.rule, d.path, d.line) for d in ext.yosys_check([str(f)], RULES)
+    }
+
+
+def test_yosys_failure_without_a_location_is_a_must(monkeypatch):
+    res = subprocess.CompletedProcess([], 1, "", "ERROR: something went wrong\n")
+    monkeypatch.setattr(ext, "_run", lambda *a, **k: res)
+    monkeypatch.setattr(ext, "PACKAGE_RE", re.compile("(?!)"))
+    monkeypatch.setattr(ext.Path, "read_text", lambda *a, **k: "")
+    (d,) = ext.yosys_check(["a.sv"], RULES)
+    assert (d.rule, d.severity) == ("EXT-YOSYS-read", "MUST") and "went wrong" in d.message

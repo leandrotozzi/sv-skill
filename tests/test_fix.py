@@ -296,3 +296,45 @@ def test_legacy_rewrite_is_formally_equivalent(tmp_path, define):
         ["yosys", "-q", "-p", script], cwd=tmp_path, capture_output=True, text=True
     )
     assert res.returncode == 0, res.stdout + res.stderr
+
+
+@needs_verible
+def test_resolved_nets_stay_wire():
+    # Two drivers or a `z` make a resolved net; a `logic` there is illegal.
+    text = (
+        "module m (\n    input logic en_i,  // E.\n    input logic d_i,  // D.\n"
+        "    output wire y_o  // Y.\n);\n    wire bus;  // B.\n"
+        "    assign bus = en_i ? d_i : 1'bz;\n    assign bus = !en_i ? ~d_i : 1'bz;\n"
+        "    assign y_o = en_i ? bus : 'z;\nendmodule\n"
+    )
+    out = fix_text(text, "m.sv", RULES)
+    assert "wire bus;" in out and "output wire  y_o" in out
+
+
+@needs_verible
+def test_clocked_always_also_written_by_initial_stays_always():
+    text = (
+        "module m (\n    input logic clk_i,  // C.\n    input logic d_i,  // D.\n"
+        "    output logic q_o  // Q.\n);\n    logic q;  // Q.\n    initial q = 1'b0;\n"
+        "    always @(posedge clk_i) q <= d_i;\n    assign q_o = q;\nendmodule\n"
+    )
+    assert "always_ff" not in _toks(fix_text(text, "m.sv", RULES))
+
+
+@needs_verible
+def test_non_ascii_comment_keeps_rewrite_offsets():
+    text = (
+        "// café\nmodule m (input wire a, output wire y);\n  reg b;  // ñandú\n"
+        "  assign y = a;\nendmodule\n"
+    )
+    out = fix_text(text, "m.sv", RULES)
+    assert "café" in out and "reg" not in _toks(out) and "input  logic a" in out
+
+
+@needs_verible
+def test_timescale_is_not_joined_with_the_next_directive():
+    text = "`timescale 1ns / 1ps\n`default_nettype none\nmodule m;\nendmodule\n`resetall\n"
+    out = fix_text(text, "m.sv", RULES)
+    assert re.search(r"^`timescale 1ns / 1ps  //.*$", out, re.M)
+    assert re.search(r"^`default_nettype none$", out, re.M)
+    assert fix_text(out, "m.sv", RULES) == out

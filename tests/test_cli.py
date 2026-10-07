@@ -283,3 +283,10 @@ def test_check_synth_reports_a_combinational_loop(capsys, tmp_path):
     assert "SYN-005" in rules()
     (tmp_path / ".svstyle.toml").write_text('synth = "vivado"\n')
     assert "SYN-005" not in rules()
+
+
+def test_non_utf8_file_is_an_error_not_a_crash(capsys, tmp_path):
+    p = tmp_path / "bad.sv"
+    p.write_bytes(b"\xff module x; endmodule\n")
+    code, _, err = _run(capsys, "check", "--no-external", p)
+    assert code == 2 and "UTF-8" in err

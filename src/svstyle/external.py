@@ -53,6 +53,9 @@ VERILATOR_RE = re.compile(
 SOFT_ERRORS = {"MODMISSING"}
 
 
+TIMEOUT = 600  # seconds; a hung tool must not hang CI
+
+
 class ToolMissing(Exception):
     """A required external tool is not on PATH (exit 2)."""
 
@@ -65,7 +68,12 @@ def _run(tool: str, args: list[str], stdin: str | None = None) -> subprocess.Com
     exe = shutil.which(tool)
     if exe is None:
         raise ToolMissing(f"{tool} not found on PATH")
-    return subprocess.run([exe, *args], input=stdin, capture_output=True, text=True)
+    try:
+        return subprocess.run(
+            [exe, *args], input=stdin, capture_output=True, text=True, timeout=TIMEOUT
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ToolFailed(f"{tool} timed out after {TIMEOUT} s") from exc
 
 
 def verible_version() -> str | None:
@@ -192,16 +200,16 @@ def _diag(m: re.Match, rule: str, severity: str, fixable: bool = False) -> Diag:
 
 # --- Yosys: `check --synth` -----------------------------------------------------
 # Verilator --lint-only does not look for combinational loops; synthesis does.
-# Yosys's own SystemVerilog frontend reads less than slang, so a file it cannot
-# read is reported as unchecked (SHOULD), never as the author's bug.
+# Yosys's own SystemVerilog frontend reads less than slang; a file it cannot
+# read is reported as unchecked (MUST): synthesis was not checked.
 
 YOSYS_WARNINGS = {
     "found logic loop": "logic-loop",
     "multiple conflicting drivers": "multiple-drivers",
     "used but has no driver": "no-driver",
 }
-YOSYS_SRC_RE = re.compile(r"source: (?P<path>[^:\s]+):(?P<line>\d+)\.(?P<col>\d+)")
-YOSYS_ERROR_RE = re.compile(r"^(?P<path>[^:\s]+):(?P<line>\d+): ERROR: (?P<msg>.*)$")
+YOSYS_SRC_RE = re.compile(r"source: (?P<path>.+?):(?P<line>\d+)\.(?P<col>\d+)")
+YOSYS_ERROR_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+): ERROR: (?P<msg>.*)$")
 
 
 def yosys_check(
@@ -210,9 +218,20 @@ def yosys_check(
     dirs = dict.fromkeys([*include_dirs, *(str(Path(p).parent) for p in paths)])
     # Yosys resolves `pkg::name` at read time, so packages go first.
     paths = sorted(paths, key=lambda p: not PACKAGE_RE.search(Path(p).read_text()))
-    read = "read_verilog -sv " + " ".join([f"-I{d}" for d in dirs] + paths)
+    # Files are quoted, but Yosys takes no quoted -I: a dir with a space is left
+    # out. Yosys searches each file's own dir anyway; any other miss fails loudly
+    # through the exit code below.
+    incs = [f"-I{d}" for d in dirs if not re.search(r"\s", d)]
+    read = "read_verilog -sv " + " ".join([*incs, *(f'"{p}"' for p in paths)])
     res = _run("yosys", ["-q", "-p", f"{read}; hierarchy; proc; check"])
-    return parse_yosys(res.stdout + res.stderr, rules, paths[0])
+    out = res.stdout + res.stderr
+    diags = parse_yosys(out, rules, paths[0])
+    if res.returncode != 0 and not any(d.rule == "EXT-YOSYS-read" for d in diags):
+        # Failed without saying where: synthesis was not checked, so do not pass.
+        why = next((ln for ln in out.splitlines() if "ERROR" in ln), f"yosys exit {res.returncode}")
+        msg = f"Yosys failed; synthesis was not checked: {why}"
+        diags.append(Diag(paths[0], 1, 1, "EXT-YOSYS-read", "MUST", msg))
+    return diags
 
 
 def parse_yosys(output: str, rules: list[Rule], fallback: str) -> list[Diag]:

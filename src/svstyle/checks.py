@@ -175,23 +175,32 @@ def check_header(ctx: _Ctx, text: str, company: str) -> None:
         )  # fmt: skip
 
 
+NETTYPE_NONE_RE = re.compile(r"`default_nettype\s+none\b")
+
+
 def check_default_nettype(ctx: _Ctx, text: str) -> None:
     if not ctx.path.endswith(".sv"):
         return
     lines = text.splitlines(keepends=True)
-    offset = 0
+    offset, first = 0, None  # first: (line, offset) of the first code line
+    # Verible joins consecutive directives onto one line, so look for the
+    # directive in the leading run of directive lines, not as a whole line.
     for no, ln in enumerate(lines, 1):
-        if ln.strip() and not ln.lstrip().startswith("//"):
-            if ln.strip() != "`default_nettype none":
-                ctx.emit(
-                    rule="default_nettype", line=no,
-                    message="`default_nettype none must follow the header",
-                    fix=(offset, "`default_nettype none\n\n"),
-                )  # fmt: skip
+        code = ln.split("//")[0].strip()
+        if code and first is None:
+            first = (no, offset)
+        if code.startswith("`") and NETTYPE_NONE_RE.search(code):
+            break
+        if code and not code.startswith("`"):
+            ctx.emit(
+                rule="default_nettype", line=first[0],
+                message="`default_nettype none must follow the header",
+                fix=(first[1], "`default_nettype none\n\n"),
+            )  # fmt: skip
             break
         offset += len(ln)
     code = [(no, ln) for no, ln in enumerate(lines, 1) if ln.strip()]
-    if code and code[-1][1].strip() != "`resetall":
+    if code and not code[-1][1].split("//")[0].rstrip().endswith("`resetall"):
         sep = "" if text.endswith("\n") else "\n"
         ctx.emit(
             rule="default_nettype", line=code[-1][0],

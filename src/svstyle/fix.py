@@ -12,6 +12,7 @@ from the syntax tree; the invariant here makes sure nothing else changed.
 """
 
 import difflib
+import re
 from collections.abc import Sequence
 from functools import cache
 
@@ -36,6 +37,12 @@ ALLOWED_EDITS = (
     (("endgenerate",), ()),
     ((), ("automatic",)),
 )
+
+# Verible joins consecutive directive lines, and a `timescale swallows the rest
+# of its line (`timescale 1ns / 1ps `default_nettype none` does not compile). A
+# trailing comment is the one thing that keeps it on its own line.
+BARE_TIMESCALE_RE = re.compile(r"^([ \t]*`timescale\b[^/\n]*(?:/[^/\n]*)?[^\S\n]*)$", re.M)
+TIMESCALE_COMMENT = "  // time unit / precision"
 
 MAX_PASSES = 4  # each pass only adds structure; real code settles in two
 INSERTED = frozenset(tok for old, new in ALLOWED_EDITS if not old for tok in new)
@@ -103,6 +110,7 @@ def fix_text(
             out = out[:off] + out[off + cut :]
         _check_tokens(text, out, path)
         text = out
+    text = BARE_TIMESCALE_RE.sub(lambda m: m[1].rstrip() + TIMESCALE_COMMENT, text)
     # A rewrite can create what another rule anchors on (`always @(*)` becomes an
     # always_comb that DOC-005 wants a comment above), so rerun until tokens settle.
     for _ in range(MAX_PASSES):

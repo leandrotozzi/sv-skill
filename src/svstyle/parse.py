@@ -101,6 +101,14 @@ def conditional_lines(text: str) -> set[int]:
     return out
 
 
+def char_offsets(text: str):
+    """slang counts byte offsets; Python indexes characters. Map one to the other."""
+    if text.isascii():
+        return lambda b: b
+    table = [i for i, ch in enumerate(text) for _ in ch.encode()] + [len(text)]
+    return table.__getitem__
+
+
 def raw_tokens(text: str) -> list[tuple[TokenKind, str, int]]:
     """(kind, text, offset) of every token of `text`, from the raw lexer.
 
@@ -110,9 +118,10 @@ def raw_tokens(text: str) -> list[tuple[TokenKind, str, int]]:
     sm = SourceManager()
     alloc = BumpAllocator()
     lexer = Lexer(sm.assignText("raw.sv", text), alloc, Diagnostics(), sm)
+    char = char_offsets(text)
     out = []
     while (tok := lexer.lex()).kind != TokenKind.EndOfFile:
-        out.append((tok.kind, tok.rawText, tok.location.offset))
+        out.append((tok.kind, tok.rawText, char(tok.location.offset)))
     return out
 
 
@@ -146,6 +155,7 @@ class _Walker:
     def __init__(self, tree: SyntaxTree, text: str):
         self.sm = tree.sourceManager
         self.text = text
+        self.char = char_offsets(text)
         self.root = tree.root
         # Zero-width tokens (the implicit type of `b_i` in `a_i, b_i`) carry no
         # trivia and sit on no line of their own; the lookups below skip them.
@@ -166,6 +176,7 @@ class _Walker:
 
     def run(self) -> Source:
         self.walk(self.root, split_list=False)
+        self.resolved, self.initial_vars = _resolved_and_initial(self.root)
         self.modernise(self.root)
         # A file with one design unit parses to that unit as the root; only a
         # CompilationUnit's members are at file scope.
@@ -195,7 +206,8 @@ class _Walker:
         if k not in containers and (self.in_macro(node) or self.has_directive(node)):
             return
         if k == K.NetDeclaration and node.netType.rawText == "wire":
-            if not any(isinstance(d, SyntaxNode) and d.initializer for d in node.declarators):
+            decls = [d for d in node.declarators if isinstance(d, SyntaxNode)]
+            if not any(d.initializer or d.name.rawText in self.resolved for d in decls):
                 self.safe_wire(node.netType, node.type)
         elif k == K.ImplicitAnsiPort and node.header.kind == K.NetPortHeader:
             h = node.header
@@ -203,6 +215,7 @@ class _Walker:
                 h.netType.rawText == "wire"
                 and h.direction.rawText != "inout"
                 and not node.declarator.initializer
+                and node.declarator.name.rawText not in self.resolved
             ):
                 self.safe_wire(h.netType, h.dataType)
         elif k == K.AlwaysBlock:
@@ -249,7 +262,10 @@ class _Walker:
             if not nested:
                 self.src.rewrites.append((start, "always_comb", cut))
         elif EDGE_RE.search(timing):
-            fix = None if nested or K.AssignmentExpression in kinds else (start, "always_ff", 6)
+            # A variable an `initial` also writes cannot belong to an always_ff.
+            shared = _assigned(stmt.statement) & self.initial_vars
+            blocked = nested or K.AssignmentExpression in kinds or shared
+            fix = None if blocked else (start, "always_ff", 6)
             self.src.legacy_always.append((line, "edge", fix))
         else:
             self.src.legacy_always.append((line, "list", None))
@@ -297,7 +313,8 @@ class _Walker:
 
     def offset(self, tok) -> int:
         loc = tok.location
-        return self.sm.getExpansionLoc(loc).offset if self.sm.isMacroLoc(loc) else loc.offset
+        loc = self.sm.getExpansionLoc(loc) if self.sm.isMacroLoc(loc) else loc
+        return self.char(loc.offset)
 
     def from_assert_macro(self, tok) -> bool:
         loc = tok.location
@@ -413,6 +430,43 @@ class _Walker:
                 fixable=not self.in_macro(node),
             )
         )  # fmt: skip
+
+
+ASSIGNS = {K.AssignmentExpression, K.NonblockingAssignmentExpression}
+Z_RE = re.compile(r"'[sS]?[bBoOhH]?\s*[0-9a-fA-F_xX]*[zZ?]")
+
+
+def _assigned(node: SyntaxNode) -> set[str]:
+    """Names on the left of every assignment under `node`; indices count too (conservative)."""
+    return {
+        t.rawText
+        for n in _nodes(node)
+        if n.kind in ASSIGNS
+        for t in _tokens(n.left)
+        if t.kind == TokenKind.Identifier
+    }
+
+
+def _resolved_and_initial(root: SyntaxNode) -> tuple[set[str], set[str]]:
+    """Nets that must stay `wire` (two `assign`s, or one driving `z`), and names
+    an `initial` writes. Per file, not per scope: a shared name only keeps more.
+
+    ponytail: a `wire` tied to an `inout` of a module in another file still becomes
+    `logic`; seeing that needs the whole design elaborated, not one file."""
+    seen: set[str] = set()
+    resolved: set[str] = set()
+    initial: set[str] = set()
+    for n in _nodes(root):
+        if n.kind == K.ContinuousAssign:
+            for a in n.assignments:
+                names = _assigned(a)
+                resolved |= names & seen
+                seen |= names
+                if Z_RE.search(str(a.right)):
+                    resolved |= names
+        elif n.kind == K.InitialBlock:
+            initial |= _assigned(n)
+    return resolved, initial
 
 
 def _nodes(node: SyntaxNode) -> list[SyntaxNode]:

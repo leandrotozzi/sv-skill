@@ -159,6 +159,9 @@ def _read(path: str, errors: list[str]) -> str | None:
     except OSError as exc:
         errors.append(f"{path}: {exc.strerror}")
         return None
+    except UnicodeDecodeError as exc:
+        errors.append(f"{path}: not UTF-8 (byte {exc.start}); svstyle reads UTF-8 only")
+        return None
 
 
 def _keep(rule: str, select: str | None, ignore: str | None) -> bool:
@@ -246,6 +249,9 @@ def _cmd_check(args, rules: list) -> int:
                     diags += found if text is None else apply_waivers(found, text)
             except external.ToolMissing as exc:
                 print(f"warning: {exc}; its rules were not checked", file=sys.stderr)
+            except external.ToolFailed as exc:
+                errors.append(f"{exc}; its rules were not checked")
+                code = max(code, 2)
     return _report(args, diags, errors, code, configs)
 
 
@@ -301,7 +307,10 @@ def _cmd_fix(args, rules: list) -> int:
                     )
                 )
             else:
-                Path(path).write_text(out, encoding="utf-8")
+                # Write beside it, then rename: a crash never leaves half a file.
+                tmp = Path(f"{path}.svstyle-tmp")
+                tmp.write_text(out, encoding="utf-8")
+                tmp.replace(path)
         diags += run_checks(out, path, rules, inc, company)  # left for the author
     if args.diff and changed:
         code = max(code, 1)  # a pending change fails CI, like `ruff format --diff`
