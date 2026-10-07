@@ -26,6 +26,7 @@ ALLOWED_EDITS = (
     ((), ("`resetall",)),
     (("reg",), ("logic",)),
     (("wire",), ("logic",)),
+    (("wire",), ()),  # `wire logic x` -> `logic x`
     (("always", "@", "(", "*", ")"), ("always_comb",)),
     (("always", "@", "*"), ("always_comb",)),
     (("always",), ("always_ff",)),
@@ -94,7 +95,14 @@ def fix_text(
     include_dirs: Sequence[str] = (),
     company: str = PLACEHOLDER,
 ) -> str:
-    parse(text, path, include_dirs)  # ParseError propagates: refuse before touching anything
+    src = parse(text, path, include_dirs)  # ParseError propagates: refuse before touching anything
+    # Verible cannot parse `wire logic x`, so drop those `wire`s before it sees the file.
+    if src.typed_wires:
+        out = text
+        for off, cut in sorted(src.typed_wires.items(), reverse=True):
+            out = out[:off] + out[off + cut :]
+        _check_tokens(text, out, path)
+        text = out
     # A rewrite can create what another rule anchors on (`always @(*)` becomes an
     # always_comb that DOC-005 wants a comment above), so rerun until tokens settle.
     for _ in range(MAX_PASSES):
@@ -123,6 +131,15 @@ def _fix_once(
         out = out[:off] + ins + out[off + cut :]
     out = verible_format(out)
 
+    _check_tokens(text, out, path)
+    try:
+        parse(out, path, include_dirs)
+    except ParseError as e:
+        raise InvariantError(f"{path}: fixed output no longer parses\n{e}") from e
+    return out
+
+
+def _check_tokens(text: str, out: str, path: str) -> None:
     before, after = token_signature(text), token_signature(out)
     # Tokens fixes only ever insert are junk to the matcher: anchored on them, a
     # repeated statement aligns with the wrong copy and a legal edit looks illegal.
@@ -133,8 +150,3 @@ def _fix_once(
             raise InvariantError(
                 f"{path}: fix changed tokens `{' '.join(before[i1:i2])}` into `{got}`"
             )
-    try:
-        parse(out, path, include_dirs)
-    except ParseError as e:
-        raise InvariantError(f"{path}: fixed output no longer parses\n{e}") from e
-    return out

@@ -74,6 +74,9 @@ class Source:
     # while `logic x = a;` is only an initial value. Wires the tree cannot see
     # (macros, disabled `ifdef` text) are never listed.
     safe_wires: set[int] = field(default_factory=set)
+    # The safe wires that also carry a data type (`wire logic x`), which Verible
+    # cannot parse: offset -> length up to the type, so `fix` deletes the `wire`.
+    typed_wires: dict[int, int] = field(default_factory=dict)
     # `initial` blocks written in this file, outside macros and `ifdef regions.
     initial_lines: list[int] = field(default_factory=list)
     # Token-rewriting fixes for code the formatter cannot touch: (offset, text, cut).
@@ -193,7 +196,7 @@ class _Walker:
             return
         if k == K.NetDeclaration and node.netType.rawText == "wire":
             if not any(isinstance(d, SyntaxNode) and d.initializer for d in node.declarators):
-                self.src.safe_wires.add(self.offset(node.netType))
+                self.safe_wire(node.netType, node.type)
         elif k == K.ImplicitAnsiPort and node.header.kind == K.NetPortHeader:
             h = node.header
             if (
@@ -201,7 +204,7 @@ class _Walker:
                 and h.direction.rawText != "inout"
                 and not node.declarator.initializer
             ):
-                self.src.safe_wires.add(self.offset(h.netType))
+                self.safe_wire(h.netType, h.dataType)
         elif k == K.AlwaysBlock:
             self.legacy_always(node)
         elif k == K.InitialBlock:
@@ -279,6 +282,12 @@ class _Walker:
             body = body.items[0]
         pred = str(body.predicate) if body.kind == K.ConditionalStatement else None
         self.src.ff_blocks.append((self.line(node.getFirstToken()), edges, pred))
+
+    def safe_wire(self, kw, data_type: SyntaxNode) -> None:
+        start = self.offset(kw)
+        self.src.safe_wires.add(start)
+        if data_type.kind != K.ImplicitType:
+            self.src.typed_wires[start] = self.offset(data_type.getFirstToken()) - start
 
     def is_main(self, tok) -> bool:
         return self.sm.getFullyExpandedLoc(tok.location).buffer == self.main

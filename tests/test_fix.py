@@ -231,6 +231,20 @@ def test_clocked_always_with_blocking_assignments_stays_always():
 
 
 @needs_verible
+def test_typed_wire_drops_the_wire():
+    # Verible cannot parse `wire logic`, so `fix` cuts the `wire` before formatting.
+    text = (
+        "module m (\n    input wire logic a_i,  // A.\n    output logic b_o  // B.\n);\n"
+        "    wire logic [1:0] t;  // T.\n    assign t = {a_i, a_i};\n    assign b_o = t[0];\n"
+        "endmodule\n"
+    )
+    out = fix_text(text, "m.sv", RULES)
+    assert "wire" not in _toks(out)
+    assert "input  logic a_i" in out and "logic [1:0] t;" in out
+    assert fix_text(out, "m.sv", RULES) == out
+
+
+@needs_verible
 def test_explicit_sensitivity_list_is_reported_not_rewritten():
     text = (
         "module m (\n    input logic a_i,\n    input logic b_i,\n    output logic y_o\n);\n"

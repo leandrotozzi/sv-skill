@@ -280,6 +280,8 @@ def check_constructs(ctx: _Ctx, text: str, src: Source) -> None:
             # `reg` is always a variable; a `wire` only when the tree says so.
             safe = kw == "reg" or offset in src.safe_wires
             fix = (offset, "logic", len(kw)) if safe else None
+            if offset in src.typed_wires:  # `wire logic x`: the type is there, drop the `wire`
+                fix = (offset, "", src.typed_wires[offset])
             msg = f"`{kw}`: declare `logic` instead"
             ctx.emit(rule="logic_only", line=line, message=msg, fix=fix)
     for line, kind, fix in src.legacy_always:
