@@ -234,8 +234,9 @@ all; `bin2bcd` left a `TODO: describe` under a three-line comment that
 `check` does not flag), without it 0/5 (13 in all, and two of those runs read
 the repo's rules). One `svstyle fix` on the drafts without the skill passed
 0/5: it cannot write the missing comments. Cost without vs. with: $3.59 vs.
-$2.12, 4.6 M vs. 2.5 M tokens, 25 vs. 11 minutes. Open: `check` should flag a
-`TODO: describe` as MUST, and offers a fix for `input wire logic` that `fix`
-cannot apply (Verible does not parse it). `grade.py` builds the equivalence
+$2.12, 4.6 M vs. 2.5 M tokens, 25 vs. 11 minutes. Since then `check` flags a
+leftover `TODO: describe` with no fix (only the author can write it), and
+`fix` drops the `wire` from `wire logic x` before Verible, which cannot parse
+it. `grade.py` builds the equivalence
 testbench with `-Wno-fatal`, so a warning such as UNOPTFLAT no longer fails a
 correct design.
