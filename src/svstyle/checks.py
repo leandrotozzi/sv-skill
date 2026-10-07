@@ -202,25 +202,31 @@ def check_default_nettype(ctx: _Ctx, text: str) -> None:
 
 def check_comments(ctx: _Ctx, src: Source) -> None:
     for a in src.anchors:
-        if a.comment is not None:
+        if a.comment is not None and TODO_TRAILING.strip() not in a.comment:
             continue
-        trailing = (a.offset, TODO_TRAILING) if a.fixable else None
-        if a.fixable and a.above:
-            # The comment is there, one line too high: move it to the end.
-            start, length, text = a.above
-            trailing = [(start, "", length), (a.offset, "  " + text)]
-        above = (a.offset, TODO_ABOVE) if a.fixable else None
-        missing = f"`{a.name}` has no trailing // comment"
+        if a.comment is not None:
+            # `fix` wrote it; only the author can replace it.
+            trailing = above = None
+            missing = f"`{a.name}` still has the `TODO: describe` placeholder; describe it"
+            block = instance = missing
+        else:
+            trailing = (a.offset, TODO_TRAILING) if a.fixable else None
+            if a.fixable and a.above:
+                # The comment is there, one line too high: move it to the end.
+                start, length, text = a.above
+                trailing = [(start, "", length), (a.offset, "  " + text)]
+            above = (a.offset, TODO_ABOVE) if a.fixable else None
+            missing = f"`{a.name}` has no trailing // comment"
+            block = f"no // comment above `{a.name}` block"
+            instance = f"no // comment above instance `{a.name}`"
         if a.kind == "port":
             ctx.emit(rule="port_comment", line=a.line, message=missing, fix=trailing)
         elif a.kind in ("param", "decl"):
             ctx.emit(rule="decl_comment", line=a.line, message=missing, fix=trailing)
         elif a.kind == "block":
-            msg = f"no // comment above `{a.name}` block"
-            ctx.emit(rule="block_comment", line=a.line, message=msg, fix=above)
+            ctx.emit(rule="block_comment", line=a.line, message=block, fix=above)
         else:
-            msg = f"no // comment above instance `{a.name}`"
-            ctx.emit(rule="instance_comment", line=a.line, message=msg, fix=above)
+            ctx.emit(rule="instance_comment", line=a.line, message=instance, fix=above)
 
 
 def check_ports(ctx: _Ctx, src: Source) -> None:

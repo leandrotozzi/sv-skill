@@ -128,11 +128,15 @@ def test_waiver_covers_external_tool_findings(capsys, sv):
 
 
 @needs_verible
-def test_fix_writes_file_and_leaves_it_check_clean(capsys, sv):
+def test_fix_writes_file_and_leaves_only_its_todo(capsys, sv):
     p = sv(CLEAN.replace("rst_ni,  // Asynchronous reset, active-low", "rst_ni,"))
     code, out, _ = _run(capsys, "fix", p)
-    assert code == 0 and "fixed 1 file" in out
+    assert "fixed 1 file" in out
     assert "rst_ni,  // TODO: describe" in p.read_text()
+    # The placeholder is for the author to fill in: check keeps failing until then.
+    code, out, _ = _run(capsys, "check", "--no-external", p)
+    assert code == 1 and "1 findings" in out and "placeholder" in out
+    p.write_text(p.read_text().replace("TODO: describe", "Asynchronous reset, active-low"))
     assert _run(capsys, "check", "--no-external", p)[0] == 0
 
 
