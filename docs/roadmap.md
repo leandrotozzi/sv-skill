@@ -289,9 +289,44 @@ that also hit RTL the skill writes. Fixed, each with a test:
 On the 35 eval designs, `check --synth` and `fix --diff` give the same
 output before and after.
 
-Open, for existing code rather than new RTL: a baseline or changed-lines mode,
-a policy for `.v` files (directory mode skips them, but `fix` modernises one
-passed by name), keeping an existing licence header instead of stacking ours,
-packages first on the Verilator command line, NAM-003 advice on `_in` names
-(it suggests `_ni`), a `wire` tied to another file's `inout` port (no
-single-file view sees it), and FMT-001 on comment-only lines.
+Then the items left open for existing code, each with a test:
+
+- **Baseline.** `check --baseline FILE [--write-baseline]` reports only
+  findings not recorded in FILE, keyed by file, rule and line text (not the
+  line number), counted.
+- **`.v` files stay Verilog.** `fix` gives them no `logic`, `always_comb` or
+  `always_ff`; the findings say to rename to `.sv` first. A directory still
+  means its `*.sv`, and the "no input files" error now says so.
+- **Licence headers are kept.** A file opening with a comment block that
+  names a copyright, licence or SPDX identifier gets a `Description:` block
+  appended to it instead of our header stacked on top (DOC-001 text updated).
+- **Packages first** for Verilator too, as for Yosys: a package type in a port
+  failed to elaborate when the module sorted first. On the 35 eval designs
+  this removes a false `EXT-VLTR-ERROR` on `alu.sv`, and Verilator, now
+  elaborating further, reports 22 findings it used to hide.
+- **NAM-003** no longer advises `_ni` for `x_in`: it offers `x_ni` if
+  active-low, `x_i` if not.
+- **A `wire` on an `inout` of another file** stays a `wire`: `parse` records
+  every module's ports (ANSI and non-ANSI), and `fix` reads all its input
+  files first. `.*` connections are not followed.
+- **FMT-001 on comment-only lines**, which Verible's line-length skips:
+  an svstyle check under `[rule.also]`.
+- **Yosys "no driver" is SHOULD on a partial design**, like Verilator's
+  MODMISSING, when a module the files instantiate is not among them.
+- **`rules --gen/--check` refuse outside a checkout** (exit 2) instead of
+  writing into site-packages; the dead Phase 2/3 branches are gone.
+
+Rerunning `fix` on the five outside codebases found three more problems,
+now fixed: a `bind` took its DOC-006 comment above the module name, so every
+run added another `TODO`; the fix loop stopped once tokens settled, but a moved
+comment lets Verible realign and free room for the next one (one more pass
+when a comment moved); and `` `default_nettype none `` broke files that use
+implicit nets (now not inserted, the finding names them) and bind files, whose
+target-scope names Verilator reads as implicit nets (not inserted there either).
+After that, on all five: no exit 4, no file Verilator reads worse than
+before, every file idempotent. What `fix` still refuses: files that need `-I`
+to parse (exit 3) and five that Verible itself cannot format (exit 2).
+
+Still open: `fix` speed (about 1.5 s per file, Verible runs twice per pass),
+duplicate PRT-003/PRT-005 reports on one instance, exclude globs for vendored
+code.

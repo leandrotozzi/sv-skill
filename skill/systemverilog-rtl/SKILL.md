@@ -85,9 +85,12 @@ Then run the tools.
 To bring legacy RTL into the style, run `svstyle fix` on it first: besides
 formatting, it turns `reg`/`wire` into `logic`, `always @(*)` into
 `always_comb`, clocked `always` into `always_ff`, and wraps lone statements
-in `begin`/`end`, wherever that provably keeps the meaning. Then work through
-what `check` still reports; `references/tooling.md` lists what `fix` leaves
-alone and why.
+in `begin`/`end`, wherever that provably keeps the meaning. A `.v` file
+keeps its Verilog: rename it to `.sv` first if it is to become SystemVerilog.
+Then work through what `check` still reports; `references/tooling.md` lists
+what `fix` leaves alone and why. To adopt the style on a large codebase
+without fixing everything at once, `check --baseline` (in `tooling.md`)
+fails only on new findings.
 
 ## The loop
 

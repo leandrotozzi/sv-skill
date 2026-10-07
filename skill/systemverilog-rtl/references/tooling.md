@@ -41,7 +41,7 @@ DOC-001 reports it as a SHOULD. An unknown key or a wrong type is an error
 
 ```sh
 svstyle check [FILES|DIRS] [-f LIST] [-F LIST] [-I DIR]... [--json] [--no-external]
-              [--synth] [--select IDS] [--ignore IDS]
+              [--synth] [--select IDS] [--ignore IDS] [--baseline FILE [--write-baseline]]
 svstyle fix   [FILES|DIRS] [-f LIST] [-F LIST] [-I DIR]... [--json] [--diff]
 svstyle rules [--id ID] [--unmapped]
 ```
@@ -56,7 +56,12 @@ svstyle rules [--id ID] [--unmapped]
   SystemVerilog than the other tools; a file it cannot read is reported as
   `EXT-YOSYS-read` (MUST): synthesis was not checked, so `check` fails until
   the code is in the subset Yosys reads (`synth-yosys.md`).
-- A directory stands for every `*.sv` below it.
+- A directory stands for every `*.sv` below it; name `.v` files explicitly.
+- `--baseline FILE` reports only findings not recorded in FILE, so existing
+  code can adopt the style without fixing everything first: run once with
+  `--write-baseline` (exits 0), commit FILE, and CI fails only on new
+  findings. A finding is keyed by file, rule and the text of its line, so
+  edits elsewhere do not resurface it; changing the line does.
 - `-f LIST` / `-F LIST` read a Verilator/VCS filelist: source paths,
   `+incdir+DIR`, nested `-f`/`-F`, `$VAR`s. `-f` paths are relative to the
   working directory, `-F` paths to the list. Other options are skipped.
@@ -80,7 +85,16 @@ syntax tree proves the meaning is unchanged:
 | `generate` / `endgenerate` | removed | never |
 | `function` / `task` | `... automatic ...` | inside a class |
 
-Nothing inside a macro or reached by an `` `ifdef`` split is rewritten. It
+Nothing inside a macro or reached by an `` `ifdef`` split is rewritten. A
+`wire` stays a `wire` when it is resolved -- two `assign`s, one driving `z`, or
+connected to an `inout` of a module in any file passed with it -- and a
+clocked `always` stays when an `initial` also writes its variables. A `.v`
+file stays Verilog-2001: it gets no `logic`, `always_comb` or `always_ff`
+(the findings say to rename it to `.sv` first, which is the migration step).
+
+A file that already opens with a licence header (a comment block naming a
+copyright, licence or SPDX identifier) keeps it; `fix` adds only a
+`Description:` block at its end instead of a second header on top. It
 then runs Verible again and verifies that every token change is one of the
 above; if not, nothing is written (exit 4). `always @(a or b)` is reported
 (LNG-003), not rewritten: `always_comb` would add the signals the list forgot,
@@ -134,7 +148,9 @@ or `EXT-VLTR-<CODE>` (Verilator) at SHOULD. The common ones:
 
 - `EXT-VLTR-MODMISSING`: a submodule's file was not on the command line.
   Pass all the design's files together; when checking one file on purpose,
-  `--ignore EXT-VLTR-MODMISSING` silences it.
+  `--ignore EXT-VLTR-MODMISSING` silences it. For the same reason, with
+  `--synth`, Yosys's "used but has no driver" (LNG-016) drops to SHOULD when
+  a module the files instantiate is not among them.
 - `EXT-VLTR-UNUSEDPARAM` is not reported for package constants: their users
   live in other files, so "unused" says nothing when a package is checked.
 - `EXT-VLTR-ERROR` (MUST): the design did not elaborate -- an undeclared
