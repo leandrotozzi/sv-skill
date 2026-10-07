@@ -305,6 +305,57 @@
       "checks": [
         {"text": "Every op and amount correct at Width 2/8 (exhaustive) and 32/64 (random), purely combinational", "equiv_tb": {"tb": "files/classics/barrel_shift_tb.sv"}}
       ]
+    },
+    {
+      "id": 131,
+      "name": "fp32-add",
+      "prompt": "Write a pipelined IEEE-754 single-precision adder in SystemVerilog, fp32_add.sv. Ports: clk_i, rst_ni (asynchronous, active low), valid_i, a_i[31:0], b_i[31:0], sub_i (1: compute a_i - b_i), valid_o, sum_o[31:0], nv_o (invalid), of_o (overflow), nx_o (inexact). Round to nearest, ties to even. Subnormal inputs and outputs are fully supported (no flush to zero). Any NaN result is the canonical quiet NaN 32'h7FC00000; a NaN operand or inf - inf gives it, and inf - inf (or a signalling NaN operand) sets nv_o. An exact zero from operands of opposite sign is +0; (-0) + (-0) is -0. Overflow gives infinity with of_o and nx_o set; nx_o is set whenever the rounded result differs from the exact one. Fixed latency of exactly 3 cycles: a valid_i sampled at edge t gives valid_o and its result after edge t+3; one new operation can be accepted every cycle. valid_o is 0 out of reset; sum_o and the flags are don't-care while valid_o is 0.",
+      "expected_output": "fp32_add.sv: 4-level pipelined IEEE-754 adder, RNE, subnormals, canonical NaN, nv/of/nx flags.",
+      "files": [],
+      "checks": [
+        {"text": "Bit-exact sums and flags against an integer model, 3-edge latency, back to back and gapped", "equiv_tb": {"tb": "files/classics/fp32_add_tb.sv"}}
+      ]
+    },
+    {
+      "id": 132,
+      "name": "i2c-master",
+      "prompt": "Write a byte-level I2C master in SystemVerilog, i2c_master.sv. Parameter ClkDiv (default 250, at least 4; a smaller value must fail at elaboration): every SCL low and SCL high phase lasts ClkDiv clk_i cycles. Ports: clk_i, rst_ni (asynchronous, active low), cmd_valid_i, cmd_ready_o, cmd_i[1:0] (0: START, 1: STOP, 2: WRITE, 3: READ), wdata_i[7:0], ack_i, rsp_valid_o, rdata_o[7:0], nack_o, scl_i, scl_oe_o, sda_i, sda_oe_o. The bus is open drain: an _oe_o of 1 pulls the line low, 0 releases it, and scl_i/sda_i read the wired line. A command is accepted on cmd_valid_i && cmd_ready_o; cmd_ready_o is high only when no command is in progress. When a command finishes, rsp_valid_o pulses for one cycle; for WRITE, nack_o is 1 if the slave did not acknowledge; for READ, rdata_o holds the byte read (MSB first) and the master then drives ACK when ack_i is 1 (sampled with the command) or NACK when 0. START from idle or while the bus is held (a repeated START) produces a START condition; STOP produces a STOP condition and leaves both lines released. SDA may change only while SCL is low, except for START and STOP. Support clock stretching: after releasing SCL the master waits until scl_i reads high before timing the high phase. Out of reset both lines are released and the master is idle. The testbench only issues legal sequences (WRITE and READ only between START and STOP).",
+      "expected_output": "i2c_master.sv: command-level I2C master, open drain, clock stretching, repeated START, ACK/NACK.",
+      "files": [],
+      "checks": [
+        {"text": "Legal I2C on a wired-AND bus with a stretching slave: bytes, ACK/NACK, repeated START, phase timing", "equiv_tb": {"tb": "files/classics/i2c_master_tb.sv"}}
+      ]
+    },
+    {
+      "id": 133,
+      "name": "systolic-mm",
+      "prompt": "Write an output-stationary systolic matrix multiplier in SystemVerilog, systolic_mm.sv, computing C = A x B for N x K by K x N signed matrices. Parameters: N (default 4, 2 to 8), DataW (default 8), AccW (default 32); any N outside 2..8 must fail at elaboration. Ports: clk_i, rst_ni (asynchronous, active low), in_valid_i, in_ready_o, in_last_i, a_col_i[N*DataW-1:0], b_row_i[N*DataW-1:0], out_valid_o, c_o[N*N*AccW-1:0]. One input beat (a transfer on in_valid_i && in_ready_o) carries column k of A (A[i][k] at a_col_i[i*DataW +: DataW]) and row k of B (B[k][j] at b_row_i[j*DataW +: DataW]), k = 0, 1, ...; in_last_i marks the last beat k = K-1, and K can be any length from 1 to 1024, different for each matrix. Beats may come with idle cycles between them. All operands are signed two's complement; C[i][j] at c_o[(i*N+j)*AccW +: AccW] is the exact sum of products wrapped modulo 2**AccW. After the last beat, out_valid_o pulses for one cycle within 3*N + 2 cycles, and c_o holds that result until the next out_valid_o. in_ready_o may go low while a result drains; the next matrix's beats are accepted after that. Build it as an N x N grid of processing elements, each doing one multiply-accumulate per cycle, with A values passed right and B values passed down between neighbours (inputs skewed internally), not as a single-cycle matrix product.",
+      "expected_output": "systolic_mm.sv: N x N grid of MAC PEs with internal skew; exact wrapped C per matrix.",
+      "files": [],
+      "checks": [
+        {"text": "Exact C for N=2/4/8 with wrap, one out_valid_o per matrix within 3N+2 cycles, held c_o, backpressure", "equiv_tb": {"tb": "files/classics/systolic_mm_tb.sv"}}
+      ]
+    },
+    {
+      "id": 134,
+      "name": "pkt-drop-fifo",
+      "prompt": "Write a store-and-forward AXI-Stream packet FIFO in SystemVerilog, pkt_drop_fifo.sv, that drops bad packets. Parameter Depth (default 64, a power of two from 16 to 4096; any other value must fail at elaboration), the buffer size in 32-bit beats, held in a RAM (an array that synthesis can map to block memory, not flops). Ports: clk_i, rst_ni (asynchronous, active low), s_tvalid_i, s_tready_o, s_tdata_i[31:0], s_tlast_i, s_tuser_i, m_tvalid_o, m_tready_i, m_tdata_o[31:0], m_tlast_o, drop_cnt_o[15:0]. A packet is the beats up to and including one with tlast. s_tuser_i on the last beat marks the packet bad: it is dropped whole, and no beat of it ever reaches the output. A packet longer than Depth beats can never fit: it is dropped too, its remaining beats accepted and discarded up to its tlast. A good packet goes out unchanged and in order, and its first beat appears only after its last beat was received (never a partial packet). When the buffer has no room and the packet being received could still fit once stored packets drain, s_tready_o goes low until there is room. drop_cnt_o counts dropped packets (bad or too long), wrapping at 2**16. The output must sustain one beat per cycle while m_tready_i is high and whole packets are stored, and the input one beat per cycle while there is room. Out of reset the FIFO is empty.",
+      "expected_output": "pkt_drop_fifo.sv: store-and-forward AXI-Stream FIFO in RAM that drops bad and too-long packets.",
+      "files": [],
+      "checks": [
+        {"text": "Only good packets out, whole and in order; store and forward; no bubbles; drop count; no deadlock", "equiv_tb": {"tb": "files/classics/pkt_drop_fifo_tb.sv"}},
+        {"text": "The packet buffer is inferred as a memory, not flops", "yosys_memory": true}
+      ]
+    },
+    {
+      "id": 135,
+      "name": "irq-ctrl",
+      "prompt": "Write a small PLIC-style interrupt controller in SystemVerilog, irq_ctrl.sv. Parameter Sources (default 8, 1 to 31; any other value must fail at elaboration); sources are numbered 1..Sources, source s on src_i[s-1]. Ports: clk_i, rst_ni (asynchronous, active low), src_i[Sources-1:0] (synchronous to clk_i), reg_we_i, reg_re_i, reg_addr_i[7:0], reg_wdata_i[31:0], reg_rdata_o[31:0], irq_o. Registers (word addresses, unused bits read 0, unmapped addresses read 0 and ignore writes): 4*(s-1) priority of source s, 3 bits (0 = never interrupts); 0x80 pending, read only, bit s-1 for source s; 0x84 enable bits; 0x88 mode bits (1 = rising-edge triggered, 0 = level); 0x8C threshold, 3 bits; 0x90 claim/complete. A read of 0x90 returns the id of the pending, enabled source with the highest priority above the threshold (ties to the lowest id), or 0 if none; it clears that source's pending bit and marks it in service. A write of an id to 0x90 completes that source; writing an id that is not in service does nothing. A source in service does not become pending; once completed, a level source still high becomes pending again, and an edge source that saw a rising edge while in service becomes pending (one edge remembered). Each cycle, a source not in service becomes pending when it is level-mode and src_i is high, or edge-mode and src_i is high where it was low the cycle before. Everything resets to 0. reg_rdata_o is valid the cycle after reg_re_i (a read has no other effect until then except the claim). irq_o is a register: high in the cycle after one where some pending, enabled source has priority above the threshold.",
+      "expected_output": "irq_ctrl.sv: PLIC-style controller with priorities, threshold, claim/complete, level and edge sources.",
+      "files": [],
+      "checks": [
+        {"text": "Cycle-accurate irq_o and register reads at Sources 1/8/31; claim, complete, edge memory, ties", "equiv_tb": {"tb": "files/classics/irq_ctrl_tb.sv"}}
+      ]
     }
   ]
 }
