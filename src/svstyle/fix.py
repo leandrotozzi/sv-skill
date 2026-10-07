@@ -13,10 +13,10 @@ from the syntax tree; the invariant here makes sure nothing else changed.
 
 import difflib
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from functools import cache
 
-from .checks import PLACEHOLDER, run_checks
+from .checks import PLACEHOLDER, is_sv, run_checks
 from .external import verible_format
 from .parse import DIRECTIVE_LINE_RE, ParseError, parse, raw_tokens
 from .rules import Rule
@@ -43,6 +43,8 @@ ALLOWED_EDITS = (
 # trailing comment is the one thing that keeps it on its own line.
 BARE_TIMESCALE_RE = re.compile(r"^([ \t]*`timescale\b[^/\n]*(?:/[^/\n]*)?[^\S\n]*)$", re.M)
 TIMESCALE_COMMENT = "  // time unit / precision"
+
+SV_ONLY = frozenset({"logic", "always_comb", "always_ff"})  # rewrites a `.v` file never gets
 
 MAX_PASSES = 4  # each pass only adds structure; real code settles in two
 INSERTED = frozenset(tok for old, new in ALLOWED_EDITS if not old for tok in new)
@@ -101,8 +103,11 @@ def fix_text(
     rules: list[Rule],
     include_dirs: Sequence[str] = (),
     company: str = PLACEHOLDER,
+    ports: Mapping[str, tuple[list[str], set[str]]] | None = None,
 ) -> str:
-    src = parse(text, path, include_dirs)  # ParseError propagates: refuse before touching anything
+    """`ports`: modules defined in the other files of the design (`Source.ports`)."""
+    # ParseError propagates: refuse before touching anything.
+    src = parse(text, path, include_dirs, ports)
     # Verible cannot parse `wire logic x`, so drop those `wire`s before it sees the file.
     if src.typed_wires:
         out = text
@@ -113,22 +118,35 @@ def fix_text(
     text = BARE_TIMESCALE_RE.sub(lambda m: m[1].rstrip() + TIMESCALE_COMMENT, text)
     # A rewrite can create what another rule anchors on (`always @(*)` becomes an
     # always_comb that DOC-005 wants a comment above), so rerun until tokens settle.
+    # Moving a comment changes no token, but Verible then realigns the block, which
+    # can bring the next comment within the column limit: go round once more.
     for _ in range(MAX_PASSES):
-        out = _fix_once(text, path, rules, include_dirs, company)
-        if token_signature(out) == token_signature(text):
+        out, moved = _fix_once(text, path, rules, include_dirs, company, ports)
+        if token_signature(out) == token_signature(text) and not moved:
             return out
         text = out
     raise InvariantError(f"{path}: fix did not settle after {MAX_PASSES} passes")
 
 
 def _fix_once(
-    text: str, path: str, rules: list[Rule], include_dirs: Sequence[str], company: str
-) -> str:
+    text: str,
+    path: str,
+    rules: list[Rule],
+    include_dirs: Sequence[str],
+    company: str,
+    ports: Mapping | None,
+) -> tuple[str, bool]:
+    """One pass; also says whether it moved a comment (the list-valued fixes)."""
     formatted = verible_format(text)
-    found = [d.fix for d in run_checks(formatted, path, rules, include_dirs, company) if d.fix]
+    src = parse(formatted, path, include_dirs, ports)
+    found = [d.fix for d in run_checks(formatted, path, rules, include_dirs, company, src) if d.fix]
+    moved = any(isinstance(fix, list) for fix in found)
     fixes = [f for fix in found for f in (fix if isinstance(fix, list) else [fix])]
-    fixes += parse(formatted, path, include_dirs).rewrites + endif_labels(formatted)
+    fixes += src.rewrites + endif_labels(formatted)
     fixes = [(off, ins, cut[0] if cut else 0) for off, ins, *cut in fixes]
+    if not is_sv(path):
+        # A Verilog file stays Verilog: these would break Verilog-2001 tools.
+        fixes = [f for f in fixes if f[1] not in SV_ONLY]
     out = formatted
     # Descending offset. At one offset a replacement goes first, so an insertion
     # there lands in front of the new text instead of being cut by it; between
@@ -144,7 +162,7 @@ def _fix_once(
         parse(out, path, include_dirs)
     except ParseError as e:
         raise InvariantError(f"{path}: fixed output no longer parses\n{e}") from e
-    return out
+    return out, moved
 
 
 def _check_tokens(text: str, out: str, path: str) -> None:

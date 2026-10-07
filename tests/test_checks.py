@@ -37,10 +37,22 @@ def test_missing_header_is_fixable_at_top():
     assert (d.line, d.severity, d.fix) == (1, "MUST", (0, header))
 
 
-def test_foreign_licence_header_gets_ours_above_it():
-    text = "// SPDX-License-Identifier: Apache-2.0\n" + CLEAN[CLEAN.index("`default_nettype") :]
+def test_licence_header_without_description_gets_one_appended():
+    lic = "// Copyright 2024 Acme\n// SPDX-License-Identifier: Apache-2.0\n"
+    text = lic + "\n" + CLEAN[CLEAN.index("`default_nettype") :]
     (d,) = [d for d in _check(text) if d.rule == "DOC-001"]
-    assert d.fix[0] == 0  # inserted above; the licence line is kept
+    assert d.fix == (len(lic), "//\n// Description:\n//   TODO: describe\n")  # ours not stacked
+
+
+def test_licence_header_with_a_description_is_accepted():
+    lic = (
+        "/* Copyright (c) 2024 ETH Zurich. Licensed under the Solderpad License. */\n"
+        "// Description: registered byte with an enable, one cycle of latency\n"
+    )
+    assert _check(lic + "\n" + CLEAN[CLEAN.index("`default_nettype") :]) == []
+    short = lic.replace("registered byte with an enable, one cycle of latency", "a byte")
+    found = _check(short + "\n" + CLEAN[CLEAN.index("`default_nettype") :])
+    assert [(d.rule, d.line) for d in found] == [("DOC-002", 2)]
 
 
 def test_malformed_existing_header_is_not_autofixed():
@@ -412,3 +424,23 @@ def test_initial_block_under_a_guard_or_from_a_macro_is_fine():
     )
     for text in (guarded, macro):
         assert "SYN-006" not in {d.rule for d in _check(text)}
+
+
+def test_suffix_order_advice_does_not_assume_active_low():
+    text = "module m (\n    input logic x_in,  // X.\n    output logic y_on  // Y.\n);\nendmodule\n"
+    msgs = [d.message for d in run_checks(text, "m.sv", RULES) if d.rule == "NAM-003"]
+    assert any("`x_ni` if it is active-low, `x_i` if" in m for m in msgs)
+    assert any("`y_no` if it is active-low, `y_o` if" in m for m in msgs)
+
+
+def test_long_comment_only_line_is_fmt001():
+    long = "x" * 100
+    text = f"module m;\n    // {long}\n    /* {long} */\nendmodule\n"
+    found = [d for d in run_checks(text, "m.sv", RULES) if d.rule == "FMT-001"]
+    assert [d.line for d in found] == [2, 3] and not any(d.fixable for d in found)
+
+
+def test_default_nettype_is_not_autofixed_in_a_bind_file():
+    text = "module p #(parameter int W = 1) ();\nendmodule\nbind t p #(.W(W)) u_p ();\n"
+    (d,) = [d for d in run_checks(text, "p.sv", RULES) if d.rule == "LNG-014" and d.line == 1]
+    assert not d.fixable and "binds" in d.message

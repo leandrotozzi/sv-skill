@@ -22,7 +22,7 @@ heading, e.g. `### DOC-003`, instead of loading the whole file.
 
 ### DOC-001 (MUST) — Every file opens with the standard header
 
-Every `.sv` and `.svh` file begins with the copyright line, the all-rights-reserved line, and a `Description:` block that says what the file does.
+Every `.sv` and `.svh` file begins with the copyright line, the all-rights-reserved line, and a `Description:` block that says what the file does. A file that opens with the project's own licence header keeps it, followed by the `Description:` block.
 
 **Why:** The description is the only part of a file that survives being read out of context -- in a diff, a search result, or a model's context window. Copyright and licence state must be mechanical, not remembered, because a file that ships without it is a legal problem discovered late.
 
@@ -829,7 +829,7 @@ always_comb begin
 end
 ```
 
-**Enforced by:** verible lint `no-tabs` `no-trailing-spaces` `posix-eof` `line-length` `forbid-line-continuations` · autofixable
+**Enforced by:** verible lint `no-tabs` `no-trailing-spaces` `posix-eof` `line-length` `forbid-line-continuations`; also svstyle `comment_line_length` · autofixable
 
 **Sources:** lowRISC §Basics (column limit), house style (four-space indent), Verible defaults
 

@@ -7,7 +7,7 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 
 ## DOC — Comments and file header
 
-- **DOC-001** · MUST · Every `.sv` and `.svh` file begins with the copyright line, the all-rights-reserved line, and a `Description:` block that says what the file does. `[fix]`
+- **DOC-001** · MUST · Every `.sv` and `.svh` file begins with the copyright line, the all-rights-reserved line, and a `Description:` block that says what the file does. A file that opens with the project's own licence header keeps it, followed by the `Description:` block. `[fix]`
 - **DOC-002** · SHOULD · The `Description:` block says what the module does and names its non-obvious constraints; it is not the module name restated.
 - **DOC-003** · MUST · Each port declaration ends with a `//` comment describing the signal. `[fix]`
 - **DOC-004** · MUST · Each parameter, localparam, signal and net declaration statement ends with a `//` comment. A declaration spread over several lines, or one whose comment would not fit trailing within 100 columns, may carry it on the line directly above instead. Enumeration members are exempt. `[fix]`

@@ -290,3 +290,45 @@ def test_non_utf8_file_is_an_error_not_a_crash(capsys, tmp_path):
     p.write_bytes(b"\xff module x; endmodule\n")
     code, _, err = _run(capsys, "check", "--no-external", p)
     assert code == 2 and "UTF-8" in err
+
+
+def test_rules_gen_and_check_refuse_outside_the_repo(capsys, monkeypatch, tmp_path):
+    from svstyle import cli
+
+    monkeypatch.setattr(cli, "SKILL_MD", tmp_path / "SKILL.md")  # as in an installed wheel
+    for flag in ("--gen", "--check"):
+        code, _, err = _run(capsys, "rules", flag)
+        assert code == 2 and "checkout" in err
+
+
+@needs_verible
+def test_fix_sees_inouts_in_the_other_files(capsys, tmp_path):
+    (tmp_path / "pad.sv").write_text("module pad (\n    inout wire io_io  // Pad.\n);\nendmodule\n")
+    top = tmp_path / "top.sv"
+    top.write_text("module top;\n    wire a;  // A.\n    pad u_pad (.io_io(a));\nendmodule\n")
+    _run(capsys, "fix", tmp_path / "pad.sv", top)
+    assert "wire a;" in top.read_text()
+
+
+@pytest.mark.skipif(not shutil.which("yosys"), reason="yosys missing")
+def test_undriven_output_of_a_missing_module_is_a_should(capsys, tmp_path):
+    p = tmp_path / "top.sv"
+    p.write_text(
+        "module top (\n    input  logic a_i,\n    output logic b_o\n);\n"
+        "    sub u_sub (.a_i(a_i), .b_o(b_o));\nendmodule\n"
+    )
+    out = json.loads(_run(capsys, "check", "--json", "--synth", "--select", "LNG-016", p)[1])
+    assert {(d["rule"], d["severity"]) for d in out["diagnostics"]} == {("LNG-016", "SHOULD")}
+
+
+def test_baseline_hides_known_findings_and_reports_new_ones(capsys, sv, tmp_path):
+    p = sv(CLEAN.replace("    logic", "    reg", 1))  # a LNG-001 to start from
+    base = tmp_path / "baseline.json"
+    check = ("check", "--no-external", "--select", "LNG-001", "--baseline", base, p)
+    assert _run(capsys, *check)[0] == 2  # no baseline file yet
+    assert _run(capsys, *check[:-1], "--write-baseline", p)[0] == 0
+    assert _run(capsys, *check)[0] == 0
+    # Moved down a line it is still known; a second `reg` is new.
+    p.write_text("\n" + p.read_text().replace("endmodule", "    reg spare_q;  // S.\nendmodule"))
+    code, out, err = _run(capsys, *check)
+    assert code == 1 and out.count("LNG-001") == 1 and "1 finding(s) hidden" in err

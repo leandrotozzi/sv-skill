@@ -34,7 +34,7 @@ id        = "DOC-001"
 title     = "Every file opens with the standard header"
 severity  = "MUST"
 category  = "DOC"
-statement = "Every `.sv` and `.svh` file begins with the copyright line, the all-rights-reserved line, and a `Description:` block that says what the file does."
+statement = "Every `.sv` and `.svh` file begins with the copyright line, the all-rights-reserved line, and a `Description:` block that says what the file does. A file that opens with the project's own licence header keeps it, followed by the `Description:` block."
 rationale = "The description is the only part of a file that survives being read out of context -- in a diff, a search result, or a model's context window. Copyright and licence state must be mechanical, not remembered, because a file that ships without it is a legal problem discovered late."
 good = """
 // Copyright (c) 2026 ACME Corp
@@ -705,6 +705,8 @@ sources = ["lowRISC §Basics (column limit)", "house style (four-space indent)",
 tool = "verible-lint"
 rule = ["no-tabs", "no-trailing-spaces", "posix-eof", "line-length", "forbid-line-continuations"]
 autofix = true
+[rule.also]
+svstyle = ["comment_line_length"]  # Verible's line-length skips comment-only lines
 
 [[rule]]
 id        = "FMT-002"

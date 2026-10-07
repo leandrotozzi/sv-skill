@@ -404,3 +404,17 @@ def test_yosys_failure_without_a_location_is_a_must(monkeypatch):
     monkeypatch.setattr(ext.Path, "read_text", lambda *a, **k: "")
     (d,) = ext.yosys_check(["a.sv"], RULES)
     assert (d.rule, d.severity) == ("EXT-YOSYS-read", "MUST") and "went wrong" in d.message
+
+
+@needs_verilator
+def test_verilator_reads_packages_first(tmp_path):
+    # A package type in a port is resolved in file order; the module sorts first here.
+    (tmp_path / "a_top.sv").write_text(
+        "module a_top\n    import z_pkg::*;\n(\n    input mode_e m_i,\n    output logic y_o\n);\n"
+        "    assign y_o = m_i == ModeA;\nendmodule\n"
+    )
+    (tmp_path / "z_pkg.sv").write_text(
+        "package z_pkg;\n    typedef enum logic {ModeA, ModeB} mode_e;\nendpackage\n"
+    )
+    paths = sorted(str(p) for p in tmp_path.iterdir())
+    assert "EXT-VLTR-ERROR" not in {d.rule for d in ext.verilator_lint(paths, RULES)}

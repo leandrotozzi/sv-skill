@@ -127,6 +127,11 @@ def _optional_register(d: Diag) -> bool:
     return re.search(rf"^\s*{re.escape(m.group(1))}\s*<=", text, re.MULTILINE) is not None
 
 
+def packages_first(paths: list[str]) -> list[str]:
+    """Verilator and Yosys resolve `pkg::name` in file order, so packages go first."""
+    return sorted(paths, key=lambda p: not PACKAGE_RE.search(Path(p).read_text(encoding="utf-8")))
+
+
 def verilator_lint(
     paths: list[str], rules: list[Rule], include_dirs: Sequence[str] = ()
 ) -> list[Diag]:
@@ -134,7 +139,7 @@ def verilator_lint(
     dirs = dict.fromkeys([*include_dirs, *(str(Path(p).parent) for p in paths)])
     # PINCONNECTEMPTY: `.q_o()` is the explicit no-connect PRT-004 asks for.
     args = ["--lint-only", "-Wall", "-Wno-fatal", "-Wno-context", "-Wno-MULTITOP"]
-    args += ["-Wno-PINCONNECTEMPTY"] + [f"-I{d}" for d in dirs] + paths
+    args += ["-Wno-PINCONNECTEMPTY"] + [f"-I{d}" for d in dirs] + packages_first(paths)
     res = _run("verilator", args)
     diags = parse_verilator(res.stderr, rules)
     lines = res.stderr.splitlines()
@@ -165,7 +170,9 @@ def parse_verible_lint(output: str, rules: list[Rule]) -> list[Diag]:
         if m := VERIBLE_LINT_RE.match(line):
             name = m.group("rule")
             if rule := index.get(name):
-                fixable = name in FIXED_BY_FIX
+                # `fix` leaves a .v file Verilog, so no always_comb there.
+                sv = m.group("path").endswith((".sv", ".svh"))
+                fixable = name in FIXED_BY_FIX and (sv or name != "always-comb")
                 out.append(_diag(m, rule.id, rule.severity, fixable))
             else:
                 out.append(_diag(m, "EXT-VL-" + name, "SHOULD"))
@@ -213,11 +220,11 @@ YOSYS_ERROR_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+): ERROR: (?P<msg>.*)$"
 
 
 def yosys_check(
-    paths: list[str], rules: list[Rule], include_dirs: Sequence[str] = ()
+    paths: list[str], rules: list[Rule], include_dirs: Sequence[str] = (), partial: bool = False
 ) -> list[Diag]:
+    """`partial`: a module the files instantiate is not among them (a black box)."""
     dirs = dict.fromkeys([*include_dirs, *(str(Path(p).parent) for p in paths)])
-    # Yosys resolves `pkg::name` at read time, so packages go first.
-    paths = sorted(paths, key=lambda p: not PACKAGE_RE.search(Path(p).read_text()))
+    paths = packages_first(paths)
     # Files are quoted, but Yosys takes no quoted -I: a dir with a space is left
     # out. Yosys searches each file's own dir anyway; any other miss fails loudly
     # through the exit code below.
@@ -225,7 +232,7 @@ def yosys_check(
     read = "read_verilog -sv " + " ".join([*incs, *(f'"{p}"' for p in paths)])
     res = _run("yosys", ["-q", "-p", f"{read}; hierarchy; proc; check"])
     out = res.stdout + res.stderr
-    diags = parse_yosys(out, rules, paths[0])
+    diags = parse_yosys(out, rules, paths[0], partial)
     if res.returncode != 0 and not any(d.rule == "EXT-YOSYS-read" for d in diags):
         # Failed without saying where: synthesis was not checked, so do not pass.
         why = next((ln for ln in out.splitlines() if "ERROR" in ln), f"yosys exit {res.returncode}")
@@ -234,7 +241,7 @@ def yosys_check(
     return diags
 
 
-def parse_yosys(output: str, rules: list[Rule], fallback: str) -> list[Diag]:
+def parse_yosys(output: str, rules: list[Rule], fallback: str, partial: bool = False) -> list[Diag]:
     index = tool_index(rules, "yosys")
     out: list[Diag] = []
     lines = output.splitlines()
@@ -259,5 +266,8 @@ def parse_yosys(output: str, rules: list[Rule], fallback: str) -> list[Diag]:
                 break
         rule = index.get(name)
         rid, sev = (rule.id, rule.severity) if rule else ("EXT-YOSYS-" + name, "SHOULD")
+        if partial and name == "no-driver":
+            # Driven, most likely, by the missing module; Verilator's MODMISSING is SHOULD too.
+            sev, msg = "SHOULD", msg + " (a submodule was not passed; is it driven there?)"
         out.append(Diag(path, ln, col, rid, sev, msg))
     return out

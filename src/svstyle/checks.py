@@ -16,7 +16,7 @@ from pathlib import Path
 
 from pyslang.parsing import TokenKind
 
-from .parse import Source, parse, raw_tokens
+from .parse import COLUMN_LIMIT, Source, implicit_nets, parse, raw_tokens
 from .rules import Diag, Rule, tool_index
 
 # Without a `.svstyle.toml` naming the company, headers carry this placeholder
@@ -71,6 +71,14 @@ HEADER_RE = re.compile(
     r"(?P<desc>(?://   .*\n)+)"
 )
 OURS_RE = re.compile(r"\A// Copyright \(c\) \d{4} ")
+# A file that opens with the project's own licence keeps it: no second header on
+# top, only a Description: block, which goes at the end of the licence comments.
+LEADING_COMMENTS_RE = re.compile(r"\A(?:[ \t]*(?://[^\n]*|/\*.*?\*/[^\n]*)\n)+", re.S)
+LICENCE_RE = re.compile(r"copyright|licen[cs]e|spdx-license-identifier", re.I)
+LICENCE_DESC_RE = re.compile(
+    r"^[ \t]*//[ \t]*Description:(?P<inline>.*)\n(?P<more>(?:[ \t]*//[ \t]+\S.*\n)*)", re.M
+)
+LICENCE_DESC = "//\n// Description:\n//   TODO: describe\n"
 MIN_DESCRIPTION_WORDS = 5  # "Gray counter module." is a restatement, not a description
 TODO_TRAILING = "  // TODO: describe"
 TODO_ABOVE = "// TODO: describe\n"
@@ -96,12 +104,16 @@ def run_checks(
     rules: list[Rule],
     include_dirs: Sequence[str] = (),
     company: str = PLACEHOLDER,
+    src: Source | None = None,
 ) -> list[Diag]:
-    """All svstyle-owned findings for one file. Raises ParseError if it does not parse."""
-    src = parse(text, path, include_dirs)
+    """All svstyle-owned findings for one file. Raises ParseError if it does not parse.
+
+    `src` is `text` already parsed, when the caller needs the tree too."""
+    src = src or parse(text, path, include_dirs)
     ctx = _Ctx(path, tool_index(rules, "svstyle"))
     check_header(ctx, text, company)
-    check_default_nettype(ctx, text)
+    check_default_nettype(ctx, text, include_dirs)
+    check_comment_length(ctx, text)
     check_comments(ctx, src)
     check_ports(ctx, src)
     check_constructs(ctx, text, src)
@@ -149,13 +161,28 @@ class _Ctx:
         )  # fmt: skip
 
 
+def check_licence_header(ctx: _Ctx, lead: str) -> None:
+    """The project's own licence header stands in for ours; it only needs a Description."""
+    m = LICENCE_DESC_RE.search(lead)
+    if m is None:
+        msg = "licence header has no `Description:`; add one below it"
+        ctx.emit(rule="header", line=1, message=msg, fix=(len(lead), LICENCE_DESC))
+        return
+    desc = " ".join([m.group("inline"), *(ln.lstrip("/ ") for ln in m.group("more").splitlines())])
+    if desc.strip().startswith("TODO") or len(desc.split()) < MIN_DESCRIPTION_WORDS:
+        line = lead.count("\n", 0, m.start()) + 1
+        msg = "Description says too little; state what it does and its constraints"
+        ctx.emit(rule="header_description", line=line, message=msg)
+
+
 def check_header(ctx: _Ctx, text: str, company: str) -> None:
     m = HEADER_RE.match(text)
     if m is None:
         if OURS_RE.match(text):
             ctx.emit(rule="header", line=1, message="file header is malformed")
+        elif (lead := LEADING_COMMENTS_RE.match(text)) and LICENCE_RE.search(lead.group()):
+            check_licence_header(ctx, lead.group())
         else:
-            # A foreign licence header stays; ours goes above it.
             header = HEADER.format(year=date.today().year, company=company)
             ctx.emit(rule="header", line=1, message="missing file header", fix=(0, header))
         return
@@ -175,28 +202,44 @@ def check_header(ctx: _Ctx, text: str, company: str) -> None:
         )  # fmt: skip
 
 
+def check_comment_length(ctx: _Ctx, text: str) -> None:
+    """FMT-001 on comment-only lines, which Verible's line-length skips."""
+    for no, ln in enumerate(text.splitlines(), 1):
+        if len(ln) > COLUMN_LIMIT and ln.lstrip().startswith(("//", "/*")):
+            msg = f"comment line is {len(ln)} columns; wrap it at {COLUMN_LIMIT}"
+            ctx.emit(rule="comment_line_length", line=no, message=msg)
+
+
+BIND_RE = re.compile(r"^[ \t]*bind\b", re.M)
 NETTYPE_NONE_RE = re.compile(r"`default_nettype\s+none\b")
 
 
-def check_default_nettype(ctx: _Ctx, text: str) -> None:
+def check_default_nettype(ctx: _Ctx, text: str, include_dirs: Sequence[str] = ()) -> None:
     if not ctx.path.endswith(".sv"):
         return
     lines = text.splitlines(keepends=True)
-    offset, first = 0, None  # first: (line, offset) of the first code line
+    lead = LEADING_COMMENTS_RE.match(text)  # the header, `/* */` included
+    skip = lead.group().count("\n") if lead else 0
+    offset, first = lead.end() if lead else 0, None  # first: (line, offset) of the first code
     # Verible joins consecutive directives onto one line, so look for the
     # directive in the leading run of directive lines, not as a whole line.
-    for no, ln in enumerate(lines, 1):
+    for no, ln in enumerate(lines[skip:], skip + 1):
         code = ln.split("//")[0].strip()
         if code and first is None:
             first = (no, offset)
         if code.startswith("`") and NETTYPE_NONE_RE.search(code):
             break
         if code and not code.startswith("`"):
-            ctx.emit(
-                rule="default_nettype", line=first[0],
-                message="`default_nettype none must follow the header",
-                fix=(first[1], "`default_nettype none\n\n"),
-            )  # fmt: skip
+            msg, fix = "`default_nettype none must follow the header", None
+            if BIND_RE.search(text):
+                # A bind's names resolve in its target, but Verilator reads them as
+                # implicit nets at file scope: the directive would break the file.
+                msg += "; this file binds, so check Verilator still reads it before adding it"
+            elif implicit := implicit_nets(text, ctx.path, include_dirs):
+                msg += f"; first declare the nets used without a declaration: {', '.join(implicit)}"
+            else:
+                fix = (first[1], "`default_nettype none\n\n")
+            ctx.emit(rule="default_nettype", line=first[0], message=msg, fix=fix)
             break
         offset += len(ln)
     code = [(no, ln) for no, ln in enumerate(lines, 1) if ln.strip()]
@@ -244,8 +287,12 @@ def check_ports(ctx: _Ctx, src: Source) -> None:
     for ports in src.port_lists:
         check_port_order(ctx, ports)
         for name, line in ports:
-            if SUFFIX_ORDER_RE.search(name):
-                msg = f"`{name}`: the direction suffix goes last (`_ni`, not `_in`)"
+            if m := SUFFIX_ORDER_RE.search(name):
+                stem, d = name[: -len(m.group())], m.group()[1:-1]
+                msg = (
+                    f"`{name}`: the direction suffix goes last; `{stem}_n{d}` if it is "
+                    f"active-low, `{stem}_{d}` if the `n` is not"
+                )
                 ctx.emit(rule="suffix_order", line=line, message=msg)
     for a in src.anchors:
         if a.kind == "port" and (", " in a.name or a.detail == "continued"):
@@ -282,7 +329,14 @@ def check_port_order(ctx: _Ctx, ports: list[tuple[str, int]]) -> None:
             return
 
 
+def is_sv(path: str) -> bool:
+    return path.endswith((".sv", ".svh"))
+
+
 def check_constructs(ctx: _Ctx, text: str, src: Source) -> None:
+    # `fix` keeps a Verilog file Verilog; renaming it to .sv is the migration step.
+    sv = is_sv(ctx.path)
+    rename = "" if sv else " (rename the file to .sv first)"
     for kind, _, offset in raw_tokens(text):
         if kw := LEGACY_NETS.get(kind):
             line = text.count("\n", 0, offset) + 1
@@ -291,14 +345,16 @@ def check_constructs(ctx: _Ctx, text: str, src: Source) -> None:
             fix = (offset, "logic", len(kw)) if safe else None
             if offset in src.typed_wires:  # `wire logic x`: the type is there, drop the `wire`
                 fix = (offset, "", src.typed_wires[offset])
-            msg = f"`{kw}`: declare `logic` instead"
-            ctx.emit(rule="logic_only", line=line, message=msg, fix=fix)
+            msg = f"`{kw}`: declare `logic` instead{rename}"
+            ctx.emit(rule="logic_only", line=line, message=msg, fix=fix if sv else None)
     for line, kind, fix in src.legacy_always:
         if kind == "edge":
             msg = "clocked `always`: write `always_ff`" + (
                 "" if fix else " (it has `=` or a delay)"
             )
-            ctx.emit(rule="always_ff_style", line=line, message=msg, fix=fix)
+            ctx.emit(
+                rule="always_ff_style", line=line, message=msg + rename, fix=fix if sv else None
+            )
         else:
             msg = (
                 "`always` with a sensitivity list: write `always_comb`, which cannot miss a signal"

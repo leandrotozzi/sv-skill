@@ -8,7 +8,7 @@ from hypothesis import strategies as st
 
 from svstyle.checks import run_checks
 from svstyle.fix import InvariantError, fix_text, token_signature
-from svstyle.parse import ParseError
+from svstyle.parse import ParseError, parse
 from svstyle.rules import load_rules
 
 BASE = "`ifdef A\n  logic x;\n`endif\nmodule m;\nendmodule\n"
@@ -338,3 +338,79 @@ def test_timescale_is_not_joined_with_the_next_directive():
     assert re.search(r"^`timescale 1ns / 1ps  //.*$", out, re.M)
     assert re.search(r"^`default_nettype none$", out, re.M)
     assert fix_text(out, "m.sv", RULES) == out
+
+
+PAD = "module pad (\n    inout wire io_io  // Pad.\n);\nendmodule\n"
+PAD_NON_ANSI = "module pad (io_io);\n    inout io_io;  // Pad.\nendmodule\n"
+TOP = (
+    "module top;\n    wire a;  // A.\n    wire b;  // B.\n"
+    "    pad u_a (.io_io(a));\n    pad u_b (b);\nendmodule\n"
+)
+
+
+@needs_verible
+@pytest.mark.parametrize("pad", [PAD, PAD_NON_ANSI], ids=["ansi", "non-ansi"])
+def test_net_on_an_inout_stays_wire(pad):
+    # By name and by position, whether the module is in this file or another.
+    for text, ports in ((pad + TOP, None), (TOP, parse(pad, "pad.sv").ports)):
+        out = fix_text(text, "top.sv", RULES, ports=ports)
+        assert "wire a;" in out and "wire b;" in out
+    assert "logic a;" in fix_text(TOP, "top.sv", RULES)  # without the other file it cannot know
+
+
+@needs_verible
+def test_licence_header_is_kept_not_stacked():
+    text = "// Copyright 2024 Acme\n// SPDX-License-Identifier: MIT\n\nmodule m;\nendmodule\n"
+    out = fix_text(text, "m.sv", RULES)
+    assert out.startswith(
+        "// Copyright 2024 Acme\n// SPDX-License-Identifier: MIT\n//\n// Description:\n"
+    )
+    assert out.count("Copyright") == 1 and fix_text(out, "m.sv", RULES) == out
+
+
+@needs_verible
+def test_verilog_file_stays_verilog():
+    text = (
+        "module m (input wire clk, input wire a, output reg y);\n"
+        "  reg t;\n  always @(*) t = a;\n  always @(posedge clk) y <= t;\nendmodule\n"
+    )
+    out = fix_text(text, "m.v", RULES)
+    assert not {"logic", "always_comb", "always_ff"} & set(_toks(out))
+    assert fix_text(out, "m.v", RULES) == out
+    found = {d.rule: d for d in run_checks(out, "m.v", RULES)}
+    assert not found["LNG-001"].fixable and "rename the file to .sv" in found["LNG-001"].message
+    assert "always_ff" in _toks(fix_text(text, "m.sv", RULES))  # the same code as .sv migrates
+
+
+@needs_verible
+def test_bind_takes_its_comment_above_the_bind():
+    text = "module m;\nendmodule\n\n// Checks m.\nbind m m_props u_props ();\n"
+    out = fix_text(text, "m.sv", RULES)
+    assert "TODO" not in out.split("endmodule")[1] and fix_text(out, "m.sv", RULES) == out
+
+
+@needs_verible
+def test_comments_above_parameters_settle_in_one_run():
+    # Moving one comment lets Verible realign the list, which can make room for the next.
+    params = [
+        ("Width of AXI stream interfaces in bits", "KEEP_ENABLE = (DATA_WIDTH>8)"),
+        ("tkeep signal width (words per cycle)", "KEEP_WIDTH = ((DATA_WIDTH+7)/8)"),
+        ("tuser value for bad frame marker", "USER_BAD_FRAME_VALUE = 1'b1"),
+        ("tuser mask for bad frame marker", "USER_BAD_FRAME_MASK = 1'b1"),
+    ]
+    body = ",\n".join(f"    // {c}\n    parameter {p}" for c, p in params)
+    text = f"module m #\n(\n{body}\n)\n(\n);\nendmodule\n"
+    out = fix_text(text, "m.v", RULES)
+    assert fix_text(out, "m.v", RULES) == out
+
+
+@needs_verible
+def test_implicit_nets_block_default_nettype_none():
+    text = (
+        "module m (input wire a, input wire b, output wire y);\n"
+        "  assign t = a & b;\n  assign y = t;\nendmodule\n"
+    )
+    out = fix_text(text, "m.sv", RULES)
+    assert "`default_nettype none" not in out  # it would make `t` an error
+    (d,) = [d for d in run_checks(out, "m.sv", RULES) if d.rule == "LNG-014"]
+    assert not d.fixable and d.message.endswith(": t")

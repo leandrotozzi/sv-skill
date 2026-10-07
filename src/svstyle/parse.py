@@ -10,10 +10,11 @@ declaration, block and instance on its own line.
 """
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 from pyslang import Bag, BumpAllocator, DiagnosticEngine, Diagnostics, Diags, SourceManager
+from pyslang.ast import Compilation, SymbolKind
 from pyslang.parsing import Lexer, PreprocessorOptions, TokenKind, TriviaKind
 from pyslang.syntax import SyntaxKind, SyntaxNode, SyntaxTree
 
@@ -77,6 +78,11 @@ class Source:
     # The safe wires that also carry a data type (`wire logic x`), which Verible
     # cannot parse: offset -> length up to the type, so `fix` deletes the `wire`.
     typed_wires: dict[int, int] = field(default_factory=dict)
+    # Modules defined here: name -> (port names in order, the inout ones), and the
+    # module types this file instantiates. Across files they tell `fix` which nets
+    # reach an inout, and `check` whether the design is complete.
+    ports: dict[str, tuple[list[str], set[str]]] = field(default_factory=dict)
+    instantiated: set[str] = field(default_factory=set)
     # `initial` blocks written in this file, outside macros and `ifdef regions.
     initial_lines: list[int] = field(default_factory=list)
     # Token-rewriting fixes for code the formatter cannot touch: (offset, text, cut).
@@ -125,8 +131,17 @@ def raw_tokens(text: str) -> list[tuple[TokenKind, str, int]]:
     return out
 
 
-def parse(text: str, name: str = "source.sv", include_dirs: Sequence[str] = ()) -> Source:
-    """Parse `text` as the file `name`; includes resolve next to it and on `include_dirs`."""
+def parse(
+    text: str,
+    name: str = "source.sv",
+    include_dirs: Sequence[str] = (),
+    ports: Mapping[str, tuple[list[str], set[str]]] | None = None,
+) -> Source:
+    """Parse `text` as the file `name`; includes resolve next to it and on `include_dirs`.
+
+    `ports` describes modules defined in other files (`Source.ports`), so a
+    `wire` connected to one of their inouts stays a `wire`.
+    """
     opts = PreprocessorOptions()
     opts.additionalIncludePaths = list(include_dirs)
     tree = SyntaxTree.fromText(text, SourceManager(), name, name, Bag([opts]))
@@ -142,7 +157,31 @@ def parse(text: str, name: str = "source.sv", include_dirs: Sequence[str] = ()) 
         if any(d.code == Diags.CouldNotOpenIncludeFile for d in errors):
             msg += "\n(an `include was not found: pass its directory with -I DIR)"
         raise ParseError(msg)
-    return _Walker(tree, text).run()
+    return _Walker(tree, text, ports or {}).run()
+
+
+def implicit_nets(text: str, name: str, include_dirs: Sequence[str] = ()) -> list[str]:
+    """Nets the code uses without declaring them; `default_nettype none` would break them.
+
+    Elaborates the file on its own: modules it instantiates from elsewhere are
+    unknown, which slang tolerates, and nets on their ports still show up.
+    """
+    opts = PreprocessorOptions()
+    opts.additionalIncludePaths = list(include_dirs)
+    # Every pyslang object here must stay referenced until the visit is done.
+    sm = SourceManager()
+    tree = SyntaxTree.fromText(text, sm, name, name, Bag([opts]))
+    comp = Compilation()
+    comp.addSyntaxTree(tree)
+    found: list[str] = []
+
+    def visit(sym) -> bool:
+        if getattr(sym, "kind", None) == SymbolKind.Net and sym.isImplicit:
+            found.append(sym.name)
+        return True
+
+    comp.getRoot().visit(visit)
+    return sorted(set(found))
 
 
 def _tokens(node: SyntaxNode) -> list:
@@ -152,10 +191,11 @@ def _tokens(node: SyntaxNode) -> list:
 
 
 class _Walker:
-    def __init__(self, tree: SyntaxTree, text: str):
+    def __init__(self, tree: SyntaxTree, text: str, ports: Mapping):
         self.sm = tree.sourceManager
         self.text = text
         self.char = char_offsets(text)
+        self.other_ports = ports
         self.root = tree.root
         # Zero-width tokens (the implicit type of `b_i` in `a_i, b_i`) carry no
         # trivia and sit on no line of their own; the lookups below skip them.
@@ -177,6 +217,7 @@ class _Walker:
     def run(self) -> Source:
         self.walk(self.root, split_list=False)
         self.resolved, self.initial_vars = _resolved_and_initial(self.root)
+        self.design_ports()
         self.modernise(self.root)
         # A file with one design unit parses to that unit as the root; only a
         # CompilationUnit's members are at file scope.
@@ -299,6 +340,31 @@ class _Walker:
         pred = str(body.predicate) if body.kind == K.ConditionalStatement else None
         self.src.ff_blocks.append((self.line(node.getFirstToken()), edges, pred))
 
+    def design_ports(self) -> None:
+        """Record ports and instances; nets on an inout must stay `wire`."""
+        nodes = _nodes(self.root)
+        for n in nodes:
+            if n.kind in (K.ModuleDeclaration, K.InterfaceDeclaration):
+                self.src.ports[n.header.name.valueText] = _module_ports(n)
+        known = {**self.other_ports, **self.src.ports}
+        for n in nodes:
+            if n.kind != K.HierarchyInstantiation:
+                continue
+            kind = n.type.valueText
+            self.src.instantiated.add(kind)
+            order, inouts = known.get(kind, ([], set()))
+            for inst in n.instances:
+                conns = [c for c in inst.connections if isinstance(c, SyntaxNode)]
+                for i, c in enumerate(conns):
+                    if c.kind == K.NamedPortConnection:
+                        port = c.name.valueText
+                    elif c.kind == K.OrderedPortConnection:
+                        port = order[i] if i < len(order) else None
+                    else:
+                        continue  # ponytail: `.*` is not followed; PRT-003 flags it anyway
+                    if port in inouts and getattr(c, "expr", None) is not None:
+                        self.resolved |= _identifiers(c.expr)
+
     def safe_wire(self, kw, data_type: SyntaxNode) -> None:
         start = self.offset(kw)
         self.src.safe_wires.add(start)
@@ -355,11 +421,13 @@ class _Walker:
             if k == K.AlwaysFFBlock:
                 self.record_ff(node)
             return
-        if k == K.HierarchyInstantiation:
-            names = ", ".join(i.decl.name.valueText for i in node.instances if i.decl)
+        if k in (K.HierarchyInstantiation, K.BindDirective):
+            # A bind's comment sits above `bind`, not above the module name after it.
+            inst = node.instantiation if k == K.BindDirective else node
+            names = ", ".join(i.decl.name.valueText for i in inst.instances if i.decl)
             styles = {
                 CONNECTION_STYLE[c.kind]
-                for i in node.instances
+                for i in inst.instances
                 for c in i.connections
                 if c.kind in CONNECTION_STYLE
             }
@@ -436,15 +504,42 @@ ASSIGNS = {K.AssignmentExpression, K.NonblockingAssignmentExpression}
 Z_RE = re.compile(r"'[sS]?[bBoOhH]?\s*[0-9a-fA-F_xX]*[zZ?]")
 
 
+def _identifiers(node: SyntaxNode) -> set[str]:
+    return {t.rawText for t in _tokens(node) if t.kind == TokenKind.Identifier}
+
+
 def _assigned(node: SyntaxNode) -> set[str]:
     """Names on the left of every assignment under `node`; indices count too (conservative)."""
-    return {
-        t.rawText
-        for n in _nodes(node)
-        if n.kind in ASSIGNS
-        for t in _tokens(n.left)
-        if t.kind == TokenKind.Identifier
-    }
+    return {name for n in _nodes(node) if n.kind in ASSIGNS for name in _identifiers(n.left)}
+
+
+def _module_ports(mod: SyntaxNode) -> tuple[list[str], set[str]]:
+    """(port names in order, the inout ones), ANSI or non-ANSI."""
+    order: list[str] = []
+    inouts: set[str] = set()
+    ports = mod.header.ports
+    if ports is None:
+        return order, inouts
+    direction = ""
+    for p in ports.ports:
+        if not isinstance(p, SyntaxNode):
+            continue  # the commas
+        if p.kind == K.ImplicitAnsiPort:
+            # `inout wire a, b`: b's empty direction continues a's.
+            d = getattr(p.header, "direction", None)  # an interface port has none
+            direction = (d and d.rawText) or direction
+            name = p.declarator.name.valueText
+        elif p.kind == K.ExplicitAnsiPort:
+            direction, name = p.direction.rawText or direction, p.name.valueText
+        else:  # non-ANSI: the name here, the direction in the body
+            name = next((t.rawText for t in _tokens(p) if t.kind == TokenKind.Identifier), "")
+        order.append(name)
+        if direction == "inout":
+            inouts.add(name)
+    for m in mod.members:
+        if m.kind == K.PortDeclaration and m.header.direction.rawText == "inout":
+            inouts |= {d.name.valueText for d in m.declarators if isinstance(d, SyntaxNode)}
+    return order, inouts
 
 
 def _resolved_and_initial(root: SyntaxNode) -> tuple[set[str], set[str]]:
