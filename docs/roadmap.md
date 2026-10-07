@@ -240,3 +240,21 @@ leftover `TODO: describe` with no fix (only the author can write it), and
 it. `grade.py` builds the equivalence
 testbench with `-Wno-fatal`, so a warning such as UNOPTFLAT no longer fails a
 correct design.
+
+Round 11 (2026-10-07): five harder blocks, `fp32-add` (RNE, subnormals,
+flags), `i2c-master` (clock stretching, repeated START), `systolic-mm` (PE
+grid), `pkt-drop-fifo` (store and forward in RAM, drops bad and too-long
+packets) and `irq-ctrl` (PLIC-style claim/complete). Each testbench was
+validated against 12 to 15 planted bugs and a second correct design. The
+question: does the skill plus one `svstyle fix` close everything, with no
+second LLM round? The designer wrote once with the skill and ran no tool.
+Before `fix` 1/5 passed the style checks, every miss FMT-001/002; after one
+`fix` 5/5. Correct 4/5: `pkt-drop-fifo` was right but its own `|=>`
+assertion fired on a reset pulse between two edges, since Verilator samples
+`disable iff` only at edges. `ASSERT` now also disables on a reset seen since
+the last edge (one-cycle properties; `##2` and longer remain exposed), and
+`check` skips what the `ASSERT*` macros expand to. Regraded: 5/5 on
+everything. The `irq-ctrl` testbench was too strict on a pending read the
+edge after a complete, which the spec leaves open; fixed. Open: line 8 of
+`assets/sync_ff.sv` is 115 columns, and FMT-001 misses long comment-only
+lines (Verible's line-length skips them).
