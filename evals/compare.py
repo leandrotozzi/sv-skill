@@ -93,7 +93,9 @@ def main(iteration: Path) -> None:
             f"<td>{scores[cfg]}</td><td>{money(costs[cfg])}</td><td>{minutes(costs[cfg])}</td>"
             for cfg in CONFIGS
         )
-        rows.append(f"<tr><td><a href='{name}.html'>{meta['eval_id']}. {html.escape(name)}</a></td>{cells}</tr>")
+        rows.append(
+            f"<tr><td><a href='{name}.html'>{meta['eval_id']}. {html.escape(name)}</a></td>{cells}</tr>"
+        )
         pages[name] = (
             f"<section><h2>{meta['eval_id']}. {html.escape(name)}</h2>"
             f"<p class='prompt'>{html.escape(meta['prompt'])}</p><div class='cols'>{''.join(cols)}</div></section>"
