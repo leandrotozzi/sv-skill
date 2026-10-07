@@ -258,3 +258,40 @@ everything. The `irq-ctrl` testbench was too strict on a pending read the
 edge after a complete, which the spec leaves open; fixed. Open: line 8 of
 `assets/sync_ff.sv` is 115 columns, and FMT-001 misses long comment-only
 lines (Verible's line-length skips them).
+
+## Review of 2026-10-07: ready for use on new RTL
+
+A code review and a stress test on five outside codebases (pulp
+common_cells, verilog-axis, the Kilts labs, two local projects) found bugs
+that also hit RTL the skill writes. Fixed, each with a test:
+
+- `fix` turned a resolved net (two `assign`s, or one driving `z`) from
+  `wire` into `logic`, which is illegal; such nets now stay `wire`. A
+  clocked `always` that an `initial` also writes no longer becomes
+  `always_ff`.
+- Verible joins consecutive directive lines, and `` `timescale `` then
+  swallows the next one (`` `timescale 1ns / 1ps `default_nettype none ``
+  does not compile; every verilog-axis file broke). `fix` gives a bare
+  `` `timescale `` a trailing comment, the one thing that keeps it on its
+  own line, and DOC/`default_nettype` looks for the directive in the
+  leading directive lines instead of as a whole line (this also ends the
+  exit 4 on empty or comment-only files).
+- A non-ASCII character anywhere shifted every rewrite: slang offsets are
+  bytes, Python's are characters. Mapped in `parse.py`.
+- `check --synth` passed silently on a path with a space, or on any Yosys
+  failure without a location; files are now quoted and a non-zero exit is an
+  `EXT-YOSYS-read` MUST.
+- A non-UTF-8 file crashed with exit 1 (read as "violations"); now exit 2.
+  External tools time out after 600 s (exit 2), and `fix` writes through a
+  temporary file and a rename.
+- `assets/sync_ff.sv` fits 100 columns; a test keeps every template there.
+
+On the 35 eval designs, `check --synth` and `fix --diff` give the same
+output before and after.
+
+Open, for existing code rather than new RTL: a baseline or changed-lines mode,
+a policy for `.v` files (directory mode skips them, but `fix` modernises one
+passed by name), keeping an existing licence header instead of stacking ours,
+packages first on the Verilator command line, NAM-003 advice on `_in` names
+(it suggests `_ni`), a `wire` tied to another file's `inout` port (no
+single-file view sees it), and FMT-001 on comment-only lines.
