@@ -12,11 +12,16 @@
 `ifndef SYNTHESIS
 
 // Concurrent assertion, clocked on clk and disabled while rst_n is low or
-// unknown. Written this way, not as `!rst_n`, so Verilator does not see the
-// reset used synchronously (SYNCASYNCNET, RST-005).
+// unknown. Verilator samples `disable iff` only at clock edges, so a reset
+// pulse between two edges would fail an `a |=> b` started before it: name_rst_q
+// remembers a reset since the last edge and disables that check too. Longer
+// properties (`##2` and up) are still not covered across such a pulse.
 `define ASSERT(name, prop, clk = clk_i, rst_n = rst_ni) \
     /* verilator lint_off SYNCASYNCNET */ \
-    name : assert property (@(posedge clk) disable iff ($isunknown(rst_n) || !rst_n) (prop)) \
+    logic name``_rst_q; \
+    always_ff @(posedge clk or negedge rst_n) name``_rst_q <= !rst_n; \
+    name : assert property (@(posedge clk) disable iff ( \
+        $isunknown(rst_n) || !rst_n || $sampled(name``_rst_q)) (prop)) \
     else $error("assertion %s failed", `"name`"); \
     /* verilator lint_on SYNCASYNCNET */
 

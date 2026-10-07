@@ -299,6 +299,10 @@ class _Walker:
         loc = tok.location
         return self.sm.getExpansionLoc(loc).offset if self.sm.isMacroLoc(loc) else loc.offset
 
+    def from_assert_macro(self, tok) -> bool:
+        loc = tok.location
+        return self.sm.isMacroLoc(loc) and self.sm.getMacroName(loc).startswith("ASSERT")
+
     def in_macro(self, node: SyntaxNode) -> bool:
         return any(self.sm.isMacroLoc(t.location) for t in _tokens(node))
 
@@ -321,6 +325,8 @@ class _Walker:
         first = node.getFirstToken()
         if first is not None and first.rawText and not self.is_main(first):
             return  # declared in an included file
+        if first is not None and self.from_assert_macro(first):
+            return  # the house assertion macros' own scaffolding, not the author's code
         if k in DECLS or k in PARAMS or k in PORTS:
             kind = "port" if k in PORTS else "param" if k in PARAMS else "decl"
             # `input logic a_i,\n b_i` - b_i has a zero-width type: it continues a_i's declaration.

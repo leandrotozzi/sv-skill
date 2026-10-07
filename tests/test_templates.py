@@ -42,6 +42,40 @@ def test_templates_lint_clean_with_assertions_enabled():
     assert res.returncode == 0, res.stderr
 
 
+PULSE_TB = """`include "assert_macros.svh"
+module t;
+    logic clk_i = 0, rst_ni = 0, v_q;
+    always #5 clk_i = ~clk_i;
+    always_ff @(posedge clk_i or negedge rst_ni)
+        if (!rst_ni) v_q <= 1'b0; else v_q <= ($time < DROP);
+    `ASSERT(Hold_A, v_q |=> v_q)
+    initial begin
+        #12 rst_ni = 1;
+        #30 rst_ni = 0;  // a pulse between the edges at 35 and 45
+        #2 rst_ni = 1;
+        #80 $display("DONE");
+        $finish;
+    end
+endmodule
+"""
+
+
+@needs_tools
+@pytest.mark.parametrize(("drop", "fires"), [(1000, False), (60, True)])
+def test_assert_survives_a_reset_pulse_between_edges(tmp_path, drop, fires):
+    """Verilator samples `disable iff` only at edges; the macro must still skip
+    the check a short reset cut short, yet catch a real drop after it."""
+    (tmp_path / "t.sv").write_text(PULSE_TB.replace("DROP", str(drop)))
+    build = subprocess.run(
+        ["verilator", "--binary", "--timing", "-Wno-fatal", "-Wno-lint", "-Wno-style",
+         f"-I{ASSETS}", "--top-module", "t", "t.sv"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )  # fmt: skip
+    assert build.returncode == 0, build.stderr
+    sim = subprocess.run(["obj_dir/Vt"], cwd=tmp_path, capture_output=True, text=True)
+    assert ("Hold_A failed" in sim.stdout + sim.stderr) == fires
+
+
 @pytest.mark.skipif(not shutil.which("yosys"), reason="yosys missing")
 def test_templates_synthesize_with_assertions_compiled_out():
     for top in ("skeleton", "fsm"):
