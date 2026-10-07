@@ -6,13 +6,14 @@ svstyle broke its own invariant and wrote nothing.
 """
 
 import argparse
-import contextlib
 import difflib
+import fnmatch
 import json
 import os
 import re
 import sys
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
@@ -195,7 +196,8 @@ def _report(
     for e in errors:
         print(f"error: {e}", file=sys.stderr)
     counts = ", ".join(f"{k} {v}" for k, v in summary.items() if v)
-    print(f"{len(diags)} findings" + (f" ({counts})" if counts else ""))
+    unchecked = f"; {len(errors)} error(s), see above" if errors else ""
+    print(f"{len(diags)} findings" + (f" ({counts})" if counts else "") + unchecked)
     return code
 
 
@@ -204,6 +206,7 @@ def _cmd_check(args, rules: list) -> int:
     includes = dict.fromkeys(args.include)
     defined: set[str] = set()  # modules and interfaces the files define
     used: set[str] = set()  # and the ones they instantiate
+    jobs = []
     for path in args.files:
         text = _read(path, errors)
         if text is None:
@@ -211,19 +214,25 @@ def _cmd_check(args, rules: list) -> int:
             continue
         try:
             cfg = configs[str(Path(path).resolve())] = load_config(path)
-            inc = [*args.include, *cfg.get("include", [])]
-            includes.update(dict.fromkeys(inc))
-            src = parse(text, path, inc)
-            diags += run_checks(text, path, rules, inc, cfg.get("company", PLACEHOLDER), src)
-            defined.update(src.ports)
-            used.update(src.instantiated)
-            texts[path] = text
         except ConfigError as exc:
             errors.append(str(exc))
             code = max(code, 2)
-        except ParseError as exc:
-            errors.append(str(exc))
+            continue
+        inc = [*args.include, *cfg.get("include", [])]
+        includes.update(dict.fromkeys(inc))
+        jobs.append((text, path, rules, inc, cfg.get("company", PLACEHOLDER)))
+    for (text, path, *_), res in zip(jobs, _pmap(_check_job, jobs), strict=True):
+        if isinstance(res, ParseError):
+            errors.append(str(res))
             code = max(code, 3)
+            continue
+        if isinstance(res, Exception):
+            raise res
+        found, ports, instantiated = res
+        diags += found
+        defined.update(ports)
+        used.update(instantiated)
+        texts[path] = text
     parsed = list(texts)
     if parsed and not args.no_external:
         _warn_verible_drift()
@@ -299,16 +308,66 @@ def _by_path(diags: list) -> dict[str, list]:
 def _design_ports(paths: list[str], include: list[str]) -> dict:
     """Every module's ports across the files given, so fix sees inouts in other files."""
     ports: dict = {}
-    for path in paths:
-        with contextlib.suppress(OSError, UnicodeDecodeError, ParseError):  # reported later
-            ports.update(parse(Path(path).read_text(encoding="utf-8"), path, include).ports)
+    for found in _pmap(_ports_job, [(p, include) for p in paths]):
+        if not isinstance(found, Exception):  # an unreadable file is reported later
+            ports.update(found)
     return ports
+
+
+# --- per-file work, spread over the cores --------------------------------------
+
+
+def _pmap(fn, jobs: list[tuple]) -> list:
+    """`fn(*job)` for each job, in order, on every core when there are several.
+
+    An exception comes back as that job's result, so each file is reported on
+    its own. Files are independent; only the slow part (pyslang, Verible) runs here.
+    """
+    if len(jobs) < 2:
+        return [_call(fn, job) for job in jobs]
+    with ProcessPoolExecutor() as pool:
+        return list(pool.map(_call, [fn] * len(jobs), jobs))
+
+
+def _call(fn, job: tuple):
+    try:
+        return fn(*job)
+    except Exception as exc:  # noqa: BLE001 - handed back to the parent to report
+        return exc
+
+
+def _ports_job(path: str, include: list[str]) -> dict:
+    return parse(Path(path).read_text(encoding="utf-8"), path, include).ports
+
+
+def _check_job(text: str, path: str, rules: list, inc: list[str], company: str):
+    src = parse(text, path, inc)
+    return run_checks(text, path, rules, inc, company, src), set(src.ports), src.instantiated
+
+
+def _fix_job(text: str, path: str, rules: list, inc: list[str], company: str, ports: dict):
+    out = fix_text(text, path, rules, inc, company, ports)
+    return out, run_checks(out, path, rules, inc, company)
+
+
+def _fix_failure(exc: Exception, path: str) -> tuple[str, int]:
+    """What to tell the user when fixing `path` raised `exc`, and the exit code."""
+    if isinstance(exc, external.ToolMissing):
+        return f"{exc}; fix needs it to stay idempotent", 2
+    if isinstance(exc, external.ToolFailed):
+        return f"{path}: {exc}", 2
+    if isinstance(exc, ParseError):
+        return str(exc), 3
+    if isinstance(exc, InvariantError):
+        return f"{exc} (please report; the file was not written)", 4
+    raise exc
 
 
 def _cmd_fix(args, rules: list) -> int:
     diags, errors, code, changed, configs = [], [], 0, 0, {}
     _warn_verible_drift()
     ports = _design_ports(args.files, args.include) if len(args.files) > 1 else {}
+    jobs = []
     for path in args.files:
         text = _read(path, errors)
         if text is None:
@@ -316,29 +375,19 @@ def _cmd_fix(args, rules: list) -> int:
             continue
         try:
             cfg = configs[str(Path(path).resolve())] = load_config(path)
-            inc = [*args.include, *cfg.get("include", [])]
-            company = cfg.get("company", PLACEHOLDER)
-            out = fix_text(text, path, rules, inc, company, ports)
         except ConfigError as exc:
             errors.append(str(exc))
             code = max(code, 2)
             continue
-        except external.ToolMissing as exc:
-            errors.append(f"{exc}; fix needs it to stay idempotent")
-            code = max(code, 2)
+        inc = [*args.include, *cfg.get("include", [])]
+        jobs.append((text, path, rules, inc, cfg.get("company", PLACEHOLDER), ports))
+    for (text, path, *_), res in zip(jobs, _pmap(_fix_job, jobs), strict=True):
+        if isinstance(res, Exception):
+            why, exit_code = _fix_failure(res, path)
+            errors.append(why)
+            code = max(code, exit_code)
             continue
-        except external.ToolFailed as exc:
-            errors.append(f"{path}: {exc}")
-            code = max(code, 2)
-            continue
-        except ParseError as exc:
-            errors.append(str(exc))
-            code = max(code, 3)
-            continue
-        except InvariantError as exc:
-            errors.append(f"{exc} (please report; the file was not written)")
-            code = max(code, 4)
-            continue
+        out, left = res
         if out != text:
             changed += 1
             if args.diff:
@@ -355,7 +404,7 @@ def _cmd_fix(args, rules: list) -> int:
                 tmp = Path(f"{path}.svstyle-tmp")
                 tmp.write_text(out, encoding="utf-8")
                 tmp.replace(path)
-        diags += run_checks(out, path, rules, inc, company)  # left for the author
+        diags += left  # what the author still has to do
     if args.diff and changed:
         code = max(code, 1)  # a pending change fails CI, like `ruff format --diff`
     if not args.json:
@@ -389,11 +438,29 @@ def _add_inputs(p: argparse.ArgumentParser) -> None:
 def _expand_inputs(args) -> None:
     """Directories become their *.sv files; filelists add files and +incdir+ dirs."""
     files: list[str] = []
+    found: list[str] = []  # discovered, not named: `exclude` applies to these
     for f in args.files:
-        files += sorted(map(str, f.rglob("*.sv"))) if f.is_dir() else [str(f)]
+        if f.is_dir():
+            found += sorted(map(str, f.rglob("*.sv")))
+        else:
+            files.append(str(f))
     for f, local in args.filelists:
-        _read_filelist(Path(f), local, files, args.include)
+        _read_filelist(Path(f), local, found, args.include)
+    files += [f for f in found if not _excluded(f)]
     args.files = list(dict.fromkeys(files))
+
+
+def _excluded(path: str) -> bool:
+    """`exclude` globs from the nearest `.svstyle.toml`, against the path relative to it.
+
+    fnmatch-style, so `*` also crosses directories: `vendor/*` is the whole tree.
+    """
+    cfg = load_config(path)
+    root = cfg.get("root")
+    if not cfg.get("exclude") or root is None:
+        return False
+    rel = Path(os.path.relpath(Path(path).resolve(), root)).as_posix()
+    return any(fnmatch.fnmatchcase(rel, pat) for pat in cfg["exclude"])
 
 
 def _read_filelist(path: Path, local: bool, files: list[str], includes: list[str]) -> None:
@@ -452,6 +519,10 @@ def main(argv: list[str] | None = None) -> int:
             _expand_inputs(args)
         except OSError as exc:
             parser.error(f"{exc.filename}: {exc.strerror}")
+        except ConfigError as exc:
+            parser.error(str(exc))
+        if missing := [d for d in args.include if not Path(d).is_dir()]:
+            parser.error(f"-I {missing[0]}: no such directory")
         if not args.files:
             parser.error(
                 "no input files: pass FILES, a directory (its *.sv; name .v files), "

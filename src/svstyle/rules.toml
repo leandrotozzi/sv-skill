@@ -460,9 +460,10 @@ defparam u_fifo.Depth = 16;
 sources = ["lowRISC §Module Instantiation", "Verilator DEFPARAM"]
 [rule.enforcement]
 tool = "verible-lint"
-rule = ["forbid-defparam", "module-port"]
+rule = ["forbid-defparam"]
 [rule.also]
 verilator = ["DEFPARAM"]
+svstyle = ["named_params"]  # any positional override; Verible's module-parameter needs two
 
 [[rule]]
 id        = "PRT-006"
@@ -1052,7 +1053,7 @@ module fifo ();
 sources = ["lowRISC §Parameterized Modules", "Verible"]
 [rule.enforcement]
 tool = "verible-lint"
-rule = ["explicit-parameter-storage-type", "proper-parameter-declaration", "module-parameter"]
+rule = ["explicit-parameter-storage-type", "proper-parameter-declaration"]
 
 [[rule]]
 id        = "LNG-012"

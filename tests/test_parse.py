@@ -139,3 +139,11 @@ def test_declarations_from_an_included_file_are_not_anchored(tmp_path):
     f.write_text('module m;\n    `include "decls.svh"\n    logic own;  // Own\nendmodule\n')
     src = parse(f.read_text(), str(f))
     assert [(a.name, a.line, a.comment) for a in src.anchors] == [("own", 3, "// Own")]
+
+
+def test_an_include_inside_a_block_counts_as_a_directive(tmp_path):
+    (tmp_path / "body.svh").write_text("y = a;\n")
+    text = "module m (input logic a, output logic y);\n  always @(*) begin\n"
+    text += '    `include "body.svh"\n  end\nendmodule\n'
+    src = parse(text, str(tmp_path / "m.sv"))
+    assert not any(ins == "always_comb" for _, ins, _ in src.rewrites)

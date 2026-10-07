@@ -224,8 +224,8 @@ def test_the_shipped_verible_config_parses_to_61_rules():
         if not line or line.startswith("#"):
             continue
         (disabled if line.startswith("-") else enabled).add(line.lstrip("+-").split("=", 1)[0])
-    assert len(enabled) == 52
-    assert len(disabled) == 9
+    assert len(enabled) == 50
+    assert len(disabled) == 11
     assert not (enabled & disabled)
 
 

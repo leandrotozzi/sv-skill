@@ -523,7 +523,7 @@ fifo_sync u_fifo ( ... );
 defparam u_fifo.Depth = 16;
 ```
 
-**Enforced by:** verible lint `forbid-defparam` `module-port`; also verilator `DEFPARAM`
+**Enforced by:** verible lint `forbid-defparam`; also verilator `DEFPARAM`; also svstyle `named_params`
 
 **Sources:** lowRISC §Module Instantiation, Verilator DEFPARAM
 
@@ -1234,7 +1234,7 @@ module fifo ();
     parameter Depth = 8;
 ```
 
-**Enforced by:** verible lint `explicit-parameter-storage-type` `proper-parameter-declaration` `module-parameter`
+**Enforced by:** verible lint `explicit-parameter-storage-type` `proper-parameter-declaration`
 
 **Sources:** lowRISC §Parameterized Modules, Verible
 

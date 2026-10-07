@@ -9,6 +9,7 @@ Everything is line-based because `fix` runs Verible first, which puts each
 declaration, block and instance on its own line.
 """
 
+import bisect
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -83,6 +84,7 @@ class Source:
     # reach an inout, and `check` whether the design is complete.
     ports: dict[str, tuple[list[str], set[str]]] = field(default_factory=dict)
     instantiated: set[str] = field(default_factory=set)
+    ordered_params: list[tuple[str, int]] = field(default_factory=list)  # (instances, line)
     # `initial` blocks written in this file, outside macros and `ifdef regions.
     initial_lines: list[int] = field(default_factory=list)
     # Token-rewriting fixes for code the formatter cannot touch: (offset, text, cut).
@@ -202,11 +204,23 @@ class _Walker:
         # Tokens pulled in by `include belong to another file, with that file's
         # line numbers; only this file's tokens (and macro expansions in it) count.
         self.main = self.root.getLastToken().location.buffer  # EOF of this file
+        every = _tokens(self.root)
         self.toks = [
-            t
-            for t in _tokens(self.root)
-            if (t.rawText or t.kind == TokenKind.EndOfFile) and self.is_main(t)
+            t for t in every if (t.rawText or t.kind == TokenKind.EndOfFile) and self.is_main(t)
         ]
+        # Where macro expansions and directives sit, so "does this node contain one"
+        # is a bisect over its span instead of a walk over its subtree.
+        self.macro_at = sorted(self.offset(t) for t in every if self.sm.isMacroLoc(t.location))
+        # An `include is a directive too: its tokens live in another buffer, so
+        # they count at the line of the `include itself.
+        self.directive_at = sorted(
+            {self.included_at(t) for t in every if not self.is_main(t)} - {None}
+            | {
+                self.offset(t)
+                for t in self.toks
+                if any(tr.kind == TriviaKind.Directive for tr in t.trivia)
+            }
+        )
         # Last token index on each line, for the trailing-comment lookup.
         self.last_on_line = {self.line(t): i for i, t in enumerate(self.toks)}
         self.anchors: list[Anchor] = []
@@ -283,7 +297,22 @@ class _Walker:
                 self.modernise(child)
 
     def has_directive(self, node: SyntaxNode) -> bool:
-        return any(tr.kind == TriviaKind.Directive for t in _tokens(node)[1:] for tr in t.trivia)
+        """A directive inside `node` (one right before its first token is outside it)."""
+        lo, hi = self.span(node)
+        i = bisect.bisect_right(self.directive_at, lo)
+        return i < len(self.directive_at) and self.directive_at[i] <= hi
+
+    def included_at(self, tok) -> int | None:
+        """Offset in this file of the `include that brought `tok` in, if any."""
+        loc = self.sm.getFullyExpandedLoc(tok.location)
+        while loc.buffer != self.main:
+            if not self.sm.isIncludedFileLoc(loc):
+                return None
+            loc = self.sm.getIncludedFrom(loc.buffer)
+        return self.char(loc.offset)
+
+    def span(self, node: SyntaxNode) -> tuple[int, int]:
+        return self.offset(node.getFirstToken()), self.offset(node.getLastToken())
 
     def legacy_always(self, node: SyntaxNode) -> None:
         stmt = node.statement
@@ -387,7 +416,9 @@ class _Walker:
         return self.sm.isMacroLoc(loc) and self.sm.getMacroName(loc).startswith("ASSERT")
 
     def in_macro(self, node: SyntaxNode) -> bool:
-        return any(self.sm.isMacroLoc(t.location) for t in _tokens(node))
+        lo, hi = self.span(node)
+        i = bisect.bisect_left(self.macro_at, lo)
+        return i < len(self.macro_at) and self.macro_at[i] <= hi
 
     def walk(self, node: SyntaxNode, split_list: bool) -> None:
         k = node.kind
@@ -402,9 +433,7 @@ class _Walker:
         if k in (K.AnsiPortList, K.ParameterPortList):
             # A directive inside the list means lines appear and vanish per
             # configuration; inserting comments there is not safe.
-            split_list = any(
-                tr.kind == TriviaKind.Directive for t in _tokens(node)[1:] for tr in t.trivia
-            )
+            split_list = self.has_directive(node)
         first = node.getFirstToken()
         if first is not None and first.rawText and not self.is_main(first):
             return  # declared in an included file
@@ -432,6 +461,9 @@ class _Walker:
                 if c.kind in CONNECTION_STYLE
             }
             style = styles.pop() if len(styles) == 1 else "mixed" if styles else "named"
+            params = inst.parameters.parameters if inst.parameters else []
+            if any(getattr(p, "kind", None) == K.OrderedParamAssignment for p in params):
+                self.src.ordered_params.append((names, self.line(node.getFirstToken())))
             self.above(node, "instance", names, style)
             return
         for child in node:

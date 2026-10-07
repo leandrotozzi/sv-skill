@@ -23,7 +23,7 @@ FORMAT_FLAGS = DATA / "verible-format.flags"
 LINT_CONFIG = DATA / "rules.verible_lint"
 
 VERIBLE_LINT_RE = re.compile(
-    r"^(?P<path>.+?):(?P<line>\d+):(?P<col>\d+)(?:-\d+)?: (?P<msg>.*?)"
+    r"^(?P<path>.+?):(?P<line>\d+):(?P<col>\d+)(?:-(?P<end>\d+))?: (?P<msg>.*?)"
     r"(?: \[Style: [^\]]*\])? \[(?P<rule>[a-z0-9-]+)\]$"
 )
 # pyslang accepted the file before Verible saw it, so this is Verible's parser
@@ -54,6 +54,9 @@ SOFT_ERRORS = {"MODMISSING"}
 
 
 TIMEOUT = 600  # seconds; a hung tool must not hang CI
+
+
+STDIN_LOC_RE = re.compile(r"^-?:?\s*<stdin>:(?P<line>\d+):\d+(?:-\d+)?:\s*")
 
 
 class ToolMissing(Exception):
@@ -88,6 +91,9 @@ def verible_format(text: str) -> str:
     if res.returncode != 0 or res.stderr.strip():
         # On non-convergence Verible dumps the whole file twice; the first line says why.
         first = res.stderr.strip().splitlines()[0][:200] if res.stderr.strip() else ""
+        if m := STDIN_LOC_RE.match(first):
+            # slang parsed the file first, so this is Verible's parser falling short.
+            first = f"Verible cannot parse line {m['line']} (slang can): {first[m.end() :]}"
         raise ToolFailed(first or f"verible-verilog-format exit {res.returncode}")
     return res.stdout
 
@@ -109,7 +115,8 @@ def verible_verify(paths: list[str], rules: list[Rule]) -> list[Diag]:
 
 def verible_lint(paths: list[str], rules: list[Rule]) -> list[Diag]:
     res = _run("verible-verilog-lint", [f"--rules_config={LINT_CONFIG}", *paths])
-    diags = parse_verible_lint(res.stdout + res.stderr, rules)  # findings go to stderr
+    lines = {p: Path(p).read_text(encoding="utf-8").splitlines() for p in paths}
+    diags = parse_verible_lint(res.stdout + res.stderr, rules, lines)  # findings go to stderr
     return [
         d
         for d in diags
@@ -163,19 +170,24 @@ def verilator_lint(
     ]
 
 
-def parse_verible_lint(output: str, rules: list[Rule]) -> list[Diag]:
+def parse_verible_lint(
+    output: str, rules: list[Rule], lines: dict[str, list[str]] | None = None
+) -> list[Diag]:
+    """`lines`: the sources, to name what a finding points at (Verible's own
+    messages say "Signal name does not match", not which one)."""
     index = tool_index(rules, "verible-lint")
     out = []
     for line in output.splitlines():
         if m := VERIBLE_LINT_RE.match(line):
+            span = _span(m, lines or {})
             name = m.group("rule")
             if rule := index.get(name):
                 # `fix` leaves a .v file Verilog, so no always_comb there.
                 sv = m.group("path").endswith((".sv", ".svh"))
                 fixable = name in FIXED_BY_FIX and (sv or name != "always-comb")
-                out.append(_diag(m, rule.id, rule.severity, fixable))
+                out.append(_diag(m, rule.id, rule.severity, fixable, span))
             else:
-                out.append(_diag(m, "EXT-VL-" + name, "SHOULD"))
+                out.append(_diag(m, "EXT-VL-" + name, "SHOULD", span=span))
         elif m := VERIBLE_SYNTAX_RE.match(line):
             msg = f"Verible cannot parse this; its lint rules were not checked: {m.group('msg')}"
             out.append(Diag(m.group("path"), int(m.group("line")), int(m.group("col")),
@@ -198,10 +210,20 @@ def parse_verilator(output: str, rules: list[Rule]) -> list[Diag]:
     return out
 
 
-def _diag(m: re.Match, rule: str, severity: str, fixable: bool = False) -> Diag:
+def _span(m: re.Match, lines: dict[str, list[str]]) -> str:
+    """The identifier a Verible finding points at, if the span is one."""
+    src, no = lines.get(m.group("path"), []), int(m.group("line"))
+    if not m.group("end") or not 0 < no <= len(src):
+        return ""
+    text = src[no - 1][int(m.group("col")) - 1 : int(m.group("end"))]
+    return text if re.fullmatch(r"\w+", text) and text not in m.group("msg") else ""
+
+
+def _diag(m: re.Match, rule: str, severity: str, fixable: bool = False, span: str = "") -> Diag:
+    msg = f"`{span}`: {m.group('msg')}" if span else m.group("msg")
     return Diag(
-        m.group("path"), int(m.group("line")), int(m.group("col")), rule, severity,
-        m.group("msg"), fixable=fixable,
+        m.group("path"), int(m.group("line")), int(m.group("col")), rule, severity, msg,
+        fixable=fixable,
     )  # fmt: skip
 
 

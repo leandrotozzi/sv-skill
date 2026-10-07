@@ -332,3 +332,29 @@ def test_baseline_hides_known_findings_and_reports_new_ones(capsys, sv, tmp_path
     p.write_text("\n" + p.read_text().replace("endmodule", "    reg spare_q;  // S.\nendmodule"))
     code, out, err = _run(capsys, *check)
     assert code == 1 and out.count("LNG-001") == 1 and "1 finding(s) hidden" in err
+
+
+def test_exclude_skips_discovered_files_but_not_named_ones(capsys, tmp_path):
+    (tmp_path / ".svstyle.toml").write_text('exclude = ["vendor/*"]\n')
+    (tmp_path / "vendor" / "ip").mkdir(parents=True)
+    vendored = tmp_path / "vendor" / "ip" / "x.sv"
+    vendored.write_text(CLEAN.replace("    logic", "    reg", 1))
+    (tmp_path / "reg_byte.sv").write_text(CLEAN)
+    assert _run(capsys, "check", "--no-external", tmp_path)[0] == 0  # the vendored file skipped
+    assert _run(capsys, "check", "--no-external", vendored)[0] == 1  # named: checked
+
+
+def test_missing_include_dir_is_an_error(capsys, sv):
+    with pytest.raises(SystemExit) as exc:
+        main(["check", "--no-external", "-I", "/no/such/dir", str(sv())])
+    assert exc.value.code == 2 and "no such directory" in capsys.readouterr().err
+
+
+@needs_verible
+def test_fix_reports_each_file_on_its_own_when_run_in_parallel(capsys, tmp_path):
+    good = tmp_path / "reg_byte.sv"
+    good.write_text(CLEAN.replace("    logic", "    reg", 1))
+    (tmp_path / "bad.sv").write_text("module bad (;\nendmodule\n")
+    code, _, err = _run(capsys, "fix", tmp_path / "bad.sv", good)
+    assert code == 3 and "bad.sv" in err
+    assert "reg " not in good.read_text()  # the other file was still fixed

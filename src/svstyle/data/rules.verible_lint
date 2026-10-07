@@ -41,8 +41,9 @@ mismatched-labels
 endif-comment
 
 # --- instantiation / parameters ---
-module-port
-module-parameter
+# svstyle's PRT-003 / PRT-005 cover every instance, not only those with two or more
+-module-port
+-module-parameter
 forbid-defparam
 explicit-parameter-storage-type
 proper-parameter-declaration=package_allow_parameter:false;package_allow_localparam:true

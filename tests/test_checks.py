@@ -219,7 +219,8 @@ def test_placeholder_without_config_points_at_the_config_file():
 def test_config_is_found_walking_up(tmp_path):
     (tmp_path / ".svstyle.toml").write_text('company = "Foo Inc"\n')
     (tmp_path / "rtl" / "sub").mkdir(parents=True)
-    assert load_config(tmp_path / "rtl" / "sub" / "m.sv") == {"company": "Foo Inc"}
+    cfg = load_config(tmp_path / "rtl" / "sub" / "m.sv")
+    assert cfg == {"company": "Foo Inc", "root": str(tmp_path.resolve())}
 
 
 def test_no_config_is_empty(tmp_path):
@@ -444,3 +445,16 @@ def test_default_nettype_is_not_autofixed_in_a_bind_file():
     text = "module p #(parameter int W = 1) ();\nendmodule\nbind t p #(.W(W)) u_p ();\n"
     (d,) = [d for d in run_checks(text, "p.sv", RULES) if d.rule == "LNG-014" and d.line == 1]
     assert not d.fixable and "binds" in d.message
+
+
+@pytest.mark.parametrize(
+    "inst, want",
+    [
+        ("sub #(2) u_sub (.a_i(a_i));", ["PRT-005"]),  # one parameter: Verible would not flag it
+        ("sub #(.W(2)) u_sub (.a_i(a_i));", []),
+        ("sub #(.W(2)) u_sub (a_i);", ["PRT-003"]),  # ports by position: PRT-003 only
+    ],
+)
+def test_positional_parameters_and_ports_are_one_finding_each(inst, want):
+    text = f"module m (\n    input logic a_i  // A.\n);\n    // Sub.\n    {inst}\nendmodule\n"
+    assert [d.rule for d in run_checks(text, "m.sv", RULES) if d.rule.startswith("PRT")] == want

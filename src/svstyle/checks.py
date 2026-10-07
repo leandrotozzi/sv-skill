@@ -23,7 +23,10 @@ from .rules import Diag, Rule, tool_index
 # and DOC-001 warns until it is replaced.
 PLACEHOLDER = "<Company>"
 CONFIG_NAME = ".svstyle.toml"
-CONFIG_KEYS = {"company": str, "select": list, "ignore": list, "include": list, "synth": str}
+CONFIG_KEYS = {
+    "company": str, "select": list, "ignore": list, "include": list, "exclude": list,
+    "synth": str,
+}  # fmt: skip
 
 
 class ConfigError(Exception):
@@ -51,6 +54,7 @@ def load_config(path: str | Path) -> dict:
             # Include dirs are written relative to the config, like ruff's paths.
             if "include" in data:
                 data["include"] = [str(d / inc) for inc in data["include"]]
+            data["root"] = str(d)  # what `exclude` globs are relative to
             return data
     return {}
 
@@ -294,6 +298,9 @@ def check_ports(ctx: _Ctx, src: Source) -> None:
                     f"active-low, `{stem}_{d}` if the `n` is not"
                 )
                 ctx.emit(rule="suffix_order", line=line, message=msg)
+    for names, line in src.ordered_params:
+        msg = f"instance `{names}` overrides parameters by position; name them: `.Width(8)`"
+        ctx.emit(rule="named_params", line=line, message=msg)
     for a in src.anchors:
         if a.kind == "port" and (", " in a.name or a.detail == "continued"):
             msg = f"one port per declaration, each with its own direction and type: {a.name}"

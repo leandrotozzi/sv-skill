@@ -20,7 +20,7 @@ needs_verilator = pytest.mark.skipif(not shutil.which("verilator"), reason="veri
 
 VERIBLE_LINT_OUT = """\
 ks.sv:25:37-39: input port names must end with _i, _ni or _pi [Style: suffixes-for-signals-and-types] [port-name-suffix]
-ks.sv:62:19-23: Use named ports for module instantiation with more than one port [Style: module-instantiation] [module-port]
+ks.sv:62:19-23: Do not use defparam. [Style: module-instantiation] [forbid-defparam]
 ks.sv:3:1: something new [Style: x] [brand-new-rule]
 """  # noqa: E501
 
@@ -106,7 +106,7 @@ def test_verible_verify_flags_unformatted_file():
 @needs_verible
 def test_verible_lint_runs_with_shipped_config():
     rules = {d.rule for d in ext.verible_lint([str(KS)], RULES)}
-    assert {"NAM-002", "PRT-005"} <= rules
+    assert "NAM-002" in rules
 
 
 @needs_verilator
@@ -418,3 +418,17 @@ def test_verilator_reads_packages_first(tmp_path):
     )
     paths = sorted(str(p) for p in tmp_path.iterdir())
     assert "EXT-VLTR-ERROR" not in {d.rule for d in ext.verilator_lint(paths, RULES)}
+
+
+def test_verible_finding_names_the_identifier_it_points_at():
+    out = "ks.sv:2:12-17: Signal name does not match the naming convention [x] [signal-name-style]"
+    lines = {"ks.sv": ["module ks;", "    logic  wKeyRg;"]}
+    (d,) = ext.parse_verible_lint(out, RULES, lines)
+    assert d.message.startswith("`wKeyRg`: Signal name")
+
+
+def test_format_parse_failure_names_the_line_not_stdin(monkeypatch):
+    err = '-: <stdin>:87:7-10: syntax error at token "else"\n'
+    monkeypatch.setattr(ext, "_run", lambda *a, **k: subprocess.CompletedProcess([], 1, "", err))
+    with pytest.raises(ext.ToolFailed, match=r"^Verible cannot parse line 87 \(slang can\): syn"):
+        ext.verible_format("module m; endmodule\n")
