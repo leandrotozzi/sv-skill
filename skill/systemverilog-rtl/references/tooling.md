@@ -26,6 +26,7 @@ company = "ACME Corp"      # the copyright holder in every file header
 select  = ["DOC", "LNG"]   # optional: only these rule IDs/prefixes
 ignore  = ["DOC-005"]      # optional: drop these
 include = ["rtl/inc"]      # optional: `include dirs, relative to this file
+exclude = ["vendor/*"]     # optional: skip these when walking a directory or filelist
 synth   = "yosys"          # optional: the synthesis tool; "yosys" runs Yosys on every check
 ```
 
@@ -48,8 +49,13 @@ svstyle rules [--id ID] [--unmapped]
 
 - `--select` / `--ignore` take comma-separated IDs or prefixes, ruff-style:
   `--select DOC,PRT-003 --ignore DOC-005`.
-- `-I DIR` adds an `` `include`` search directory (repeatable); a file's own
-  directory is always searched. Verilator gets the same directories.
+- `-I DIR` adds an `` `include`` search directory (repeatable; a missing one is
+  an error); a file's own directory is always searched. Verilator gets the
+  same directories.
+- `exclude` globs match the path relative to the `.svstyle.toml`, fnmatch-style
+  (`*` crosses directories, so `vendor/*` is the whole tree). They drop files
+  found by walking a directory or reading a filelist; a file named on the
+  command line is always checked, as in ruff.
 - `--no-external` runs only svstyle's own checks (fast; no Verible/Verilator).
 - `--synth` also runs Yosys (`read_verilog -sv; hierarchy; proc; check`):
   combinational loops (SYN-005), conflicting drivers. Yosys reads less
@@ -137,7 +143,7 @@ the author after the fix.
 
 | Owner | Rules | Notes |
 |---|---|---|
-| `svstyle` | DOC-001..006, PRT-001..003, NAM-003, STR-005, LNG-001, LNG-014, SYN-001, RST-001 | header, comments, ANSI ports, port order, named connections, suffix order, import scope, `logic`, `default_nettype`, no synthesis directives, async active-low reset |
+| `svstyle` | DOC-001..006, PRT-001..003, PRT-005 (positional parameters), NAM-003, STR-005, LNG-001, LNG-014, SYN-001, RST-001, FMT-001 (comment-only lines) | header, comments, ANSI ports, port order, named connections and parameters, suffix order, import scope, `logic`, `default_nettype`, no synthesis directives, async active-low reset |
 | Verible format | FMT-002 | reported as "file needs formatting"; `svstyle fix` resolves it |
 | Verible lint | naming, `always_comb`/`always_ff` usage, `begin`/`end`, file names, literals, ... | tool rule name maps to the house ID |
 | Verilator `-Wall` | LNG-004..006, LNG-009, LNG-015..017, PRT-004, RST-005 | latches, multi-driven, mixed assignments, `casex`, widths, undriven/unused signals, missing pins; also backs up STR-001, PRT-005, LNG-003, LNG-007, LNG-013, LNG-014, SYN-002 |

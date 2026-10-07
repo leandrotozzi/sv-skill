@@ -327,6 +327,29 @@ After that, on all five: no exit 4, no file Verilator reads worse than
 before, every file idempotent. What `fix` still refuses: files that need `-I`
 to parse (exit 3) and five that Verible itself cannot format (exit 2).
 
-Still open: `fix` speed (about 1.5 s per file, Verible runs twice per pass),
-duplicate PRT-003/PRT-005 reports on one instance, exclude globs for vendored
-code.
+Then the rest of the list:
+
+- **Speed.** Verible was never the cost (0.3 s of 8 s on a 900-line file):
+  `parse` checked "is this node in a macro / does it hold a directive" by
+  walking each node's subtree, quadratic in nesting. Now a bisect over
+  positions collected once (an `` `include`` counts at its own line); on 522
+  corpus files the old and new answers agree on all 185k nodes. And files run
+  on every core. `fix` on verilog-axis 61 s -> 12 s, common_cells 35 s -> 6 s;
+  `check --no-external` 8 s -> 2 s and 5 s -> 1 s.
+- **PRT-003 / PRT-005 duplicates.** Verible's `module-port` (named ports) was
+  mapped to PRT-005 (named parameters) and `module-parameter` to LNG-011
+  (parameter declarations). Both are off now: svstyle reports ports by
+  position under PRT-003 and, new, any parameter by position under PRT-005,
+  one finding each (Verible only flagged two or more).
+- **`exclude` globs** in `.svstyle.toml`, for files found in a directory or
+  filelist; a file named on the command line is always checked.
+- **Verible findings name their identifier** (`` `wKeyReg`: Signal name does
+  not match ...``), so one line with three bad names is three readable
+  findings, not three identical ones.
+- **Small ones:** a missing `-I` directory is an error; a Verible parse
+  failure in `fix` says "Verible cannot parse line N (slang can)" instead of
+  `<stdin>:N`; the summary after an error says so instead of a bare
+  "0 findings".
+
+Still open: the difflib alignment in the token invariant is now the largest
+cost in `fix` (about a third); `fix` runs `parse` several times per pass.
