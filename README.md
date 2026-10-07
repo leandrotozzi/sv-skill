@@ -15,8 +15,10 @@ Style lineage: lowRISC (`_i/_o`, `clk_i`, `rst_ni`, `_q/_d`, CamelCase params,
 
 ## Status
 
-All phases and the [roadmap](docs/roadmap.md) done: with the skill 9/9 evals pass every
-check (100%, vs. 52% without). Design spec:
+Ready for new RTL written with the skill: on 35 classic and hard blocks the
+skill's RTL is functionally correct and one `svstyle fix` closes the style
+(round 11: 5/5). Running `svstyle` over existing third-party code works but
+is noisy and has known gaps; see the [roadmap](docs/roadmap.md). Design spec:
 [`docs/superpowers/specs/2026-09-22-sv-skill-design.md`](docs/superpowers/specs/2026-09-22-sv-skill-design.md).
 
 ## Development
