@@ -353,3 +353,24 @@ Then the rest of the list:
 
 Still open: the difflib alignment in the token invariant is now the largest
 cost in `fix` (about a third); `fix` runs `parse` several times per pass.
+
+## Round 12 (2026-10-08): the round-11 blocks with the current skill
+
+The same five blocks and protocol as round 11 (the designer writes once with
+the skill and runs no tool; then one `svstyle fix`), after this review's
+changes to `check`, `fix` and `SKILL.md`. Before `fix`, 1/5 passed the style
+checks, and three of the four misses were FMT-002 alone. After one `fix`, 4/5
+passed everything, functional testbench included. The miss, `fp32-add`, named
+a signal `small`, a SystemVerilog keyword (charge strength), so the file did
+not parse and neither `fix` nor the testbench could run. With the name changed
+by hand (not counted) it scored 10/10. Fixed twice: a parse error now names a
+keyword used as an identifier, and `SKILL.md` lists the reserved words that
+catch people out. The `fp32-add` rerun scored 10/10 after one `fix`, so 5/5.
+One caveat on the rerun: its designer read the grader's testbench header to
+settle the latency question, which the first run had already answered right.
+
+CI now runs, on GitHub (private repo), with Verilator and Yosys from a pinned
+OSS CAD Suite build (Verilator 5.053-devel, Yosys 0.69). Apt's 5.020 and 0.33
+failed four tests: Yosys 0.33 cannot read `assets/sync_ff.sv` and locates
+loops on line 1, and Verilator 5.020 handles a reset pulse between edges
+differently.
