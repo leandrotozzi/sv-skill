@@ -9,15 +9,30 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       VERIBLE: v0.0-3946-g851d3ff4  # keep in sync with external.KNOWN_GOOD_VERIBLE_VERSION
+      # Verilator and Yosys from a dated OSS CAD Suite build: apt's (5.020 / 0.33) are
+      # years behind what svstyle is developed against (5.052 / 0.66).
+      OSS_CAD: 2026-10-07
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+      - name: Cache OSS CAD Suite
+        id: oss-cad
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/oss-cad-suite
+          key: oss-cad-suite-${{ env.OSS_CAD }}
+      - name: Download OSS CAD Suite
+        if: steps.oss-cad.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL "https://github.com/YosysHQ/oss-cad-suite-build/releases/download/$OSS_CAD/oss-cad-suite-linux-x64-${OSS_CAD//-/}.tgz" \
+            | tar xz -C "$RUNNER_TEMP"
       - name: Install Verible (pinned), Verilator and Yosys
         run: |
           curl -sSL "https://github.com/chipsalliance/verible/releases/download/$VERIBLE/verible-$VERIBLE-linux-static-x86_64.tar.gz" \
             | tar xz -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/verible-$VERIBLE/bin" >> "$GITHUB_PATH"
-          sudo apt-get update -q && sudo apt-get install -yq verilator yosys
+          echo "$RUNNER_TEMP/oss-cad-suite/bin" >> "$GITHUB_PATH"
+      - run: verilator --version && yosys -V && verible-verilog-format --version | head -1
       - run: uv sync --extra dev
       - run: uv run ruff check src tests evals
       - run: uv run ruff format --check src tests evals
