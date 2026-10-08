@@ -66,6 +66,10 @@ is missing -- it is not a comment. So write every comment yourself, as you go:
   narrow vector: give the index its own sized variable. Port bits the spec
   says to ignore (`addr_i[1:0]`) get their waiver when you write the port:
   `// svstyle: waive LNG-017 <why>` on its own line above the port.
+- **No keyword as a name.** SystemVerilog reserves more words than Verilog:
+  `small`, `medium`, `large`, `strong`, `weak`, `do`, `final`, `ref`, `bit`,
+  `byte`, `int`, `type`, `alias`... A signal called `small` does not parse at all
+  (exit 3). Prefer descriptive names anyway: `small_mant`, not `small`.
 - **Widths match on every assignment** (LNG-015), constants included: a
   narrow slice stored in an `int` or a `localparam int` needs a cast,
   `localparam int P = 32'(T[i*3 +: 3]);`, or a variable of the slice's width.

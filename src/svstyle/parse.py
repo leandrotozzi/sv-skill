@@ -117,6 +117,16 @@ def char_offsets(text: str):
     return table.__getitem__
 
 
+def _keywords_at(text: str, offsets: list[int]) -> list[str]:
+    """Keywords that parse errors point at: `small` or `do` used as a name."""
+    char = char_offsets(text)
+    at = {char(o) for o in offsets}
+    words = {
+        raw for kind, raw, off in raw_tokens(text) if off in at and kind.name.endswith("Keyword")
+    }
+    return sorted(words)
+
+
 def raw_tokens(text: str) -> list[tuple[TokenKind, str, int]]:
     """(kind, text, offset) of every token of `text`, from the raw lexer.
 
@@ -158,6 +168,8 @@ def parse(
         )
         if any(d.code == Diags.CouldNotOpenIncludeFile for d in errors):
             msg += "\n(an `include was not found: pass its directory with -I DIR)"
+        if words := _keywords_at(text, [d.location.offset for d in errors]):
+            msg += f"\n({', '.join(f'`{w}`' for w in words)}: reserved in SystemVerilog; rename it)"
         raise ParseError(msg)
     return _Walker(tree, text, ports or {}).run()
 

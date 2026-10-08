@@ -147,3 +147,9 @@ def test_an_include_inside_a_block_counts_as_a_directive(tmp_path):
     text += '    `include "body.svh"\n  end\nendmodule\n'
     src = parse(text, str(tmp_path / "m.sv"))
     assert not any(ins == "always_comb" for _, ins, _ in src.rewrites)
+
+
+def test_a_keyword_used_as_a_name_is_named_in_the_error():
+    text = "module m;\n    logic small;\n    assign small = 1'b0;\nendmodule\n"
+    with pytest.raises(ParseError, match=r"`small`: reserved in SystemVerilog; rename it"):
+        parse(text, "m.sv")
