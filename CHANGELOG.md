@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- LNG-001 no longer reads a closing `` `default_nettype wire`` as a `wire`
+  declaration; `fix` replaces that line with `` `resetall`` instead of
+  appending one that Verible joined onto it.
+- `fix` is about a third faster: a pass reuses the previous pass's parse,
+  the last pass neither reformats nor reparses, and the token invariant skips
+  the alignment when no token changed. Output unchanged on 173 sample files.
 - `svstyle fix` honours `select` / `ignore` in `.svstyle.toml`: it no longer
   inserts headers or comments for rules `check` ignores.
 - The skill says what to do without the tools: write to the rules, format by

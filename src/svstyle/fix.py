@@ -18,7 +18,7 @@ from functools import cache
 
 from .checks import PLACEHOLDER, is_sv, run_checks
 from .external import verible_format
-from .parse import DIRECTIVE_LINE_RE, ParseError, parse, raw_tokens
+from .parse import DIRECTIVE_LINE_RE, ParseError, Source, parse, raw_tokens
 from .rules import Rule, keep_rule
 
 # (tokens before, tokens after) for every token edit a fix may make.
@@ -109,6 +109,19 @@ def fix_text(
 ) -> str:
     """`ports`: modules defined in the other files of the design (`Source.ports`).
     `filters`: the config's (select, ignore); a rule left out gets no fix either."""
+    return fix_and_parse(text, path, rules, include_dirs, company, ports, filters)[0]
+
+
+def fix_and_parse(
+    text: str,
+    path: str,
+    rules: list[Rule],
+    include_dirs: Sequence[str] = (),
+    company: str = PLACEHOLDER,
+    ports: Mapping[str, tuple[list[str], set[str]]] | None = None,
+    filters: tuple[str | None, str | None] = (None, None),
+) -> tuple[str, Source]:
+    """`fix_text`, plus the fixed text already parsed, so a caller need not parse it again."""
     # ParseError propagates: refuse before touching anything.
     src = parse(text, path, include_dirs, ports)
     # Verible cannot parse `wire logic x`, so drop those `wire`s before it sees the file.
@@ -123,10 +136,13 @@ def fix_text(
     # always_comb that DOC-005 wants a comment above), so rerun until tokens settle.
     # Moving a comment changes no token, but Verible then realigns the block, which
     # can bring the next comment within the column limit: go round once more.
+    src = None  # `text` parsed, once a pass has done it
     for _ in range(MAX_PASSES):
-        out, moved = _fix_once(text, path, rules, include_dirs, company, ports, filters)
-        if token_signature(out) == token_signature(text) and not moved:
-            return out
+        out, moved, same, src = _fix_once(
+            text, path, rules, include_dirs, company, ports, filters, src
+        )
+        if same and not moved:
+            return out, src
         text = out
     raise InvariantError(f"{path}: fix did not settle after {MAX_PASSES} passes")
 
@@ -139,10 +155,17 @@ def _fix_once(
     company: str,
     ports: Mapping | None,
     filters: tuple[str | None, str | None],
-) -> tuple[str, bool]:
-    """One pass; also says whether it moved a comment (the list-valued fixes)."""
+    prev: Source | None,
+) -> tuple[str, bool, bool, Source]:
+    """One pass: the output, whether it moved a comment (the list-valued fixes),
+    whether its tokens equal the input's, and the output parsed.
+
+    `prev`: `text` parsed by the previous pass, reused when Verible leaves it alone."""
     formatted = verible_format(text)
-    src = parse(formatted, path, include_dirs, ports)
+    if prev is not None and formatted == text:
+        src = prev
+    else:
+        src = parse(formatted, path, include_dirs, ports)
     diags = run_checks(formatted, path, rules, include_dirs, company, src)
     found = [d.fix for d in diags if d.fix and keep_rule(d.rule, *filters)]
     moved = any(isinstance(fix, list) for fix in found)
@@ -152,6 +175,8 @@ def _fix_once(
     if not is_sv(path):
         # A Verilog file stays Verilog: these would break Verilog-2001 tools.
         fixes = [f for f in fixes if f[1] not in SV_ONLY]
+    if not fixes:  # the usual last pass: nothing to insert, nothing to reformat
+        return formatted, False, _check_tokens(text, formatted, path), src
     out = formatted
     # Descending offset. At one offset a replacement goes first, so an insertion
     # there lands in front of the new text instead of being cut by it; between
@@ -162,16 +187,19 @@ def _fix_once(
         out = out[:off] + ins + out[off + cut :]
     out = verible_format(out)
 
-    _check_tokens(text, out, path)
+    same = _check_tokens(text, out, path)
     try:
-        parse(out, path, include_dirs)
+        out_src = parse(out, path, include_dirs, ports)
     except ParseError as e:
         raise InvariantError(f"{path}: fixed output no longer parses\n{e}") from e
-    return out, moved
+    return out, moved, same, out_src
 
 
-def _check_tokens(text: str, out: str, path: str) -> None:
+def _check_tokens(text: str, out: str, path: str) -> bool:
+    """Raise unless every token change is an allowed edit; True if there is none."""
     before, after = token_signature(text), token_signature(out)
+    if before == after:
+        return True
     # Tokens fixes only ever insert are junk to the matcher: anchored on them, a
     # repeated statement aligns with the wrong copy and a legal edit looks illegal.
     matcher = difflib.SequenceMatcher(INSERTED.__contains__, before, after, autojunk=False)
@@ -181,3 +209,4 @@ def _check_tokens(text: str, out: str, path: str) -> None:
             raise InvariantError(
                 f"{path}: fix changed tokens `{' '.join(before[i1:i2])}` into `{got}`"
             )
+    return False

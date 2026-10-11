@@ -20,13 +20,8 @@ Open work only. Every number and every "done" or "not doing" is in
 
 ## svstyle
 
-- [ ] `fix` speed: the difflib alignment in the token invariant is about a
-      third of `fix`, and `parse` runs several times per pass.
 - [ ] A single comment above two declarations leaves the second with a
       `TODO: describe` (no mechanical fix without inventing text).
-- [ ] LNG-001 reports a closing `` `default_nettype wire`` as a `wire`
-      declaration (MUST), and `fix` then appends `` `resetall`` on the same
-      line (it compiles, but reads badly).
 - [ ] Verible stays on `v0.0-3946`; move the pin when the non-blocking
       `verible-latest` CI job is green.
 

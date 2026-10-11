@@ -791,3 +791,18 @@ its testbench before and are now unchecked; its RTL is still graded by the
 equivalence testbench. Before numbers are the progressive-disclosure run,
 one run each.
 
+
+### `fix` speed and a closing directive (2026-10-11)
+
+Profile of `fix` on the 72 classic files: `parse` about 60 % (five parses
+per file), the difflib alignment 17 %, Verible 11 %. A pass now reuses the
+previous pass's tree when Verible leaves the text alone, the last pass (no
+fixes) neither reformats nor reparses, the final `check` reuses the last
+tree, and the invariant skips difflib when the tokens are equal. Wall time
+9.0 s to 5.9 s on 8 cores; `fix --diff --json` output is byte-identical on
+173 eval, probe and fixture files.
+
+Found trying the gradual-adoption config: `fix` ignored `select`/`ignore`
+(fixed), LNG-001 flagged a closing `` `default_nettype wire``, and the
+`` `resetall`` that `fix` appended was joined onto it by Verible. The
+directive is now replaced by `` `resetall``, which also restores it.

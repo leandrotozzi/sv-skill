@@ -27,7 +27,7 @@ from .checks import (
     load_config,
     run_checks,
 )
-from .fix import InvariantError, fix_text
+from .fix import InvariantError, fix_and_parse
 from .parse import ParseError, parse
 from .rules import RULES_TOML, RulesError, by_category, keep_rule, load_rules, tool_index
 
@@ -366,8 +366,8 @@ def _check_job(text: str, path: str, rules: list, inc: list[str], company: str):
 def _fix_job(
     text: str, path: str, rules: list, inc: list[str], company: str, ports: dict, filters: tuple
 ):
-    out = fix_text(text, path, rules, inc, company, ports, filters)
-    return out, run_checks(out, path, rules, inc, company)
+    out, src = fix_and_parse(text, path, rules, inc, company, ports, filters)
+    return out, run_checks(out, path, rules, inc, company, src)
 
 
 def _fix_failure(exc: Exception, path: str) -> tuple[str, int]:

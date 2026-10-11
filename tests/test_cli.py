@@ -431,7 +431,7 @@ def test_unexpected_worker_exception_exits_4_without_a_traceback(capsys, sv, mon
     monkeypatch.setattr(cli, "run_checks", boom)
     code, _, err = _run(capsys, "check", "--no-external", sv())
     assert code == 4 and "internal error" in err and "RuntimeError: boom" in err
-    monkeypatch.setattr(cli, "fix_text", boom)
+    monkeypatch.setattr(cli, "fix_and_parse", boom)
     p = sv()
     code, _, err = _run(capsys, "fix", p)
     assert code == 4 and "not written" in err and p.read_text() == CLEAN
