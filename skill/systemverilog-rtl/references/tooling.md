@@ -2,13 +2,16 @@
 
 ## Getting the tool
 
-`svstyle` lives in the repository this skill comes from: two directories
-above the skill's real (non-symlinked) path. If `svstyle` is not on PATH:
+If `svstyle` is not on PATH, install it from PyPI, or run it without
+installing:
 
 ```sh
-uv tool install --editable <repo>     # puts `svstyle` on PATH, tracks the repo
-uvx --from <repo> svstyle --help      # or run it once without installing
+uv tool install svstyle      # or: pipx install svstyle
+uvx svstyle check rtl/       # one-off run, nothing installed
 ```
+
+Working on svstyle itself: `uv tool install --editable <checkout>` puts the
+checkout's version on PATH.
 
 External tools are used when present: `verible-verilog-format` and
 `verible-verilog-lint` (pinned to `v0.0-3946-g851d3ff4`; another version

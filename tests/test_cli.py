@@ -420,3 +420,18 @@ def test_synth_finds_includes_in_a_dir_with_a_space(capsys, tmp_path):
     )
     code, out, err = _run(capsys, "check", "--synth", "--select", "EXT-YOSYS", "-I", inc, p)
     assert code == 0, out + err
+
+
+# --- rules ----------------------------------------------------------------------
+
+
+def test_rules_id_unmapped_and_html(capsys, tmp_path):
+    code, out, _ = _run(capsys, "rules", "--id", "prt-003")
+    assert code == 0 and "PRT-003" in out
+    assert _run(capsys, "rules", "--id", "XYZ-999")[0] == 2
+    code, out, _ = _run(capsys, "rules", "--unmapped")
+    ids = {ln.split()[0] for ln in out.splitlines()}
+    assert code == 0 and "CDC-001" in ids and "STR-002" not in ids  # STR-002 is mechanised
+    page = tmp_path / "guide.html"
+    assert _run(capsys, "rules", "--html", page)[0] == 0
+    assert "PRT-003" in page.read_text()
