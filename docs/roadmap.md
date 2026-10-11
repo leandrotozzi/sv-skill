@@ -496,3 +496,28 @@ number), M15 (probes in CI and yosys-slang, which supersedes M10) and M16
   publishes `docs/style-guide.html`.
 - [ ] By hand: make the repo public, enable Pages, add the PyPI trusted
   publisher, push the `v0.1.0` tag.
+
+### M13 (partial) — VerilogEval v2, first run
+
+`evals/verilogeval.py` (2026-10-10): 30 of the 155 working spec-to-RTL
+problems (every 5th; Prob099 is broken upstream), Opus 5.5, one run each, in
+an empty directory with `--setting-sources project`; the with-skill run adds
+the repo with `--plugin-dir`. $12 in total.
+
+| config | pass@1 (iverilog) | svstyle clean | Verilator -Wall clean | $/problem | s/problem |
+|---|---|---|---|---|---|
+| without skill | 23/30 | 0/30 | 28/30 | 0.10 | 11 |
+| with skill | 25/30 | 30/30 | 29/30 | 0.30 | 36 |
+
+- iverilog 13 needs the testbenches' `$dumpvars` lines dropped, and rejects
+  `state_d = in ? StB : StA;` (legal SV) in both configs on Prob119; under
+  Verilator both pass, so 24 vs 26. It cannot read the SVA macros either.
+- The skill wins Prob078 and Prob139 and loses Prob149 (one mismatch in
+  2040 under Verilator, a spec ambiguity on `dfr` it flagged and guessed
+  wrong). Prob053, Prob093 and Prob104 fail in both configs.
+- Reading: the benchmark grades guessing an ambiguous spec, which the skill
+  does not target; the functional delta (+2) is within noise at n=30. The
+  style delta is the skill's point: 30/30 vs 0/30, with the given
+  interface kept through the waivers in `SKILL.md`.
+- First run lost: outputs inside the repo are inside the plugin directory,
+  where Claude Code refuses writes. The runner now refuses `--out` there.
