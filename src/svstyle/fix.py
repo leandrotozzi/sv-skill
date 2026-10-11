@@ -19,7 +19,7 @@ from functools import cache
 from .checks import PLACEHOLDER, is_sv, run_checks
 from .external import verible_format
 from .parse import DIRECTIVE_LINE_RE, ParseError, parse, raw_tokens
-from .rules import Rule
+from .rules import Rule, keep_rule
 
 # (tokens before, tokens after) for every token edit a fix may make.
 ALLOWED_EDITS = (
@@ -104,8 +104,10 @@ def fix_text(
     include_dirs: Sequence[str] = (),
     company: str = PLACEHOLDER,
     ports: Mapping[str, tuple[list[str], set[str]]] | None = None,
+    filters: tuple[str | None, str | None] = (None, None),
 ) -> str:
-    """`ports`: modules defined in the other files of the design (`Source.ports`)."""
+    """`ports`: modules defined in the other files of the design (`Source.ports`).
+    `filters`: the config's (select, ignore); a rule left out gets no fix either."""
     # ParseError propagates: refuse before touching anything.
     src = parse(text, path, include_dirs, ports)
     # Verible cannot parse `wire logic x`, so drop those `wire`s before it sees the file.
@@ -121,7 +123,7 @@ def fix_text(
     # Moving a comment changes no token, but Verible then realigns the block, which
     # can bring the next comment within the column limit: go round once more.
     for _ in range(MAX_PASSES):
-        out, moved = _fix_once(text, path, rules, include_dirs, company, ports)
+        out, moved = _fix_once(text, path, rules, include_dirs, company, ports, filters)
         if token_signature(out) == token_signature(text) and not moved:
             return out
         text = out
@@ -135,11 +137,13 @@ def _fix_once(
     include_dirs: Sequence[str],
     company: str,
     ports: Mapping | None,
+    filters: tuple[str | None, str | None],
 ) -> tuple[str, bool]:
     """One pass; also says whether it moved a comment (the list-valued fixes)."""
     formatted = verible_format(text)
     src = parse(formatted, path, include_dirs, ports)
-    found = [d.fix for d in run_checks(formatted, path, rules, include_dirs, company, src) if d.fix]
+    diags = run_checks(formatted, path, rules, include_dirs, company, src)
+    found = [d.fix for d in diags if d.fix and keep_rule(d.rule, *filters)]
     moved = any(isinstance(fix, list) for fix in found)
     fixes = [f for fix in found for f in (fix if isinstance(fix, list) else [fix])]
     fixes += src.rewrites + endif_labels(formatted)

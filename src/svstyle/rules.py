@@ -203,6 +203,13 @@ def by_category(rules: list[Rule]) -> dict[str, list[Rule]]:
     return {c: out[c] for c in CATEGORIES if c in out}
 
 
+def keep_rule(rule: str, select: str | None, ignore: str | None) -> bool:
+    """ruff-style prefixes: `--select DOC,PRT-001 --ignore DOC-005`."""
+    if select and not rule.startswith(tuple(select.split(","))):
+        return False
+    return not (ignore and rule.startswith(tuple(ignore.split(","))))
+
+
 def tool_index(rules: list[Rule], tool: str) -> dict[str, Rule]:
     """Map a tool's own rule name / warning code back to our rule.
 

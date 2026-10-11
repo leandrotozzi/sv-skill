@@ -198,6 +198,22 @@ def test_fix_fills_company_from_config(capsys, tmp_path):
     assert code == 0 and out.strip().endswith("0 findings")
 
 
+@needs_verible
+def test_fix_skips_ignored_rules(capsys, tmp_path):
+    # The README's gradual-adoption config: fix must not insert what check ignores.
+    ignore = '["DOC-001", "DOC-003", "DOC-004", "DOC-005", "DOC-006"]'
+    (tmp_path / ".svstyle.toml").write_text(f"ignore = {ignore}\n")
+    p = tmp_path / "inv.sv"
+    p.write_text(
+        "`default_nettype none\n\nmodule inv (\n    input  logic a_i,\n"
+        "    output logic y_o\n);\n\n    assign y_o = ~a_i;\n\nendmodule\n\n`resetall\n"
+    )
+    before = p.read_text()
+    assert _run(capsys, "fix", p)[0] == 0
+    assert p.read_text() == before
+    assert _run(capsys, "check", "--no-external", p)[0] == 0
+
+
 def test_bad_config_exits_2(capsys, tmp_path):
     (tmp_path / ".svstyle.toml").write_text("company = 3\n")
     p = tmp_path / "reg_byte.sv"
