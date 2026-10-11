@@ -34,7 +34,7 @@ jobs:
           echo "$RUNNER_TEMP/oss-cad-suite/bin" >> "$GITHUB_PATH"
       - run: verilator --version && yosys -V && verible-verilog-format --version | head -1
       - run: uv sync --extra dev
-      - run: uv run ruff check src tests evals
-      - run: uv run ruff format --check src tests evals
+      - run: uv run ruff check src tests evals hooks
+      - run: uv run ruff format --check src tests evals hooks
       - run: uv run svstyle rules --check
       - run: uv run pytest -n auto

@@ -1,0 +1,12 @@
+{
+  "name": "sv-skill",
+  "description": "SystemVerilog RTL house style: skill plus the svstyle checker",
+  "owner": { "name": "Leandro Tozzi" },
+  "plugins": [
+    {
+      "name": "systemverilog-rtl",
+      "source": "./",
+      "description": "Write, review and fix synthesizable SystemVerilog RTL in a lowRISC-derived house style"
+    }
+  ]
+}

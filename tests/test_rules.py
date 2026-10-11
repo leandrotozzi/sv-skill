@@ -273,3 +273,13 @@ def test_tooling_md_counts_the_review_rules():
     tooling = Path(__file__).parents[1] / "skill/systemverilog-rtl/references/tooling.md"
     review = sum(r.tool == "review" for r in load_rules())
     assert f"| review | {review} rules |" in tooling.read_text()
+
+
+def test_plugin_version_is_the_package_version():
+    import json
+    from pathlib import Path
+
+    from svstyle import __version__
+
+    plugin = Path(__file__).parents[1] / ".claude-plugin/plugin.json"
+    assert json.loads(plugin.read_text())["version"] == __version__
