@@ -374,3 +374,66 @@ OSS CAD Suite build (Verilator 5.053-devel, Yosys 0.69). Apt's 5.020 and 0.33
 failed four tests: Yosys 0.33 cannot read `assets/sync_ff.sv` and locates
 loops on line 1, and Verilator 5.020 handles a reset pulse between edges
 differently.
+
+## Review of 2026-10-07 (Verilator + Yosys): verification in the loop
+
+The skill targets the right tools, and its Yosys subset is lint-clean in
+Verilator (all 149 probes). What separates it from a professional flow is
+that "done" never simulates: `check --synth` is lint plus a Yosys read, and
+functional correctness is measured only by the eval harness. Ordered by what
+lets wrong RTL through today.
+
+### M9 — The skill simulates before it is done
+
+- [ ] **17. `assets/tb_skeleton.sv`.** A self-checking testbench template
+  that builds with `verilator --binary --timing`: clock and reset generation,
+  a `step` task, an error counter with the first failure's message, one
+  `PASS`/`FAIL` line and `$finish`. Take the shape from
+  `evals/files/classics/*_tb.sv`, which is what `grade.py` already runs.
+- [ ] **18. `references/testbench-verilator.md`.** What a testbench for this
+  flow is: Verilator 5 with `--binary --timing -Wno-fatal`, the SV a testbench
+  may use that RTL may not (queues, unpacked structs, `automatic`, `string`,
+  bare SVA), checks against a reference model or golden vectors, a fixed
+  seed, the build and run command, and how to read a failing `ASSERT` from
+  `assert_macros.svh`.
+- [ ] **19. SKILL.md: a "Simulate" step and a "Done means" item.** After
+  `fix` and `check`, write the testbench from the template, run it, and
+  report what it checked. Done means the testbench printed `PASS` and no
+  `ASSERT` fired. The testbench is not RTL: keep it out of `svstyle check`
+  (`exclude = ["tb/*"]` in `.svstyle.toml`).
+- [ ] **20. Eval the testbenches, not only the RTL.** For the classics that
+  have a planted-bug set, run the skill's own testbench against the planted
+  bugs: the score is how many it catches. Record it in `grade.py` as a
+  per-eval check, next to the equivalence testbench.
+- [ ] **21. `svstyle sim`, only if 19 sprawls.** One command that builds and
+  runs a testbench with the flags from 18 and reports the exit code, the
+  assertion failures and the `PASS` line. Not before 17–19 are in use.
+
+### M10 — Yosys frontends and versions
+
+- [ ] **22. Rerun the probes on CI's tools.** `evals/yosys-probes/run.sh`
+  with Yosys 0.69 and Verilator 5.053 (the OSS CAD Suite build CI uses);
+  update the stamps in the probes README and `synth-yosys.md`. Add the run to
+  CI, so a Yosys bump that changes a row fails the build instead of the next
+  eval.
+- [ ] **23. yosys-slang probe.** The same 149 probes through
+  `plugin -i slang; read_slang`. Record which "does not parse" and
+  "synthesises wrong" rows disappear. Decision gate: adopt only if the
+  project's Yosys ships the plugin (OSS CAD Suite does, Homebrew's does not).
+- [ ] **24. `synth = "yosys-slang"`** (after 23): `check --synth` reads with
+  `read_slang`, and the skill loads a shorter `synth-yosys-slang.md` in place
+  of `synth-yosys.md`.
+
+### Recorded, no action
+
+- The skill description summarises the workflow as well as naming triggers;
+  trigger evals score 100 %, so it stays.
+- `SKILL.md` plus `rules.md` load about 4,200 words per SystemVerilog
+  request; acceptable for a domain skill.
+- `ASSERT` covers a reset pulse between edges for one-cycle properties only;
+  `##2` and longer stay exposed (documented in the macro).
+- Verible stays pinned at `v0.0-3946` (see Spec follow-ups).
+- Icarus Verilog is not a target. A probe run on 2026-10-07 (iverilog 13.0,
+  the 149 Yosys probes) found the SVA macros with `|->`, `unique if`,
+  function `output` arguments, block-local `automatic` and struct-typed
+  localparams unsupported there; none of it matters for Verilator.
