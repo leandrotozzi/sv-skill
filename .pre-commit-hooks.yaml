@@ -1,0 +1,14 @@
+- id: svstyle-check
+  name: svstyle check
+  description: Report SystemVerilog house-style findings; fails on a MUST.
+  entry: svstyle check
+  language: python
+  files: \.(sv|svh|v)$
+  require_serial: true  # Verilator elaborates the files together
+
+- id: svstyle-fix
+  name: svstyle fix
+  description: Format with Verible and insert missing headers and comments.
+  entry: svstyle fix
+  language: python
+  files: \.(sv|svh|v)$
