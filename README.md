@@ -45,6 +45,112 @@ third-party code works but is noisy. Open work is in the
 every measurement in the
 [history](https://github.com/leandrotozzi/sv-skill/blob/main/docs/history.md).
 
+## What it looks like
+
+One prompt, Opus 5.5, with and without the skill (eval `updown-counter`,
+round 1): *"Write an up/down counter in SystemVerilog, updown_counter.sv.
+Parameter Width (default 8). Ports: clk_i, rst_ni (asynchronous, active low),
+en_i, load_i, load_val_i[Width-1:0], up_i, count_o[Width-1:0]. ..."* Both
+match the reference model cycle for cycle.
+
+Without the skill: correct, and `svstyle check` reports 13 findings (11 MUST)
+-- no header, no comments, 2-space indent, no `` `default_nettype none``.
+
+```systemverilog
+// Up/down counter with synchronous load, wrapping modulo 2**Width.
+module updown_counter #(
+  parameter int unsigned Width = 8
+) (
+  input  logic             clk_i,
+  input  logic             rst_ni,
+  input  logic             en_i,
+  input  logic             load_i,
+  input  logic [Width-1:0] load_val_i,
+  input  logic             up_i,
+  output logic [Width-1:0] count_o
+);
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      count_o <= '0;
+    end else if (load_i) begin
+      count_o <= load_val_i;
+    end else if (en_i) begin
+      count_o <= up_i ? count_o + 1'b1 : count_o - 1'b1;
+    end
+  end
+
+endmodule
+```
+
+With the skill: the first `check` reports one SHOULD, the `<Company>`
+placeholder, which a `.svstyle.toml` with `company = "..."` fills in.
+
+```systemverilog
+// Copyright (c) 2026 <Company>
+// All rights reserved
+//
+// Description:
+//   Loadable up/down counter. Each clock, load_i loads load_val_i (load has
+//   priority over enable); otherwise en_i steps the count up by one when up_i
+//   is high and down by one when it is low, wrapping modulo 2**Width.
+//   count_o is the register itself: it changes one cycle after the inputs.
+//   Reset clears the count to zero.
+
+`default_nettype none
+
+`include "assert_macros.svh"
+
+module updown_counter #(
+    parameter int unsigned Width = 8  // Counter width in bits; at least 1
+) (
+    input  logic             clk_i,       // System clock
+    input  logic             rst_ni,      // Asynchronous reset, active-low
+    input  logic             en_i,        // Step the count this cycle (ignored while load_i)
+    input  logic             load_i,      // Load load_val_i this cycle; wins over en_i
+    input  logic [Width-1:0] load_val_i,  // Value loaded when load_i is high
+    input  logic             up_i,        // Step direction: 1 counts up, 0 counts down
+    output logic [Width-1:0] count_o      // Current count, registered
+);
+    // Width must be positive: a zero-width counter has no meaning.
+    if (Width < 1) begin : gen_width_check
+        $error("Width must be at least 1");
+    end
+
+    logic [Width-1:0] count_q, count_d;  // Count register and its next value
+
+    // Next count: load has priority, then a wrapping step in the chosen direction.
+    always_comb begin
+        count_d = count_q;
+        if (load_i) begin
+            count_d = load_val_i;
+        end else if (en_i) begin
+            if (up_i) begin
+                count_d = count_q + Width'(1);
+            end else begin
+                count_d = count_q - Width'(1);
+            end
+        end
+    end
+
+    // Count register, cleared by reset.
+    always_ff @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni) begin
+            count_q <= '0;
+        end else begin
+            count_q <= count_d;
+        end
+    end
+
+    assign count_o = count_q;
+
+    // The count is never X once out of reset (VER-002).
+    `ASSERT_KNOWN(CountKnown_A, count_o)
+endmodule
+
+`resetall
+```
+
 ## Install
 
 The skill, as a Claude Code plugin (from inside Claude Code):
