@@ -148,6 +148,18 @@ bad connection): fix it first, because the rest of the report is incomplete.
 If `svstyle` is not on PATH, or for exit codes, `--json`, `--select` and
 waivers, read `references/tooling.md`.
 
+### Without the tools
+
+If `svstyle` cannot be installed (no shell, no network, or the user says
+no), write the RTL exactly as above: the rules, the Yosys subset, the
+templates, every comment, the judgement list below. Format it by hand to
+FMT-001..003. Then say plainly that nothing was run: no format,
+lint, elaboration, synthesis or simulation. Never say `check` passed.
+
+With `svstyle` but without some of its tools, `check` skips each missing one
+with a warning (`fix` refuses without Verible: format by hand and `check`).
+Name the skipped tools in your report; what they own stays unchecked.
+
 ## Simulate
 
 A clean `check` says the RTL is well formed, not that it does what the spec
@@ -207,7 +219,8 @@ list against the code you wrote:
 - `svstyle check --synth` exits 0 on every file of the design (VER-003);
   SHOULD findings are allowed but each one is a deliberate choice. Drop
   `--synth` only if the project synthesises with another tool or Yosys is
-  not installed, and say so.
+  not installed, and say so. Without the tools, see "Without the tools":
+  the report says what was not run instead.
 - No `// TODO: describe` is left: `grep -rn "TODO: describe" rtl/` is empty.
 - The testbench printed `PASS` and no `` `ASSERT`` fired, or the block was
   small enough to skip it (see "Simulate").
