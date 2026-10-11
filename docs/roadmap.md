@@ -705,5 +705,10 @@ the cost went to building the testbench, mostly not for its own bugs:
 | before | 67/67 | 6.71 | 1508 | 37 | 33 |
 | after the mkdir fix | 67/67 | 5.56 | 1244 | 14 | 11 |
 
-The 11 left are mostly the template `cp`, fixed after this run (not yet
-measured).
+| after the `cp` fix | 67/67 | 6.08 | 1376 | 13 | 6 |
+
+The `cp` fix took template-copy denials from 6 to 0. Cost moved within
+one-run noise (axil-regs alone $0.85 to $1.39 with the same builds); the
+reliable gains are the builds (37 to 13) and the denials (33 to 6). Four
+of the six left were `; echo exit=$?` appended to a command; `SKILL.md`
+now says the tool reports the exit code.

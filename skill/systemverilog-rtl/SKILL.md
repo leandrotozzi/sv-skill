@@ -28,7 +28,8 @@ reset style and comment layout. `assets/` sits next to this SKILL.md; reach
 it by absolute path, not one relative to the project. To copy a template,
 read it with the file-read tool and write it into the project: a shell `cp`
 out of the skill's directory, a shell variable or a `;` chain each needs a
-permission prompt. Run each shell command on its own.
+permission prompt. Run each shell command on its own; the tool already
+reports the exit code, so no `; echo $?`.
 
 | Template | Use it for |
 |---|---|
