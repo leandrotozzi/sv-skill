@@ -169,7 +169,8 @@ def parse(
         if any(d.code == Diags.CouldNotOpenIncludeFile for d in errors):
             msg += "\n(an `include was not found: pass its directory with -I DIR)"
         if words := _keywords_at(text, [d.location.offset for d in errors]):
-            msg += f"\n({', '.join(f'`{w}`' for w in words)}: reserved in SystemVerilog; rename it)"
+            names = ", ".join(f"`{w}`" for w in words)
+            msg += f"\n({names}: reserved in SystemVerilog (NAM-010); rename it)"
         raise ParseError(msg)
     return _Walker(tree, text, ports or {}).run()
 

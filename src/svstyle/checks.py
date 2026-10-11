@@ -128,6 +128,8 @@ def run_checks(
     check_ports(ctx, src)
     check_constructs(ctx, text, src)
     check_resets(ctx, src)
+    check_extension(ctx, text)
+    check_keyword_names(ctx, src)
     return sorted(apply_waivers(ctx.out, text), key=lambda d: d.line)
 
 
@@ -344,6 +346,32 @@ def check_port_order(ctx: _Ctx, ports: list[tuple[str, int]]) -> None:
 
 def is_sv(path: str) -> bool:
     return path.endswith((".sv", ".svh"))
+
+
+DESIGN_UNITS = {
+    TokenKind.ModuleKeyword, TokenKind.MacromoduleKeyword, TokenKind.PackageKeyword,
+    TokenKind.InterfaceKeyword, TokenKind.ProgramKeyword, TokenKind.ClassKeyword,
+    TokenKind.CheckerKeyword, TokenKind.PrimitiveKeyword, TokenKind.ConfigKeyword,
+}  # fmt: skip
+
+
+def check_extension(ctx: _Ctx, text: str) -> None:
+    """A `.sv` that defines nothing only makes sense `include`d: it is a header."""
+    if ctx.path.endswith(".sv") and not any(k in DESIGN_UNITS for k, _, _ in raw_tokens(text)):
+        msg = "defines no module, package or interface; a file only `include`d is `.svh`"
+        ctx.emit(rule="file_extension", line=1, message=msg)
+
+
+def check_keyword_names(ctx: _Ctx, src: Source) -> None:
+    """A SystemVerilog keyword as a name parses only under `begin_keywords` of an older
+    standard, and breaks the day that directive goes; without it parse() refuses."""
+    for a in src.anchors:
+        if a.kind not in ("port", "param", "decl"):
+            continue
+        for name in a.name.split(", "):
+            if raw_tokens(name)[0][0].name.endswith("Keyword"):
+                msg = f"`{name}` is a SystemVerilog keyword; rename it"
+                ctx.emit(rule="keyword_name", line=a.line, message=msg)
 
 
 def check_constructs(ctx: _Ctx, text: str, src: Source) -> None:

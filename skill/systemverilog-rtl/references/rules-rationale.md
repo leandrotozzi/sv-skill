@@ -315,7 +315,7 @@ prim_assert.svh
 prim_assert.sv  // but only ever `include`d
 ```
 
-**Enforced by:** review only
+**Enforced by:** svstyle `file_extension`
 
 **Sources:** lowRISC §Files
 
@@ -801,7 +801,7 @@ logic packet_type;
 logic type;  // `type` is a SystemVerilog keyword
 ```
 
-**Enforced by:** review only
+**Enforced by:** svstyle `keyword_name`
 
 **Sources:** lowRISC §Naming Conventions
 

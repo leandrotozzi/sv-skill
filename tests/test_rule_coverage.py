@@ -37,6 +37,9 @@ SNIPPETS = {
     "DOC-002": ("m.sv", "// Copyright (c) 2026 X\n// All rights reserved\n//\n// Description:\n"
                         "//   TODO: describe\n\n" + mod("    assign b_o = a_i;")),
     "DOC-003": ("m.sv", mod("    assign b_o = a_i;")),
+    "STR-002": ("defs.sv", "`define WIDTH 8\n"),
+    "NAM-010": ("m.v", '`begin_keywords "1364-2001"\n' + mod("    wire bit;\n    assign bit = a_i;\n    assign b_o = bit;",
+                       ports="    input  wire a_i,\n    output wire b_o") + "`end_keywords\n"),
     "STR-005": ("m.sv", "package p_pkg;\nendpackage\nimport p_pkg::*;\n" + mod("    assign b_o = a_i;")),
     "PRT-002": ("m.sv", mod("    assign b_o = a_i;", ports="    input  logic a_i,\n    input  logic clk_i,\n    output logic b_o")),
     "NAM-003": ("m.sv", mod("    assign b_o = a_i & rst_in;", ports="    input  logic rst_in,\n    input  logic a_i,\n    output logic b_o")),

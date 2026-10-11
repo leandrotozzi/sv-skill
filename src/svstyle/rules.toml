@@ -281,7 +281,9 @@ good = "prim_assert.svh"
 bad = "prim_assert.sv  // but only ever `include`d"
 sources = ["lowRISC §Files"]
 [rule.enforcement]
-tool = "review"
+tool    = "svstyle"
+rule    = "file_extension"
+autofix = false
 
 [[rule]]
 id        = "STR-003"
@@ -676,7 +678,9 @@ good = "logic packet_type;"
 bad = "logic type;  // `type` is a SystemVerilog keyword"
 sources = ["lowRISC §Naming Conventions"]
 [rule.enforcement]
-tool = "review"
+tool    = "svstyle"
+rule    = "keyword_name"
+autofix = false
 
 # ===========================================================================
 # FMT -- formatting and layout. The formatter owns this whole family: every

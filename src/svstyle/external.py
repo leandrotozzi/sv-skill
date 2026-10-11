@@ -3,7 +3,8 @@
 The configs ship inside the package and are always passed explicitly, so a
 user repo needs no config of its own. Tool diagnostics that map to no house
 rule pass through as `EXT-VL-<rule>` / `EXT-VLTR-<CODE>` at SHOULD, so gaps in
-the rules DB stay visible (`svstyle rules --unmapped`).
+the rules DB stay visible. (The other direction, rules no tool enforces, is
+`svstyle rules --unmapped`.)
 """
 
 import re

@@ -265,3 +265,11 @@ def test_full_markdown_opens_with_a_contents_list():
     text = render_markdown_full(load_rules())
     contents = text[: text.index("\n## DOC")]
     assert "- DOC — Comments and file header: DOC-001 … DOC-010" in contents
+
+
+def test_tooling_md_counts_the_review_rules():
+    from pathlib import Path
+
+    tooling = Path(__file__).parents[1] / "skill/systemverilog-rtl/references/tooling.md"
+    review = sum(r.tool == "review" for r in load_rules())
+    assert f"| review | {review} rules |" in tooling.read_text()

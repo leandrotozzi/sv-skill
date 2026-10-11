@@ -151,5 +151,5 @@ def test_an_include_inside_a_block_counts_as_a_directive(tmp_path):
 
 def test_a_keyword_used_as_a_name_is_named_in_the_error():
     text = "module m;\n    logic small;\n    assign small = 1'b0;\nendmodule\n"
-    with pytest.raises(ParseError, match=r"`small`: reserved in SystemVerilog; rename it"):
+    with pytest.raises(ParseError, match=r"`small`: reserved in SystemVerilog \(NAM-010\)"):
         parse(text, "m.sv")

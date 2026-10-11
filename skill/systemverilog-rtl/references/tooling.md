@@ -143,11 +143,11 @@ the author after the fix.
 
 | Owner | Rules | Notes |
 |---|---|---|
-| `svstyle` | DOC-001..006, PRT-001..003, PRT-005 (positional parameters), NAM-003, STR-005, LNG-001, LNG-014, SYN-001, RST-001, FMT-001 (comment-only lines) | header, comments, ANSI ports, port order, named connections and parameters, suffix order, import scope, `logic`, `default_nettype`, no synthesis directives, async active-low reset |
+| `svstyle` | DOC-001..006, PRT-001..003, PRT-005 (positional parameters), NAM-003, NAM-010, STR-002, STR-005, LNG-001, LNG-014, SYN-001, RST-001, FMT-001 (comment-only lines) | header, comments, ANSI ports, port order, named connections and parameters, suffix order, import scope, `logic`, `default_nettype`, no synthesis directives, async active-low reset, `.sv` vs `.svh`, keywords as names |
 | Verible format | FMT-002 | reported as "file needs formatting"; `svstyle fix` resolves it |
 | Verible lint | naming, `always_comb`/`always_ff` usage, `begin`/`end`, file names, literals, ... | tool rule name maps to the house ID |
 | Verilator `-Wall` | LNG-004..006, LNG-009, LNG-015..017, PRT-004, RST-005 | latches, multi-driven, mixed assignments, `casex`, widths, undriven/unused signals, missing pins; also backs up STR-001, PRT-005, LNG-003, LNG-007, LNG-013, LNG-014, SYN-002 |
-| review | 30 rules | `svstyle rules --unmapped`; walk them yourself |
+| review | 29 rules | `svstyle rules --unmapped`; walk them yourself |
 
 Tool findings with no house rule pass through as `EXT-VL-<rule>` (Verible)
 or `EXT-VLTR-<CODE>` (Verilator) at SHOULD. The common ones:
