@@ -385,42 +385,46 @@ lets wrong RTL through today.
 
 ### M9 — The skill simulates before it is done
 
-- [ ] **17. `assets/tb_skeleton.sv`.** A self-checking testbench template
+Done as M12 (17–20); 21 dropped, the step did not sprawl.
+
+- [x] **17. `assets/tb_skeleton.sv`.** A self-checking testbench template
   that builds with `verilator --binary --timing`: clock and reset generation,
   a `step` task, an error counter with the first failure's message, one
   `PASS`/`FAIL` line and `$finish`. Take the shape from
   `evals/files/classics/*_tb.sv`, which is what `grade.py` already runs.
-- [ ] **18. `references/testbench-verilator.md`.** What a testbench for this
+- [x] **18. `references/testbench-verilator.md`.** What a testbench for this
   flow is: Verilator 5 with `--binary --timing -Wno-fatal`, the SV a testbench
   may use that RTL may not (queues, unpacked structs, `automatic`, `string`,
   bare SVA), checks against a reference model or golden vectors, a fixed
   seed, the build and run command, and how to read a failing `ASSERT` from
   `assert_macros.svh`.
-- [ ] **19. SKILL.md: a "Simulate" step and a "Done means" item.** After
+- [x] **19. SKILL.md: a "Simulate" step and a "Done means" item.** After
   `fix` and `check`, write the testbench from the template, run it, and
   report what it checked. Done means the testbench printed `PASS` and no
   `ASSERT` fired. The testbench is not RTL: keep it out of `svstyle check`
   (`exclude = ["tb/*"]` in `.svstyle.toml`).
-- [ ] **20. Eval the testbenches, not only the RTL.** For the classics that
+- [x] **20. Eval the testbenches, not only the RTL.** For the classics that
   have a planted-bug set, run the skill's own testbench against the planted
   bugs: the score is how many it catches. Record it in `grade.py` as a
   per-eval check, next to the equivalence testbench.
-- [ ] **21. `svstyle sim`, only if 19 sprawls.** One command that builds and
+- [x] **21. `svstyle sim`, only if 19 sprawls.** One command that builds and
   runs a testbench with the flags from 18 and reports the exit code, the
   assertion failures and the `PASS` line. Not before 17–19 are in use.
 
 ### M10 — Yosys frontends and versions
 
-- [ ] **22. Rerun the probes on CI's tools.** `evals/yosys-probes/run.sh`
+Done as M15.
+
+- [x] **22. Rerun the probes on CI's tools.** `evals/yosys-probes/run.sh`
   with Yosys 0.69 and Verilator 5.053 (the OSS CAD Suite build CI uses);
   update the stamps in the probes README and `synth-yosys.md`. Add the run to
   CI, so a Yosys bump that changes a row fails the build instead of the next
   eval.
-- [ ] **23. yosys-slang probe.** The same 149 probes through
+- [x] **23. yosys-slang probe.** The same 149 probes through
   `plugin -i slang; read_slang`. Record which "does not parse" and
   "synthesises wrong" rows disappear. Decision gate: adopt only if the
   project's Yosys ships the plugin (OSS CAD Suite does, Homebrew's does not).
-- [ ] **24. `synth = "yosys-slang"`** (after 23): `check --synth` reads with
+- [x] **24. `synth = "yosys-slang"`** (after 23): `check --synth` reads with
   `read_slang`, and the skill loads a shorter `synth-yosys-slang.md` in place
   of `synth-yosys.md`.
 
