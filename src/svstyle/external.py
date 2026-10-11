@@ -7,6 +7,7 @@ the rules DB stay visible. (The other direction, rules no tool enforces, is
 `svstyle rules --unmapped`.)
 """
 
+import os
 import re
 import shutil
 import subprocess
@@ -102,10 +103,15 @@ def verible_format(text: str) -> str:
 
 def verible_verify(paths: list[str], rules: list[Rule]) -> list[Diag]:
     """One FMT-002 finding per file the formatter would change."""
+    from concurrent.futures import ThreadPoolExecutor
+
     sev = next(r.severity for r in rules if r.id == "FMT-002")
+    args = [f"--flagfile={FORMAT_FLAGS}", "--verify"]
+    # One process per file: run them on every core, report in file order.
+    with ThreadPoolExecutor(os.cpu_count()) as pool:
+        results = list(pool.map(lambda p: _run("verible-verilog-format", [*args, p]), paths))
     out = []
-    for p in paths:
-        res = _run("verible-verilog-format", [f"--flagfile={FORMAT_FLAGS}", "--verify", p])
+    for p, res in zip(paths, results, strict=True):
         if "failed to converge" in res.stderr:
             # --verify exits 0 here, so a naive check would call the file formatted.
             msg = "Verible cannot format this file (does not converge); lay it out by hand"
