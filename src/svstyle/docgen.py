@@ -26,10 +26,17 @@ TOOL_LABEL = {
 # ---------------------------------------------------------------------------
 
 
-def render_markdown_compact(rules: list[Rule]) -> str:
-    """The skill's always-loaded reference: one line per rule."""
+# Categories that only matter in some designs, rendered to their own file so the
+# always-loaded rules.md stays short; SKILL.md says when to read each.
+ON_DEMAND = {"CDC": "rules-cdc.md"}
+
+
+def render_markdown_compact(rules: list[Rule], part: str = "") -> str:
+    """One line per rule: all of them; or `part="core"`, every category but
+    ON_DEMAND's (the skill's always-loaded rules.md); or `part=<category>`."""
+    title = f"{part} rules" if part not in ("", "core") else "SystemVerilog RTL rules"
     out = [
-        "# SystemVerilog RTL rules",
+        f"# {title}",
         "",
         "Generated from `rules.toml` — do not edit. Full rationale and examples:",
         "`rules-rationale.md` (load it when a rule is questioned or a finding is unclear).",
@@ -37,7 +44,12 @@ def render_markdown_compact(rules: list[Rule]) -> str:
         "`MUST` violations fail `svstyle check`. `[fix]` marks what `svstyle fix` writes for you.",
         "",
     ]
+    if part == "core":
+        out += [f"{c} rules are in `{f}`, read only when they apply." for c, f in ON_DEMAND.items()]
+        out.append("")
     for cat, group in by_category(rules).items():
+        if (part == "core" and cat in ON_DEMAND) or (part not in ("", "core") and cat != part):
+            continue
         out += [f"## {cat} — {CATEGORIES[cat]}", ""]
         for r in group:
             fix = " `[fix]`" if r.autofix else ""

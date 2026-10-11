@@ -22,6 +22,9 @@ code outside it is a parse error and an extra round. If it is
 `yosys-slang`, read the much shorter `references/synth-yosys-slang.md`
 instead. Any other value: skip both.
 
+If the design has more than one clock, an asynchronous input, or a reset
+entering a clock domain, also read `references/multi-clock.md`.
+
 Start from the closest template in `assets/` rather than a blank file. Each
 already passes `svstyle check`, so you inherit a correct header, port order,
 reset style and comment layout. `assets/` sits next to this SKILL.md; reach
@@ -35,7 +38,7 @@ reports the exit code, so no `; echo $?`.
 |---|---|
 | `assets/skeleton.sv` | any module: registered stage, parameter check, reset vs. datapath flops |
 | `assets/fsm.sv` + `assets/fsm_pkg.sv` | a state machine: `typedef enum` state, `state_q`/`state_d`, commented case arms, registered outputs |
-| `assets/sync_ff.sv` | a synchroniser rank (`NumFlops` 2 or 3) for a one-bit level, or a reset synchroniser with `d_i` tied to 1; copy it next to the RTL and instance it, do not rewrite it |
+| `assets/sync_ff.sv` | a synchroniser, only with more than one clock (see `references/multi-clock.md`) |
 | `assets/assert_macros.svh` | `` `ASSERT``, `` `ASSERT_KNOWN``, `` `ASSERT_INIT`` (VER-001); both templates include it |
 | `assets/skeleton_tb.sv` | the self-checking testbench for "Simulate" below: a model beside the DUT, a `step` task, one PASS/FAIL line |
 
@@ -115,37 +118,8 @@ Then run the tools.
 
 ## Existing code
 
-To bring legacy RTL into the style, run `svstyle fix` on it first: besides
-formatting, it turns `reg`/`wire` into `logic`, `always @(*)` into
-`always_comb`, clocked `always` into `always_ff`, and wraps lone statements
-in `begin`/`end`, wherever that provably keeps the meaning. A `.v` file
-keeps its Verilog: rename it to `.sv` first if it is to become SystemVerilog.
-Then work through what `check` still reports; `references/tooling.md` lists
-what `fix` leaves alone and why. To adopt the style on a large codebase
-without fixing everything at once, `check --baseline` (in `tooling.md`)
-fails only on new findings.
-
-## Reviewing RTL
-
-When the user asks for a review, report; do not edit unless asked.
-
-1. Run `svstyle check --synth` on every file of the design in one call (or
-   without `--synth`, as in "The loop" below). Its findings are the
-   mechanical part.
-2. Walk the review rules (`svstyle rules --unmapped`, about thirty) by what
-   the code contains: CDC-* and RST-002/003 only with more than one clock,
-   FSM-* and DOC-008 only with an enum state, PRT-007 only with ready/valid,
-   LNG-018 only with signed arithmetic. Then the design itself: does it do
-   what its description and the spec say, at the edges (reset, full, empty,
-   overflow, back-to-back)?
-3. Report in this order: findings, each with rule ID (or "design"),
-   `file:line`, severity and one line of why (`references/rules-rationale.md`,
-   by heading, when the reason is not obvious); then what you did not check
-   (no testbench run, files you were not given, a second clock you inferred).
-
-A correct file gets a short report that says so. Do not invent findings to
-fill one, and do not report style the interface forces (see "When the
-interface is given").
+To review RTL, or to bring legacy RTL into the style, read
+`references/existing-code.md` first.
 
 ## The loop
 
@@ -191,20 +165,10 @@ model is wrong, fix that, rerun once. Still failing: stop and report it.
 About half the rules need judgement. Before calling the RTL done, walk this
 list against the code you wrote:
 
-- **Reset** (RST-002..004): reset control (state, counters, valids), leave
-  datapath unreset; a reset entering a clock domain goes through a reset
-  synchroniser, one per domain: an instance of `assets/sync_ff.sv` with
-  `.d_i(1'b1)`. It sits where the reset enters the domain: the top level, or
-  a block that itself spans clocks (an async FIFO). A single-clock block takes
-  `rst_ni` already synchronised to `clk_i` and adds none; one inside it would
-  drop the inputs of the first cycles after reset. Where there is one, the
-  synchronised reset releases a few cycles after the input, so an interface
-  that accepts transfers must refuse them until then: reset `full`/`ready` flags to the blocking value (full = 1,
-  ready = 0), not to the idle one.
-- **Clock-domain crossings** (CDC-001..006): two flops for a single bit (an
-  instance of `assets/sync_ff.sv`), registered in the source domain first;
-  never a synchroniser per bit of a bus -- use a handshake, Gray code or an
-  async FIFO; crossings live in a module whose only job is the crossing.
+- **Reset** (RST-004): reset control (state, counters, valids), leave
+  datapath unreset. A single-clock block takes `rst_ni` already
+  synchronised to `clk_i` and adds no reset synchroniser; one inside it
+  would drop the inputs of the first cycles after reset.
 - **FSMs** (FSM-001..004): `typedef enum` state, one FSM per module, no
   combinational outputs across the module boundary.
 - **Ports** (PRT-006, PRT-007): the rest of the port list grouped by
@@ -224,8 +188,7 @@ list against the code you wrote:
   100 columns: name a long condition with a commented `logic`, or split the
   check into several assertions.
 - **Naming** (NAM-003, NAM-009): an active-low flop is `<name>_nq`
-  (`cs_nq`, driving `cs_no`); whole-word names; a signal outside the default
-  clock domain carries its domain's prefix.
+  (`cs_nq`, driving `cs_no`); whole-word names.
 - **Structure** (STR-003, STR-004): declarations next to the logic that
   drives them; no package import cycles.
 - **Departures** (DOC-009): if the design genuinely needs to break a rule,

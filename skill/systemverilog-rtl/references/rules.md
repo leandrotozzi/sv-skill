@@ -5,6 +5,8 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 
 `MUST` violations fail `svstyle check`. `[fix]` marks what `svstyle fix` writes for you.
 
+CDC rules are in `rules-cdc.md`, read only when they apply.
+
 ## DOC — Comments and file header
 
 - **DOC-001** · MUST · Every `.sv` and `.svh` file begins with the copyright line, the all-rights-reserved line, and a `Description:` block that says what the file does. A file that opens with the project's own licence header keeps it, followed by the `Description:` block. `[fix]`
@@ -101,15 +103,6 @@ Generated from `rules.toml` — do not edit. Full rationale and examples:
 - **FSM-002** · SHOULD · An FSM is written as a sequential `always_ff` holding the state register plus a combinational `always_comb` computing next state and outputs; a third `always_ff` is added when outputs must be registered.
 - **FSM-003** · SHOULD · An FSM does not drive combinational (Mealy) outputs across a module boundary; such outputs are registered first, or the output logic moves into the consuming module.
 - **FSM-004** · SHOULD · A module contains at most one state machine.
-
-## CDC — Clock domain crossing
-
-- **CDC-001** · MUST · Every one-bit signal crossing an asynchronous clock boundary passes through two flip-flops clocked by the destination clock, with no logic between them.
-- **CDC-002** · MUST · A multi-bit value is not crossed by putting a two-flop synchroniser on each bit.
-- **CDC-003** · MUST · A multi-bit crossing uses one of: consolidation to a single bit regenerated locally; an unsynchronised data bus held stable behind a synchronised enable; Gray coding for counters; or an asynchronous FIFO.
-- **CDC-004** · MUST · A signal is registered in its source clock domain immediately before crossing; combinational logic does not drive a crossing directly.
-- **CDC-005** · MUST · A one-bit signal crossed open-loop through a two-flop synchroniser is held for more than 1.5 destination clock periods -- three destination edges. Narrower events use a closed-loop handshake.
-- **CDC-006** · SHOULD · Only the top level of a design sees more than one clock; every clock-domain crossing lives inside a module whose purpose is that crossing.
 
 ## GEN — Generate and parameterisation
 

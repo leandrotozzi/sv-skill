@@ -37,7 +37,8 @@ REPO = Path(__file__).resolve().parents[2]
 SKILL = REPO / "skill" / "systemverilog-rtl"
 OUTPUTS = {
     REPO / "docs" / "style-guide.html": "html",
-    SKILL / "references" / "rules.md": "compact",
+    SKILL / "references" / "rules.md": "compact:core",
+    **{SKILL / "references" / f: f"compact:{c}" for c, f in docgen.ON_DEMAND.items()},
     SKILL / "references" / "rules-rationale.md": "full",
 }
 
@@ -52,8 +53,8 @@ RULE_ID_RE = re.compile(r"\b[A-Z]{3}-\d{3}\b")
 def _render(kind: str, rules: list) -> str:
     if kind == "html":
         return docgen.render_html(rules)
-    if kind == "compact":
-        return docgen.render_markdown_compact(rules)
+    if kind.startswith("compact"):
+        return docgen.render_markdown_compact(rules, kind.partition(":")[2])
     return docgen.render_markdown_full(rules)
 
 
@@ -89,11 +90,14 @@ def _check(rules: list) -> int:
     for name in sorted(enabled - set(cited)):
         problems.append(f"config enables verible-lint rule {name!r} that no rule claims")
 
-    # 3. Every rule ID cited in SKILL.md must exist.
+    # 3. Every rule ID cited in SKILL.md and the hand-written references must exist.
     ids = {r.id for r in rules}
-    for rid in sorted(set(RULE_ID_RE.findall(SKILL_MD.read_text(encoding="utf-8")))):
-        if rid not in ids:
-            problems.append(f"SKILL.md cites {rid}, which is not in rules.toml")
+    for doc in [SKILL_MD, *sorted((SKILL / "references").glob("*.md"))]:
+        if doc in OUTPUTS:
+            continue
+        for rid in sorted(set(RULE_ID_RE.findall(doc.read_text(encoding="utf-8")))):
+            if rid not in ids:
+                problems.append(f"{doc.name} cites {rid}, which is not in rules.toml")
 
     # 4. Generated files must be up to date.
     for path, kind in OUTPUTS.items():

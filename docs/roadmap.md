@@ -747,3 +747,20 @@ one-run noise (axil-regs alone $0.85 to $1.39 with the same builds); the
 reliable gains are the builds (37 to 13) and the denials (33 to 6). Four
 of the six left were `; echo exit=$?` appended to a command; `SKILL.md`
 now says the tool reports the exit code.
+
+### Progressive disclosure (2026-10-11)
+
+`SKILL.md` keeps what writing new single-clock RTL needs. Review and legacy
+code moved to `references/existing-code.md`, multi-clock guidance to
+`references/multi-clock.md`, and the CDC rules to a generated
+`references/rules-cdc.md`. The `rules --check` drift test now also checks
+rule IDs in the hand-written references. Upfront load: 4,752 → 4,178 words.
+
+Old vs new skill, one run each: 7 classics $6.37 → $6.35 (80/80 → 79/80;
+the miss is seq-detect's testbench catching 2/3 planted bugs, a part this
+change does not touch); evals 3, 7, 13 $1.89 → $2.25 (27/27 both);
+VerilogEval subset of 30 $10.54 → $11.11. The on-demand files are read
+exactly where they apply (async-fifo, uart-rx, evals 3, 7, 13) and nowhere
+else. No measurable cost change: a 12 % cut of the upfront words is ~3 %
+of the cost, below one-run noise. Kept for structure, not cost.
+

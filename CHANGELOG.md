@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The skill loads less up front: reviewing and legacy code moved to
+  `references/existing-code.md`, multi-clock guidance to
+  `references/multi-clock.md`, and the CDC rules to a generated
+  `references/rules-cdc.md`; `SKILL.md` says when to read each.
 - The skill simulates before it is done: `assets/skeleton_tb.sv`, a
   self-checking Verilator testbench template, `references/testbench-verilator.md`,
   and a bounded "Simulate" step and "Done means" item in `SKILL.md`.
