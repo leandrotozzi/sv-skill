@@ -339,6 +339,33 @@ def test_reset_style(old, new):
     assert ("RST-001", 21) in _found(text)
 
 
+@pytest.mark.parametrize(
+    "name,is_reset",
+    [("rst_ni", True), ("rst", True), ("reset", True), ("rst_n", True), ("resetn", True),
+     ("areset", True), ("sys_reset_i", True), ("RESET", True), ("nrst", True),
+     ("first_i", False), ("burst_q", False), ("preset_i", False), ("reset_value", True),
+     ("rstate", False)],
+)  # fmt: skip
+def test_reset_names(name, is_reset):
+    from svstyle.checks import RESET_NAME_RE
+
+    assert bool(RESET_NAME_RE.fullmatch(name)) == is_reset
+
+
+def test_synchronous_reset_named_reset_is_found():
+    text = _edit("@(posedge clk_i or negedge rst_ni)", "@(posedge clk_i)")
+    text = text.replace("if (!rst_ni)", "if (reset)")
+    text = text.replace("rst_ni,  // Asynchronous", "reset,   // Asynchronous")
+    assert ("RST-001", 21) in _found(text)
+
+
+def test_a_first_flag_is_not_a_synchronous_reset():
+    text = _edit("@(posedge clk_i or negedge rst_ni)", "@(posedge clk_i)")
+    text = text.replace("if (!rst_ni)", "if (first_i)")
+    text = text.replace("rst_ni,  // Asynchronous", "first_i, // Asynchronous")
+    assert "RST-001" not in {d.rule for d in _check(text)}
+
+
 def test_unreset_datapath_flop_is_not_a_reset_style_finding():
     text = _edit(
         "    // Second stage",

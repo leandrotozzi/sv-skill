@@ -100,7 +100,9 @@ CLOCK_RE = re.compile(r"(?:\w+_)?clk(?:_(?!en)\w+)?_i")
 # A scan reset belongs to the DFT interface (with test_en_i), not the functional resets.
 RESET_RE = re.compile(r"(?!scan_)(?:\w+_)?rst(?:_\w+)?_n?i")
 SUFFIX_ORDER_RE = re.compile(r"_(?:i|o|io)n$")
-RESET_NAME_RE = re.compile(r"\b\w*rst\w*\b")
+# `rst`/`reset` as a whole part of the name (`rst_ni`, `areset`, `sys_reset_i`),
+# so `first_i` and `burst_q` are not resets.
+RESET_NAME_RE = re.compile(r"(?i)\b(?:\w+_)?[ans]?(?:rst|reset)n?(?:_\w+)?\b")
 DIRECTIVE_RE = re.compile(
     r"(?://|/\*).*\b(?:synopsys|synthesis|pragma|cadence|ambit)\b.*\b(full_case|parallel_case)\b"
     r"|\(\*[^)]*\b(full_case|parallel_case)\b"
