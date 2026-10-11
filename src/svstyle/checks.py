@@ -8,6 +8,7 @@ Autofixable findings carry `fix = (offset, text)` to insert, or
 list of those applied together (moving a comment).
 """
 
+import functools
 import re
 import tomllib
 from collections.abc import Sequence
@@ -35,7 +36,12 @@ class ConfigError(Exception):
 
 def load_config(path: str | Path) -> dict:
     """The nearest `.svstyle.toml` above `path`, like ruff finds `ruff.toml`; {} if none."""
-    for d in Path(path).resolve().parents:
+    return _config_from(Path(path).resolve().parent)
+
+
+@functools.cache  # one read per directory per run; `cli.main` clears it
+def _config_from(start: Path) -> dict:
+    for d in (start, *start.parents):
         cfg = d / CONFIG_NAME
         if cfg.is_file():
             try:

@@ -9,6 +9,7 @@ the rules DB stay visible (`svstyle rules --unmapped`).
 import re
 import shutil
 import subprocess
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -130,7 +131,7 @@ def _optional_register(d: Diag) -> bool:
     m = NOT_NBA_RE.match(d.message)
     if d.rule != "NAM-004" or not m:
         return False
-    text = Path(d.path).read_text()
+    text = Path(d.path).read_text(encoding="utf-8")
     return re.search(rf"^\s*{re.escape(m.group(1))}\s*<=", text, re.MULTILINE) is not None
 
 
@@ -161,7 +162,9 @@ def verilator_lint(
     asked = {Path(p).resolve() for p in paths}
     # A package's constants are used by modules elsewhere in the design, so
     # "unused" means nothing when the package is linted without them.
-    packages = {Path(p).resolve() for p in paths if PACKAGE_RE.search(Path(p).read_text())}
+    packages = {
+        Path(p).resolve() for p in paths if PACKAGE_RE.search(Path(p).read_text(encoding="utf-8"))
+    }
     return [
         d
         for d in diags
@@ -247,12 +250,18 @@ def yosys_check(
     """`partial`: a module the files instantiate is not among them (a black box)."""
     dirs = dict.fromkeys([*include_dirs, *(str(Path(p).parent) for p in paths)])
     paths = packages_first(paths)
-    # Files are quoted, but Yosys takes no quoted -I: a dir with a space is left
-    # out. Yosys searches each file's own dir anyway; any other miss fails loudly
-    # through the exit code below.
-    incs = [f"-I{d}" for d in dirs if not re.search(r"\s", d)]
-    read = "read_verilog -sv " + " ".join([*incs, *(f'"{p}"' for p in paths)])
-    res = _run("yosys", ["-q", "-p", f"{read}; hierarchy; proc; check"])
+    with tempfile.TemporaryDirectory(prefix="svstyle") as tmp:
+        # Files are quoted, but Yosys takes no quoted -I: a dir with a space is
+        # reached through a symlink whose path has none.
+        incs = []
+        for i, d in enumerate(dirs):
+            if re.search(r"\s", d):
+                link = Path(tmp) / f"inc{i}"
+                link.symlink_to(Path(d).resolve(), target_is_directory=True)
+                d = str(link)
+            incs.append(f"-I{d}")
+        read = "read_verilog -sv " + " ".join([*incs, *(f'"{p}"' for p in paths)])
+        res = _run("yosys", ["-q", "-p", f"{read}; hierarchy; proc; check"])
     out = res.stdout + res.stderr
     diags = parse_yosys(out, rules, paths[0], partial)
     if res.returncode != 0 and not any(d.rule == "EXT-YOSYS-read" for d in diags):

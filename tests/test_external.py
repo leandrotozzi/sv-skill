@@ -432,3 +432,13 @@ def test_format_parse_failure_names_the_line_not_stdin(monkeypatch):
     monkeypatch.setattr(ext, "_run", lambda *a, **k: subprocess.CompletedProcess([], 1, "", err))
     with pytest.raises(ext.ToolFailed, match=r"^Verible cannot parse line 87 \(slang can\): syn"):
         ext.verible_format("module m; endmodule\n")
+
+
+def test_a_hung_tool_fails_instead_of_hanging(monkeypatch):
+    def hang(cmd, **kw):
+        raise subprocess.TimeoutExpired(cmd, kw["timeout"])
+
+    monkeypatch.setattr(ext.shutil, "which", lambda t: f"/bin/{t}")
+    monkeypatch.setattr(ext.subprocess, "run", hang)
+    with pytest.raises(ext.ToolFailed, match="timed out"):
+        ext._run("verilator", ["--version"])

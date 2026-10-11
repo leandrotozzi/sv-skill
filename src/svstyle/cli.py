@@ -7,18 +7,26 @@ svstyle broke its own invariant and wrote nothing.
 
 import argparse
 import difflib
+import errno
 import fnmatch
 import json
 import os
 import re
 import sys
 from collections import Counter
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
 from . import __version__, docgen, external
-from .checks import PLACEHOLDER, ConfigError, apply_waivers, load_config, run_checks
+from .checks import (
+    PLACEHOLDER,
+    ConfigError,
+    _config_from,
+    apply_waivers,
+    load_config,
+    run_checks,
+)
 from .fix import InvariantError, fix_text
 from .parse import ParseError, parse
 from .rules import RULES_TOML, RulesError, by_category, load_rules, tool_index
@@ -227,7 +235,9 @@ def _cmd_check(args, rules: list) -> int:
             code = max(code, 3)
             continue
         if isinstance(res, Exception):
-            raise res
+            errors.append(_internal(res, path))
+            code = max(code, 4)
+            continue
         found, ports, instantiated = res
         diags += found
         defined.update(ports)
@@ -246,10 +256,13 @@ def _cmd_check(args, rules: list) -> int:
             # A module nobody passed is a black box to Yosys: its outputs look undriven.
             partial = bool(used - defined)
             tools += (lambda: external.yosys_check(parsed, rules, list(includes), partial),)
-        for tool in tools:
+        # The tools are separate processes: run them at once, report in order.
+        with ThreadPoolExecutor(len(tools)) as pool:
+            runs = [pool.submit(tool) for tool in tools]
+        resolved = {str(Path(p).resolve()): t for p, t in texts.items()}
+        for run in runs:
             try:
-                resolved = {str(Path(p).resolve()): t for p, t in texts.items()}
-                for path, found in _by_path(tool()).items():
+                for path, found in _by_path(run.result()).items():
                     text = resolved.get(str(Path(path).resolve()))
                     diags += found if text is None else apply_waivers(found, text)
             except external.ToolMissing as exc:
@@ -360,7 +373,11 @@ def _fix_failure(exc: Exception, path: str) -> tuple[str, int]:
         return str(exc), 3
     if isinstance(exc, InvariantError):
         return f"{exc} (please report; the file was not written)", 4
-    raise exc
+    return _internal(exc, path) + "; the file was not written", 4
+
+
+def _internal(exc: Exception, path: str) -> str:
+    return f"{path}: internal error, please report: {type(exc).__name__}: {exc}"
 
 
 def _cmd_fix(args, rules: list) -> int:
@@ -463,19 +480,24 @@ def _excluded(path: str) -> bool:
     return any(fnmatch.fnmatchcase(rel, pat) for pat in cfg["exclude"])
 
 
-def _read_filelist(path: Path, local: bool, files: list[str], includes: list[str]) -> None:
+def _read_filelist(
+    path: Path, local: bool, files: list[str], includes: list[str], stack: tuple = ()
+) -> None:
     """The subset of the Verilator/VCS filelist syntax that names sources and includes.
 
     `-f` paths are relative to the cwd, `-F` paths to the list; `$VAR` expands;
     `//` comments and other simulator options (`+define+`, `-timescale`) are skipped.
     """
+    if (here := path.resolve()) in stack:
+        raise OSError(errno.ELOOP, "filelist includes itself", str(path))
     base = path.parent if local else Path()
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = os.path.expandvars(raw.split("//", 1)[0]).strip()
         if line.startswith("+incdir+"):
             includes += [str(base / d) for d in line[len("+incdir+") :].split("+") if d]
         elif line[:3] in ("-f ", "-F "):
-            _read_filelist(base / line[3:].strip(), line[1] == "F", files, includes)
+            nested = base / line[3:].strip()
+            _read_filelist(nested, line[1] == "F", files, includes, (*stack, here))
         elif line and not line.startswith(("-", "+")):
             files.append(str(base / line))
 
@@ -512,6 +534,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--diff", action="store_true", help="print the diff instead of writing")
 
     args = parser.parse_args(argv)
+    _config_from.cache_clear()  # a config may have changed since the last call
     if getattr(args, "write_baseline", False) and not args.baseline:
         parser.error("--write-baseline needs --baseline FILE")
     if args.cmd in ("check", "fix"):

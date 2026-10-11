@@ -358,3 +358,65 @@ def test_fix_reports_each_file_on_its_own_when_run_in_parallel(capsys, tmp_path)
     code, _, err = _run(capsys, "fix", tmp_path / "bad.sv", good)
     assert code == 3 and "bad.sv" in err
     assert "reg " not in good.read_text()  # the other file was still fixed
+
+
+# --- unexpected failures, filelists, config -------------------------------------
+
+
+def test_unexpected_worker_exception_exits_4_without_a_traceback(capsys, sv, monkeypatch):
+    import svstyle.cli as cli
+
+    def boom(*_):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(cli, "run_checks", boom)
+    code, _, err = _run(capsys, "check", "--no-external", sv())
+    assert code == 4 and "internal error" in err and "RuntimeError: boom" in err
+    monkeypatch.setattr(cli, "fix_text", boom)
+    p = sv()
+    code, _, err = _run(capsys, "fix", p)
+    assert code == 4 and "not written" in err and p.read_text() == CLEAN
+
+
+def test_filelist_that_includes_itself_is_an_error(capsys, tmp_path):
+    (tmp_path / "a.f").write_text("-F b.f\n")
+    (tmp_path / "b.f").write_text("-F a.f\n")
+    with pytest.raises(SystemExit) as exc:
+        main(["check", "--no-external", "-F", str(tmp_path / "a.f")])
+    assert exc.value.code == 2 and "includes itself" in capsys.readouterr().err
+
+
+def test_lowercase_f_paths_are_relative_to_the_cwd(capsys, tmp_path, monkeypatch):
+    (tmp_path / "rtl").mkdir()
+    (tmp_path / "rtl" / "reg_byte.sv").write_text(CLEAN)
+    (tmp_path / "rtl" / "files.f").write_text("rtl/reg_byte.sv\n")
+    monkeypatch.chdir(tmp_path)
+    code, out, err = _run(capsys, "check", "--no-external", "-f", "rtl/files.f")
+    assert code == 0, err
+    assert out.strip().endswith("0 findings")
+
+
+def test_config_select_keeps_only_those_rules(capsys, tmp_path):
+    (tmp_path / ".svstyle.toml").write_text('select = ["DOC-003"]\n')
+    p = tmp_path / "reg_byte.sv"
+    p.write_text(
+        CLEAN.replace("    logic", "    reg", 1).replace(
+            "rst_ni,  // Asynchronous reset, active-low", "rst_ni,"
+        )
+    )
+    out = json.loads(_run(capsys, "check", "--no-external", "--json", p)[1])
+    assert {d["rule"] for d in out["diagnostics"]} == {"DOC-003"}
+
+
+@pytest.mark.skipif(not shutil.which("yosys"), reason="yosys missing")
+def test_synth_finds_includes_in_a_dir_with_a_space(capsys, tmp_path):
+    inc = tmp_path / "inc dir"
+    inc.mkdir()
+    (inc / "defs.svh").write_text("`define WIDTH 8\n")
+    p = tmp_path / "rtl" / "reg_byte.sv"
+    p.parent.mkdir()
+    p.write_text(
+        CLEAN.replace("`default_nettype none\n", '`default_nettype none\n`include "defs.svh"\n')
+    )
+    code, out, err = _run(capsys, "check", "--synth", "--select", "EXT-YOSYS", "-I", inc, p)
+    assert code == 0, out + err
