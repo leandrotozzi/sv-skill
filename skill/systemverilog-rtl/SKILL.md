@@ -38,6 +38,29 @@ module name). The FSM template keeps its enum in a package because other
 modules usually need the type; an enum used by one module only can be a
 `typedef` inside it. Packages are `<name>_pkg` in `<name>_pkg.sv`.
 
+## When the interface is given
+
+A spec, a benchmark, a testbench, vendor IP or the code it plugs into may
+fix the module name, the port names, the reset polarity or the reset style
+(`clk`, `reset`, `in`, `out`, a synchronous active-high reset). Then keep
+them exactly as given, and never rename a port unless the user asks: the
+house style is for what you choose, not for a contract you were handed.
+
+Everything inside still follows the style: comments, internal names, `_q`
+flops (register `out_q` and `assign out = out_q;`). Waive what the interface
+forces, with the reason (DOC-009). A trailing waiver also serves as the
+port comment:
+
+```systemverilog
+    input  logic       clk,    // svstyle: waive NAM-002 fixed interface; system clock
+    input  logic       reset,  // svstyle: waive NAM-002 fixed interface; sync reset, active-high
+...
+    // svstyle: waive RST-001 fixed interface: synchronous active-high reset
+    always_ff @(posedge clk) begin
+```
+
+Say in the header's `Description:` that the interface is fixed and by what.
+
 ## Write it the way the checker expects
 
 The fixer can insert a missing comment, but it can only write
@@ -95,6 +118,28 @@ Then work through what `check` still reports; `references/tooling.md` lists
 what `fix` leaves alone and why. To adopt the style on a large codebase
 without fixing everything at once, `check --baseline` (in `tooling.md`)
 fails only on new findings.
+
+## Reviewing RTL
+
+When the user asks for a review, report; do not edit unless asked.
+
+1. Run `svstyle check --synth` on every file of the design in one call (or
+   without `--synth`, as in "The loop" below). Its findings are the
+   mechanical part.
+2. Walk the review rules (`svstyle rules --unmapped`, about thirty) by what
+   the code contains: CDC-* and RST-002/003 only with more than one clock,
+   FSM-* and DOC-008 only with an enum state, PRT-007 only with ready/valid,
+   LNG-018 only with signed arithmetic. Then the design itself: does it do
+   what its description and the spec say, at the edges (reset, full, empty,
+   overflow, back-to-back)?
+3. Report in this order: findings, each with rule ID (or "design"),
+   `file:line`, severity and one line of why (`references/rules-rationale.md`,
+   by heading, when the reason is not obvious); then what you did not check
+   (no testbench run, files you were not given, a second clock you inferred).
+
+A correct file gets a short report that says so. Do not invent findings to
+fill one, and do not report style the interface forces (see "When the
+interface is given").
 
 ## The loop
 
