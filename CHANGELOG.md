@@ -8,6 +8,8 @@
 - The PostToolUse hook skips testbenches (`tb/` and `*_tb.sv`).
 - Evals: 15 planted bugs for five classics in `evals/files/classics/bugs/`,
   and `grade.py`'s `tb_catches` runs the output's own testbench against them.
+- `evals/run.py`: run and grade any eval through `claude -p`, with and
+  without the skill; `evals/README.md`.
 
 ## 0.1.0 — 2026-10-10
 

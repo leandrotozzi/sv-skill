@@ -17,7 +17,9 @@ from pathlib import Path
 
 # USD per million tokens, Claude Opus 5.5 (cache writes: 5 min x1.25, 1 h x2).
 PRICE = {"input": 4.0, "cache_5m": 5.0, "cache_1h": 8.0, "cache_read": 0.2, "output": 20.0}
-PROJECT = Path.home() / ".claude/projects/-Users-leandrotozzi-Documents-claude-sv-skill"
+# Claude Code's transcript dir for this checkout: its path with "/" as "-".
+REPO = Path(__file__).resolve().parents[1]
+PROJECT = Path.home() / ".claude/projects" / str(REPO).replace("/", "-")
 
 
 def _chars(x) -> int:

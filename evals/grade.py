@@ -23,7 +23,7 @@ CHECKS = {
 }
 
 
-def run(cmd: list[str], cwd: Path, timeout: float | None = None) -> subprocess.CompletedProcess:
+def run(cmd: list[str], cwd: Path, timeout: float = 600) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
 
 
@@ -47,10 +47,10 @@ def grade_review(out: Path, checks: list[dict]) -> list[dict]:
                     if re.search(c["report_absent"], ln) and not NEGATED_RE.search(ln)]  # fmt: skip
             ok, ev = not hits, f"found {hits[0]!r}" if hits else "absent"
         else:  # unchanged: an edited copy among the outputs is an edit nobody asked for
+            # At its name (skill-creator runs) or at its repo path (run.py copies it there).
             edited = [
-                f for f in c["unchanged"]
-                if (out / Path(f).name).exists()
-                and (out / Path(f).name).read_text() != (EVALS / f).read_text()
+                f for f in c["unchanged"] for p in (out / Path(f).name, out / f)
+                if p.exists() and p.read_text() != (EVALS.parent / f).read_text()
             ]  # fmt: skip
             ok, ev = not edited, f"edited: {edited}" if edited else "untouched"
         exp.append({"text": c["text"], "passed": bool(ok), "evidence": ev[:600]})
@@ -127,7 +127,8 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
     ]  # fmt: skip
     check("verilator --lint-only -Wall is clean", not warns, "\n".join(warns[:8]) or "clean")
 
-    read = f"read_verilog -sv {' '.join(incs)} {' '.join(files)}"
+    quoted = " ".join(f'"{f}"' for f in files)  # a path with a space
+    read = f"read_verilog -sv {' '.join(incs)} {quoted}"
     ys = run(["yosys", "-q", "-p", f"{read}; synth -auto-top"], out)
     check("Yosys reads and synthesizes the design", ys.returncode == 0,
           (ys.stderr or ys.stdout).strip()[-400:] or "ok")  # fmt: skip

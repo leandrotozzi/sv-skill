@@ -560,3 +560,28 @@ Rerun of the five, with the skill, Opus 5.5, `claude -p` (2026-10-11):
 - Cost per block is up from about $0.30–0.53 in earlier rounds: the
   testbench is most of the new work.
 
+### M13 — Reproducible evals (runner)
+
+- [x] `evals/run.py`: `claude -p` per eval, config and run in an empty
+  directory outside the repo, inputs copied to the path the prompt names,
+  graded by `grade.py`, one Markdown table. `evals/README.md` records the
+  layout and the tool versions.
+- [x] `grade.py`: a 600 s default timeout on every tool call, Yosys file
+  names quoted, the `unchanged` check also looks at the input's repo path.
+  `cost.py` derives the transcript directory from the checkout.
+- [ ] VerilogEval: the full 155 only if the user approves the cost (the
+  30-problem run above is the current number).
+
+First run of evals 10–12 (written in M14), Opus 5.5, one run each,
+2026-10-11, $1.83 in total:
+
+| eval | with skill | without skill |
+|---|---|---|
+| 10 fixed interface | 11/11 | 6/11 (behaviour and ports right; style 0/5) |
+| 11 review, three planted bugs | 5/5 | 5/5 |
+| 12 review, correct block | 3/3 | 3/3 |
+
+Evals 11 and 12 do not separate the configs: the baseline finds the three
+bugs and invents no CDC finding either. They stay as regression checks for
+the review workflow; a discriminating review eval needs subtler bugs.
+

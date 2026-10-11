@@ -1,0 +1,48 @@
+# Evals
+
+| File | What |
+|---|---|
+| `evals.json` | skill evals 1–12: prompts, input files, per-eval checks |
+| `classics.json` | 35 classic blocks (101–), each graded against a reference by `files/classics/<name>_tb.sv` |
+| `files/classics/bugs/` | planted-bug variants of five classics; `tb_catches` runs the output's own testbench on them |
+| `run.py` | runs evals through `claude -p`, with and without the skill, grades, prints a table |
+| `grade.py` | every check by a tool: `svstyle`, Verilator, Yosys, equivalence and review checks |
+| `verilogeval.py` | VerilogEval v2 spec-to-RTL subset, same runner, graded by the dataset's testbenches |
+| `cost.py`, `compare.py` | cost from transcripts and side-by-side HTML of skill-creator iterations |
+| `trigger_evals.json` | skill-description trigger evals |
+| `yosys-probes/` | one-construct Yosys probes behind `synth-yosys.md` |
+
+## Run
+
+```sh
+uv run python evals/run.py classics --ids 101,105 --runs 3
+uv run python evals/run.py evals --ids 10,11,12 --configs with_skill
+```
+
+Each run starts in an empty directory outside the repo (`--out`, default
+`$TMPDIR/sv-evals`) with `--setting-sources project`, so no user skill, hook
+or `CLAUDE.md` leaks in; `with_skill` adds this repo with `--plugin-dir`.
+Inside the repo it would not work: Claude Code refuses writes into a plugin
+directory. Input files are copied to the path the prompt names.
+
+```
+OUT/eval-<name>/eval_metadata.json
+OUT/eval-<name>/<config>/run-N/outputs/       what the model wrote
+OUT/eval-<name>/<config>/run-N/grading.json   every check, with evidence
+OUT/eval-<name>/<config>/run-N/timing.json    cost (USD), turns, seconds
+OUT/results.md                                one row per eval and config
+```
+
+`grade.py DIR` also grades a skill-creator iteration (`<config>/outputs`
+moved to `run-1/outputs`).
+
+## Tools
+
+Results depend on these; record them with any number you publish.
+
+| Tool | Local | CI (OSS CAD Suite 2026-10-07) |
+|---|---|---|
+| Verible | v0.0-3946 (pinned) | v0.0-3946 |
+| Verilator | 5.052 | 5.053 |
+| Yosys | 0.66 | 0.69 |
+| Icarus Verilog | 13.0 (VerilogEval only; see `verilogeval.py`) | — |
