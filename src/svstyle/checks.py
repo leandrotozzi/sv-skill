@@ -128,9 +128,10 @@ def run_checks(
     check_comment_length(ctx, text)
     check_comments(ctx, src)
     check_ports(ctx, src)
-    check_constructs(ctx, text, src)
+    toks = raw_tokens(text)
+    check_constructs(ctx, text, src, toks)
     check_resets(ctx, src)
-    check_extension(ctx, text)
+    check_extension(ctx, toks)
     check_keyword_names(ctx, src)
     return sorted(apply_waivers(ctx.out, text), key=lambda d: d.line)
 
@@ -365,11 +366,18 @@ DESIGN_UNITS = {
 }  # fmt: skip
 
 
-def check_extension(ctx: _Ctx, text: str) -> None:
-    """A `.sv` that defines nothing only makes sense `include`d: it is a header."""
-    if ctx.path.endswith(".sv") and not any(k in DESIGN_UNITS for k, _, _ in raw_tokens(text)):
+def check_extension(ctx: _Ctx, toks: list) -> None:
+    """A `.sv` that defines nothing only makes sense `include`d: it is a header.
+
+    `toks`: the file's `raw_tokens`."""
+    if ctx.path.endswith(".sv") and not any(k in DESIGN_UNITS for k, _, _ in toks):
         msg = "defines no module, package or interface; a file only `include`d is `.svh`"
         ctx.emit(rule="file_extension", line=1, message=msg)
+
+
+@functools.cache
+def _is_keyword(name: str) -> bool:
+    return raw_tokens(name)[0][0].name.endswith("Keyword")
 
 
 def check_keyword_names(ctx: _Ctx, src: Source) -> None:
@@ -379,17 +387,17 @@ def check_keyword_names(ctx: _Ctx, src: Source) -> None:
         if a.kind not in ("port", "param", "decl"):
             continue
         for name in a.name.split(", "):
-            if raw_tokens(name)[0][0].name.endswith("Keyword"):
+            if _is_keyword(name):
                 msg = f"`{name}` is a SystemVerilog keyword; rename it"
                 ctx.emit(rule="keyword_name", line=a.line, message=msg)
 
 
-def check_constructs(ctx: _Ctx, text: str, src: Source) -> None:
+def check_constructs(ctx: _Ctx, text: str, src: Source, toks: list) -> None:
     # `fix` keeps a Verilog file Verilog; renaming it to .sv is the migration step.
     sv = is_sv(ctx.path)
     rename = "" if sv else " (rename the file to .sv first)"
     prev = ""
-    for kind, tok, offset in raw_tokens(text):
+    for kind, tok, offset in toks:
         # `default_nettype wire` names a net type, it declares nothing.
         if (kw := LEGACY_NETS.get(kind)) and prev != "`default_nettype":
             line = text.count("\n", 0, offset) + 1

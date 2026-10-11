@@ -217,17 +217,29 @@ class _Walker:
         # Tokens pulled in by `include belong to another file, with that file's
         # line numbers; only this file's tokens (and macro expansions in it) count.
         self.main = self.root.getLastToken().location.buffer  # EOF of this file
-        every = _tokens(self.root)
-        self.toks = [
-            t for t in every if (t.rawText or t.kind == TokenKind.EndOfFile) and self.is_main(t)
-        ]
+        # One visit for the whole tree: each crossing into pyslang costs, and
+        # `.kind` builds a Python enum on every read, so read it once per node.
+        self.nodes: list[SyntaxNode] = []
+        every: list = []
+        self.root.visit(lambda x: (self.nodes if isinstance(x, SyntaxNode) else every).append(x))
+        self.kinds = [n.kind for n in self.nodes]
+        main = [self.is_main(t) for t in every]
+        foreign = [t for t, m in zip(every, main, strict=True) if not m]
+        written = [t for t in every if t.rawText or t.kind == TokenKind.EndOfFile]
+        self.toks = [t for t in written if self.is_main(t)] if foreign else written
+        if not foreign:
+            self.is_main = lambda _tok: True  # every token of the tree was just checked
         # Where macro expansions and directives sit, so "does this node contain one"
         # is a bisect over its span instead of a walk over its subtree.
         self.macro_at = sorted(self.offset(t) for t in every if self.sm.isMacroLoc(t.location))
+        # Spans nest only when every token is this file's own text: a nested macro's
+        # or an `include's tokens have offsets into another buffer. Then a node with
+        # no macro or directive in its span has none in its children's either.
+        self.spans_nest = not self.macro_at and not foreign
         # An `include is a directive too: its tokens live in another buffer, so
         # they count at the line of the `include itself.
         self.directive_at = sorted(
-            {self.included_at(t) for t in every if not self.is_main(t)} - {None}
+            {self.included_at(t) for t in foreign} - {None}
             | {
                 self.offset(t)
                 for t in self.toks
@@ -243,7 +255,7 @@ class _Walker:
 
     def run(self) -> Source:
         self.walk(self.root, split_list=False)
-        self.resolved, self.initial_vars = _resolved_and_initial(self.root)
+        self.resolved, self.initial_vars = _resolved_and_initial(self.nodes, self.kinds)
         self.design_ports()
         self.modernise(self.root)
         # A file with one design unit parses to that unit as the root; only a
@@ -256,23 +268,29 @@ class _Walker:
             ]
         return self.src
 
-    def modernise(self, node: SyntaxNode) -> None:
+    def modernise(self, node: SyntaxNode, clean: bool = False) -> None:
         """Collect the legacy constructs `fix` may rewrite, over the whole tree.
 
         Only this file's own text, outside macro expansions and preprocessor
         splits, is ever rewritten; everything else is reported and left alone.
+        `clean`: an ancestor's span holds no macro, directive or `include, so
+        this node's cannot either and the lookups below are skipped.
         """
         k = node.kind
-        first = node.getFirstToken()
-        if k == K.ClassDeclaration or (
-            first is not None and first.rawText and not self.is_main(first)
-        ):
+        if k == K.ClassDeclaration:
             return
-        # Containers are always entered; anything smaller that a macro or an
-        # `ifdef reaches into is left exactly as written.
-        containers = (K.ModuleDeclaration, K.CompilationUnit, K.PackageDeclaration)
-        if k not in containers and (self.in_macro(node) or self.has_directive(node)):
-            return
+        if not clean:
+            first = node.getFirstToken()
+            if first is not None and first.rawText and not self.is_main(first):
+                return
+            # Containers are always entered; anything smaller that a macro or an
+            # `ifdef reaches into is left exactly as written.
+            lo, hi = self.offset(first), self.offset(node.getLastToken())
+            dirty = self._macro_in(lo, hi) or self._directive_in(lo, hi)
+            containers = (K.ModuleDeclaration, K.CompilationUnit, K.PackageDeclaration)
+            if dirty and k not in containers:
+                return
+            clean = not dirty and self.spans_nest
         if k == K.NetDeclaration and node.netType.rawText == "wire":
             decls = [d for d in node.declarators if isinstance(d, SyntaxNode)]
             if not any(d.initializer or d.name.rawText in self.resolved for d in decls):
@@ -300,18 +318,19 @@ class _Walker:
         ):
             kw = node.prototype.keyword
             self.src.rewrites.append((self.offset(kw) + len(kw.rawText), " automatic", 0))
-        for body in _bodies(node):
-            if body.kind != K.SequentialBlockStatement and not self.in_macro(body):
+        for body in _bodies(node, k):
+            if body.kind != K.SequentialBlockStatement and (clean or not self.in_macro(body)):
                 last = body.getLastToken()
                 self.src.rewrites.append((self.offset(body.getFirstToken()), "begin ", 0))
                 self.src.rewrites.append((self.offset(last) + len(last.rawText), " end", 0))
-        for child in node:
-            if isinstance(child, SyntaxNode):
-                self.modernise(child)
+        for child in _children(node):
+            self.modernise(child, clean)
 
     def has_directive(self, node: SyntaxNode) -> bool:
         """A directive inside `node` (one right before its first token is outside it)."""
-        lo, hi = self.span(node)
+        return self._directive_in(*self.span(node))
+
+    def _directive_in(self, lo: int, hi: int) -> bool:
         i = bisect.bisect_right(self.directive_at, lo)
         return i < len(self.directive_at) and self.directive_at[i] <= hi
 
@@ -384,13 +403,12 @@ class _Walker:
 
     def design_ports(self) -> None:
         """Record ports and instances; nets on an inout must stay `wire`."""
-        nodes = _nodes(self.root)
-        for n in nodes:
-            if n.kind in (K.ModuleDeclaration, K.InterfaceDeclaration):
+        for n, k in zip(self.nodes, self.kinds, strict=True):
+            if k in (K.ModuleDeclaration, K.InterfaceDeclaration):
                 self.src.ports[n.header.name.valueText] = _module_ports(n)
         known = {**self.other_ports, **self.src.ports}
-        for n in nodes:
-            if n.kind != K.HierarchyInstantiation:
+        for n, k in zip(self.nodes, self.kinds, strict=True):
+            if k != K.HierarchyInstantiation:
                 continue
             kind = n.type.valueText
             self.src.instantiated.add(kind)
@@ -429,7 +447,9 @@ class _Walker:
         return self.sm.isMacroLoc(loc) and self.sm.getMacroName(loc).startswith("ASSERT")
 
     def in_macro(self, node: SyntaxNode) -> bool:
-        lo, hi = self.span(node)
+        return self._macro_in(*self.span(node))
+
+    def _macro_in(self, lo: int, hi: int) -> bool:
         i = bisect.bisect_left(self.macro_at, lo)
         return i < len(self.macro_at) and self.macro_at[i] <= hi
 
@@ -479,9 +499,8 @@ class _Walker:
                 self.src.ordered_params.append((names, self.line(node.getFirstToken())))
             self.above(node, "instance", names, style)
             return
-        for child in node:
-            if isinstance(child, SyntaxNode):
-                self.walk(child, split_list)
+        for child in _children(node):
+            self.walk(child, split_list)
 
     def trailing(
         self, node: SyntaxNode, kind: str, name: str, split_list: bool, detail: str = ""
@@ -587,7 +606,7 @@ def _module_ports(mod: SyntaxNode) -> tuple[list[str], set[str]]:
     return order, inouts
 
 
-def _resolved_and_initial(root: SyntaxNode) -> tuple[set[str], set[str]]:
+def _resolved_and_initial(nodes: list, kinds: list) -> tuple[set[str], set[str]]:
     """Nets that must stay `wire` (two `assign`s, or one driving `z`), and names
     an `initial` writes. Per file, not per scope: a shared name only keeps more.
 
@@ -596,17 +615,30 @@ def _resolved_and_initial(root: SyntaxNode) -> tuple[set[str], set[str]]:
     seen: set[str] = set()
     resolved: set[str] = set()
     initial: set[str] = set()
-    for n in _nodes(root):
-        if n.kind == K.ContinuousAssign:
+    for n, k in zip(nodes, kinds, strict=True):
+        if k == K.ContinuousAssign:
             for a in n.assignments:
                 names = _assigned(a)
                 resolved |= names & seen
                 seen |= names
                 if Z_RE.search(str(a.right)):
                     resolved |= names
-        elif n.kind == K.InitialBlock:
+        elif k == K.InitialBlock:
             initial |= _assigned(n)
     return resolved, initial
+
+
+def _children(node: SyntaxNode) -> list[SyntaxNode]:
+    """The child nodes of `node`, tokens and empty slots left out.
+
+    Indexing is several times faster than pyslang's `__iter__`, which yields the
+    same children minus the empty slots."""
+    out = []
+    for i in range(len(node)):
+        child = node[i]
+        if isinstance(child, SyntaxNode):
+            out.append(child)
+    return out
 
 
 def _nodes(node: SyntaxNode) -> list[SyntaxNode]:
@@ -624,13 +656,12 @@ PROCESSES = {
 }  # fmt: skip
 
 
-def _bodies(node: SyntaxNode) -> list[SyntaxNode]:
+def _bodies(node: SyntaxNode, k: SyntaxKind) -> list[SyntaxNode]:
     """The statements of `node` that explicit-begin wants inside begin/end.
 
     An `else if` is not one: the `if` is the else-branch's structure, and
-    wrapping it would turn a flat chain into a staircase.
+    wrapping it would turn a flat chain into a staircase. `k` is `node.kind`.
     """
-    k = node.kind
     if k == K.ConditionalStatement:
         out = [node.statement]
         if node.elseClause is not None and node.elseClause.clause.kind != K.ConditionalStatement:
