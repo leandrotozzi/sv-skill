@@ -226,6 +226,8 @@ def check_comment_length(ctx: _Ctx, text: str) -> None:
 
 BIND_RE = re.compile(r"^[ \t]*bind\b", re.M)
 NETTYPE_NONE_RE = re.compile(r"`default_nettype\s+none\b")
+# A closing `default_nettype wire` restores the default, which `resetall does too.
+NETTYPE_WIRE_END_RE = re.compile(r"`default_nettype\s+wire\s*$")
 
 
 def check_default_nettype(ctx: _Ctx, text: str, include_dirs: Sequence[str] = ()) -> None:
@@ -257,12 +259,18 @@ def check_default_nettype(ctx: _Ctx, text: str, include_dirs: Sequence[str] = ()
             break
         offset += len(ln)
     code = [(no, ln) for no, ln in enumerate(lines, 1) if ln.strip()]
-    if code and not code[-1][1].split("//")[0].rstrip().endswith("`resetall"):
+    last = code[-1][1].split("//")[0].rstrip() if code else ""
+    if code and not last.endswith("`resetall"):
         sep = "" if text.endswith("\n") else "\n"
+        fix = (len(text), sep + "\n`resetall\n")
+        if m := NETTYPE_WIRE_END_RE.search(last):
+            # Replace it: appended, Verible would join `resetall onto its line.
+            start = sum(len(ln) for ln in lines[: code[-1][0] - 1]) + m.start()
+            fix = (start, "`resetall", m.end() - m.start())
         ctx.emit(
             rule="default_nettype", line=code[-1][0],
             message="file must end with `resetall",
-            fix=(len(text), sep + "\n`resetall\n"),
+            fix=fix,
         )  # fmt: skip
 
 
@@ -380,8 +388,10 @@ def check_constructs(ctx: _Ctx, text: str, src: Source) -> None:
     # `fix` keeps a Verilog file Verilog; renaming it to .sv is the migration step.
     sv = is_sv(ctx.path)
     rename = "" if sv else " (rename the file to .sv first)"
-    for kind, _, offset in raw_tokens(text):
-        if kw := LEGACY_NETS.get(kind):
+    prev = ""
+    for kind, tok, offset in raw_tokens(text):
+        # `default_nettype wire` names a net type, it declares nothing.
+        if (kw := LEGACY_NETS.get(kind)) and prev != "`default_nettype":
             line = text.count("\n", 0, offset) + 1
             # `reg` is always a variable; a `wire` only when the tree says so.
             safe = kw == "reg" or offset in src.safe_wires
@@ -390,6 +400,7 @@ def check_constructs(ctx: _Ctx, text: str, src: Source) -> None:
                 fix = (offset, "", src.typed_wires[offset])
             msg = f"`{kw}`: declare `logic` instead{rename}"
             ctx.emit(rule="logic_only", line=line, message=msg, fix=fix if sv else None)
+        prev = tok
     for line, kind, fix in src.legacy_always:
         if kind == "edge":
             msg = "clocked `always`: write `always_ff`" + (

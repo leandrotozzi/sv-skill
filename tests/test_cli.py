@@ -214,6 +214,24 @@ def test_fix_skips_ignored_rules(capsys, tmp_path):
     assert _run(capsys, "check", "--no-external", p)[0] == 0
 
 
+@needs_verible
+def test_closing_default_nettype_wire_becomes_resetall(capsys, tmp_path):
+    # Not a `wire` declaration (LNG-001), and `fix` replaces it rather than
+    # appending a `resetall that Verible would join onto the same line.
+    (tmp_path / ".svstyle.toml").write_text('ignore = ["DOC"]\n')
+    p = tmp_path / "inv.sv"
+    body = (
+        "`default_nettype none\n\nmodule inv (\n    input  logic a_i,\n"
+        "    output logic y_o\n);\n\n    assign y_o = ~a_i;\n\nendmodule\n\n"
+    )
+    p.write_text(body + "`default_nettype wire\n")
+    code, out, _ = _run(capsys, "check", "--no-external", p)
+    assert "LNG-001" not in out and "`resetall" in out
+    assert _run(capsys, "fix", p)[0] == 0
+    assert p.read_text() == body + "`resetall\n"
+    assert _run(capsys, "check", "--no-external", p)[0] == 0
+
+
 def test_bad_config_exits_2(capsys, tmp_path):
     (tmp_path / ".svstyle.toml").write_text("company = 3\n")
     p = tmp_path / "reg_byte.sv"

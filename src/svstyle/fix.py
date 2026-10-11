@@ -25,6 +25,7 @@ from .rules import Rule, keep_rule
 ALLOWED_EDITS = (
     ((), ("`default_nettype", "none")),
     ((), ("`resetall",)),
+    (("`default_nettype", "wire"), ("`resetall",)),
     (("reg",), ("logic",)),
     (("wire",), ("logic",)),
     (("wire",), ()),  # `wire logic x` -> `logic x`
