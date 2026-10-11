@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `svstyle fix` honours `select` / `ignore` in `.svstyle.toml`: it no longer
+  inserts headers or comments for rules `check` ignores.
+- The skill says what to do without the tools: write to the rules, format by
+  hand, and report that nothing was run; name any tool `check` skipped.
+- `docs/roadmap.md` holds open work only; the record moved to `docs/history.md`.
 - The skill skips the testbench for a small block (one clock, no memory,
   no protocol, simple logic, under about 40 lines) and says so.
 - The skill loads less up front: reviewing and legacy code moved to

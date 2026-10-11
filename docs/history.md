@@ -1,4 +1,8 @@
-# Roadmap
+# History
+
+What was measured and decided, round by round, from the 2026-09-28 review
+on. Open work lives in [`roadmap.md`](roadmap.md); this file is the record
+behind it: eval numbers, costs, and why things were or were not done.
 
 Findings from the 2026-09-28 project review, ordered by what lets bad RTL
 through today. Each item names the finding and the fix.

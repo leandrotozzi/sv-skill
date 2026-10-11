@@ -27,11 +27,23 @@ Style lineage: lowRISC (`_i/_o`, `clk_i`, `rst_ni`, `_q/_d`, CamelCase params,
 
 ## Status
 
-On 25 classic blocks, three runs each (75 runs), RTL written with the skill
-was functionally correct 74/75 against self-checking testbenches, and its
-first `svstyle check` was clean 72/75. The Yosys subset in the skill is
-backed by 149 one-construct probes proved with `sat`. Running `svstyle` over
-existing third-party code works but is noisy; see the [roadmap](https://github.com/leandrotozzi/sv-skill/blob/main/docs/roadmap.md).
+What the skill buys is style and clean synthesis, not more correct RTL:
+
+| | without skill | with skill |
+|---|---|---|
+| VerilogEval v2, pass@1 (155 problems, adjudicated) | 149 | 147, equal after review |
+| VerilogEval v2, `svstyle check` clean | 0 | 155 |
+| VerilogEval v2, cost per problem | $0.10 | $0.35 |
+| Classic blocks, Yosys synthesis with no warning and no latch | 22/24 | 35/35 |
+
+On 25 of those classics, three runs each, RTL written with the skill was
+functionally correct 74/75 against self-checking testbenches. The Yosys
+subset in the skill is backed by 149 one-construct probes proved with `sat`,
+four of which synthesise wrong with no error. Running `svstyle` over existing
+third-party code works but is noisy. Open work is in the
+[roadmap](https://github.com/leandrotozzi/sv-skill/blob/main/docs/roadmap.md),
+every measurement in the
+[history](https://github.com/leandrotozzi/sv-skill/blob/main/docs/history.md).
 
 ## Install
 
@@ -57,7 +69,9 @@ uvx svstyle check rtl/         # or run it once without installing
 
 External tools used when present: `verible-verilog-format` / `verible-verilog-lint`
 (pinned `v0.0-3946`), `verilator`, and `yosys` for `--synth`.
-`svstyle check --no-external` skips them; `fix` needs Verible.
+`svstyle check --no-external` skips them; `fix` needs Verible. Where nothing
+can be installed (claude.ai, the API), the skill still writes to the rules
+and says that nothing was checked.
 
 With [pre-commit](https://pre-commit.com):
 
@@ -92,7 +106,13 @@ rtl/fifo.sv:14:1: DOC-003 `rst_ni` has no trailing // comment [fix available]
 ```
 
 Per-project `select` / `ignore` / `include` go in `.svstyle.toml`; a finding is
-waived inline with `// svstyle: waive DOC-004 <reason>`.
+waived inline with `// svstyle: waive DOC-004 <reason>`. To adopt the style
+gradually, start without the comment and header rules:
+
+```toml
+# .svstyle.toml
+ignore = ["DOC-001", "DOC-003", "DOC-004", "DOC-005", "DOC-006"]
+```
 
 More:
 
