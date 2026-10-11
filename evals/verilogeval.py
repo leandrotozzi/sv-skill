@@ -54,7 +54,8 @@ def simulate(dataset: Path, prob: str, dut: Path, work: Path) -> tuple[bool, str
     tb.write_text("".join(ln for ln in (d / f"{prob}_test.sv").open() if "$dump" not in ln))
     sim = work / "sim"
     srcs = [str(dut), str(tb), str(d / f"{prob}_ref.sv")]
-    build = subprocess.run([*IVERILOG, "-o", str(sim), *srcs], capture_output=True, text=True,
+    # -I: the DUT may include a header beside it (the skill's assert_macros.svh).
+    build = subprocess.run([*IVERILOG, f"-I{dut.parent}", "-o", str(sim), *srcs], capture_output=True, text=True,
                            cwd=work)  # fmt: skip
     if build.returncode:
         return False, "does not build: " + build.stderr.strip()[-300:]

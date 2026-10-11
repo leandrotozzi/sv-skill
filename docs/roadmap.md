@@ -571,8 +571,39 @@ Rerun of the five, with the skill, Opus 5.5, `claude -p` (2026-10-11):
 - [x] `grade.py`: a 600 s default timeout on every tool call, Yosys file
   names quoted, the `unchanged` check also looks at the input's repo path.
   `cost.py` derives the transcript directory from the checkout.
-- [ ] VerilogEval: the full 155 only if the user approves the cost (the
-  30-problem run above is the current number).
+- [x] VerilogEval, the full 155 (2026-10-11, Opus 5.5, one run each,
+  $70 in total; below).
+
+Full VerilogEval v2, 155 problems:
+
+| config | pass@1 (iverilog) | pass@1 (adjudicated) | svstyle clean | Verilator -Wall clean | $/problem | s/problem |
+|---|---|---|---|---|---|---|
+| without skill | 134/155 | 149/155 | 0/155 | 143/155 | 0.10 | 21 |
+| with skill | 131/155 | 147/155 | 155/155 | 147/155 | 0.35 | 71 |
+
+- iverilog 13 is the wrong judge for SystemVerilog: 32 of the 45 failures
+  do not build. They are an enum in a ternary (`state_d = in ? A : B`,
+  "requires an explicit cast"), an array indexed in a function, and the
+  skill's `assert_macros.svh`, which the grader did not pass with `-I` (now
+  fixed). Verilator cannot replace it: it is 2-state, and several
+  references output `'x` as a don't-care that the testbench matches with
+  `===`.
+- Adjudicated: a run that does not build under iverilog is graded by
+  simulating its Yosys netlist (`proc; write_verilog`) in iverilog.
+  Netlists that build pass, except Prob139 with the skill. Both configs
+  fail the same six (034, 053, 062, 078, 093, 104). Only the skill fails
+  066 and 139. Yosys `equiv` proves 066 equivalent to the reference (the
+  iverilog failure is a simulation artefact). 139 passes under Verilator;
+  `equiv` cannot decide it because the state encodings differ. So the
+  functional numbers are equal.
+- Cost: 3.5× per problem. From the transcripts, the extra spend splits
+  into roughly 40 % testbench, 40 % reading the skill (`SKILL.md` and
+  references, re-read as context on every later turn) and 20 % the
+  check/fix loop; 9.3 turns per run against 2.4.
+- Reading: as in the 30-problem run, the skill adds no pass@1 on this
+  benchmark. It makes every output pass `svstyle`, at 3.5× the cost. The
+  testbench, the largest single cost, finds nothing here, because the
+  problems are small and come with their own testbench.
 
 First run of evals 10–12 (written in M14), Opus 5.5, one run each,
 2026-10-11, $1.83 in total:
