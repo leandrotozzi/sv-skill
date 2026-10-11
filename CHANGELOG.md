@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- The skill simulates before it is done: `assets/skeleton_tb.sv`, a
+  self-checking Verilator testbench template, `references/testbench-verilator.md`,
+  and a bounded "Simulate" step and "Done means" item in `SKILL.md`.
+- The PostToolUse hook skips testbenches (`tb/` and `*_tb.sv`).
+- Evals: 15 planted bugs for five classics in `evals/files/classics/bugs/`,
+  and `grade.py`'s `tb_catches` runs the output's own testbench against them.
+
 ## 0.1.0 — 2026-10-10
 
 First release.

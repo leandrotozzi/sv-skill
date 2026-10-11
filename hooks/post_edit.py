@@ -11,7 +11,8 @@ import sys
 
 path = json.load(sys.stdin).get("tool_input", {}).get("file_path", "")
 exe = shutil.which("svstyle")
-if not path.endswith((".sv", ".svh")) or exe is None:
+tb = "/tb/" in path or path.endswith("_tb.sv")  # a testbench is not RTL
+if not path.endswith((".sv", ".svh")) or tb or exe is None:
     sys.exit(0)
 try:
     res = subprocess.run([exe, "check", "--no-external", path],

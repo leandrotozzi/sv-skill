@@ -13,8 +13,12 @@ from svstyle.fix import fix_text
 from svstyle.rules import load_rules
 
 ASSETS = Path(__file__).parents[1] / "skill" / "systemverilog-rtl" / "assets"
-TEMPLATES = sorted([*ASSETS.glob("*.sv"), *ASSETS.glob("*.svh")])
-RTL = sorted(ASSETS.glob("*.sv"), key=lambda p: (not p.name.endswith("_pkg.sv"), p.name))
+TB = ASSETS / "skeleton_tb.sv"  # a testbench, not RTL: the house rules do not apply
+TEMPLATES = sorted({*ASSETS.glob("*.sv"), *ASSETS.glob("*.svh")} - {TB})
+RTL = sorted(
+    (p for p in TEMPLATES if p.suffix == ".sv"),
+    key=lambda p: (not p.name.endswith("_pkg.sv"), p.name),
+)
 needs_tools = pytest.mark.skipif(
     not (shutil.which("verible-verilog-format") and shutil.which("verilator")),
     reason="verible or verilator missing",
@@ -102,7 +106,37 @@ def test_templates_pass_full_check_with_only_the_company_placeholder(capsys):
     assert all(PLACEHOLDER in d["message"] for d in doc["diagnostics"])
 
 
-@pytest.mark.parametrize("path", TEMPLATES, ids=lambda p: p.name)
+def simulate(tmp_path: Path, dut: str) -> subprocess.CompletedProcess:
+    """Build and run the testbench template the way testbench-verilator.md says."""
+    (tmp_path / "dut.sv").write_text(dut)
+    build = subprocess.run(
+        ["verilator", "--binary", "--timing", "--assert", "-Wno-fatal", "--x-assign", "unique",
+         "--x-initial", "unique", f"-I{ASSETS}", "--top-module", TB.stem, "dut.sv", str(TB)],
+        cwd=tmp_path, capture_output=True, text=True,
+    )  # fmt: skip
+    assert build.returncode == 0, build.stderr
+    run = [f"obj_dir/V{TB.stem}", "+verilator+rand+reset+2"]
+    return subprocess.run(run, cwd=tmp_path, capture_output=True, text=True)
+
+
+@needs_tools
+def test_testbench_template_passes_on_the_skeleton(tmp_path):
+    sim = simulate(tmp_path, (ASSETS / "skeleton.sv").read_text())
+    assert sim.returncode == 0 and "PASS: " in sim.stdout, sim.stdout + sim.stderr
+
+
+@needs_tools
+@pytest.mark.parametrize(
+    ("good", "bad"),
+    [("valid_d = valid_i;", "valid_d = valid_i && !data_i[7];"),  # a wrong output
+     ("valid_q <= 1'b0;", "valid_q <= valid_q;")],  # a missing reset
+)  # fmt: skip
+def test_testbench_template_fails_on_a_planted_bug(tmp_path, good, bad):
+    sim = simulate(tmp_path, (ASSETS / "skeleton.sv").read_text().replace(good, bad))
+    assert sim.returncode != 0 and "FAIL: " in sim.stdout + sim.stderr
+
+
+@pytest.mark.parametrize("path", [*TEMPLATES, TB], ids=lambda p: p.name)
 def test_template_lines_fit_100_columns(path):
     # Verible's line-length skips comment-only lines, so check every line here.
     assert [n for n, ln in enumerate(path.read_text().splitlines(), 1) if len(ln) > 100] == []

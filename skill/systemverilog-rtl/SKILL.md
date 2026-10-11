@@ -32,6 +32,7 @@ from it by absolute path, not one relative to the project:
 | `assets/fsm.sv` + `assets/fsm_pkg.sv` | a state machine: `typedef enum` state, `state_q`/`state_d`, commented case arms, registered outputs |
 | `assets/sync_ff.sv` | a synchroniser rank (`NumFlops` 2 or 3) for a one-bit level, or a reset synchroniser with `d_i` tied to 1; copy it next to the RTL and instance it, do not rewrite it |
 | `assets/assert_macros.svh` | `` `ASSERT``, `` `ASSERT_KNOWN``, `` `ASSERT_INIT`` (VER-001); both templates include it |
+| `assets/skeleton_tb.sv` | the self-checking testbench for "Simulate" below: a model beside the DUT, a `step` task, one PASS/FAIL line |
 
 Rename the module and the file together (STR-001: the basename is the
 module name). The FSM template keeps its enum in a package because other
@@ -168,6 +169,18 @@ bad connection): fix it first, because the rest of the report is incomplete.
 If `svstyle` is not on PATH, or for exit codes, `--json`, `--select` and
 waivers, read `references/tooling.md`.
 
+## Simulate
+
+A clean `check` says the RTL is well formed, not that it does what the spec
+says. Once it is clean, read `references/testbench-verilator.md`, write
+`tb/<name>_tb.sv` from `assets/skeleton_tb.sv` with a model written from the
+spec (not from your RTL), and build and run it once with the command there.
+Skip this only when the user says so, Verilator is missing, or the user
+supplies a testbench (then run theirs); say which.
+
+Keep it bounded: on a FAIL, decide from the spec whether the RTL or the
+model is wrong, fix that, rerun once. Still failing: stop and report it.
+
 ## What no tool checks for you
 
 About half the rules need judgement. Before calling the RTL done, walk this
@@ -222,8 +235,10 @@ list against the code you wrote:
   `--synth` only if the project synthesises with another tool or Yosys is
   not installed, and say so.
 - No `// TODO: describe` is left: `grep -rn "TODO: describe" rtl/` is empty.
+- The testbench printed `PASS` and no `` `ASSERT`` fired (see "Simulate").
 - The judgement list above has been walked, and anything that departs from
   it carries a DOC-009 comment.
 
 Tell the user what you ran and what it reported, including any SHOULD
-findings you left in place and why.
+findings you left in place and why, and what the testbench checked (the
+directed cases, how many random cycles, the seed) and what it did not.

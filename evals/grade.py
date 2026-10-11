@@ -23,8 +23,8 @@ CHECKS = {
 }
 
 
-def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+def run(cmd: list[str], cwd: Path, timeout: float | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
 
 
 REPORT_CHECKS = ("report", "report_absent", "unchanged")
@@ -62,8 +62,14 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
         return grade_review(out, checks)
     # Packages first: Yosys and Verilator need them before their users.
     # Testbenches some runs leave behind are not RTL; grade the design only.
-    rtl = [p.name for p in out.glob("*.sv") if not re.search(r"(^tb_|_tb\.sv$)", p.name)]
-    files = sorted(rtl, key=lambda n: (not n.endswith("_pkg.sv"), n))
+    # Anywhere below the outputs (some runs use rtl/), but not a build directory.
+    rtl = [
+        p.relative_to(out).as_posix() for p in out.rglob("*.sv")
+        if not re.search(r"(^tb_|_tb\.sv$)", p.name)
+        and not {"build", "obj_dir"} & set(p.relative_to(out).parts)
+    ]  # fmt: skip
+    files = sorted(rtl, key=lambda n: (not n.endswith("_pkg.sv"), Path(n).name))
+    incs = [f"-I{out / d}" for d in sorted({str(Path(f).parent) for f in files})]
     exp = []
 
     def check(text: str, passed: bool, evidence: str) -> None:
@@ -109,8 +115,9 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
 
     # PINCONNECTEMPTY: `.q_o()` is PRT-004's explicit no-connect, as in svstyle.
     vl = run(
-        ["verilator", "--lint-only", "-Wall", "-Wno-MULTITOP", "-Wno-PINCONNECTEMPTY", *files], out
-    )
+        ["verilator", "--lint-only", "-Wall", "-Wno-MULTITOP", "-Wno-PINCONNECTEMPTY",
+         *incs, *files], out,
+    )  # fmt: skip
     # A line the author waived for svstyle (DOC-009) is waived here too.
     waived = {f"{f}:{n}:" for f in files for n in waivers((out / f).read_text())}
     warns = [
@@ -120,7 +127,8 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
     ]  # fmt: skip
     check("verilator --lint-only -Wall is clean", not warns, "\n".join(warns[:8]) or "clean")
 
-    ys = run(["yosys", "-q", "-p", f"read_verilog -sv {' '.join(files)}; synth -auto-top"], out)
+    read = f"read_verilog -sv {' '.join(incs)} {' '.join(files)}"
+    ys = run(["yosys", "-q", "-p", f"{read}; synth -auto-top"], out)
     check("Yosys reads and synthesizes the design", ys.returncode == 0,
           (ys.stderr or ys.stdout).strip()[-400:] or "ok")  # fmt: skip
 
@@ -131,7 +139,6 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
             m = re.search(c["present"], rtl_text)
             check(c["text"], m, f"found {m.group(0)!r}" if m else f"no match for {c['present']}")
         elif "yosys_memory" in c:
-            read = f"read_verilog -sv {' '.join(files)}"
             script = f"{read}; hierarchy -auto-top; proc; memory -nomap; stat"
             st = run(["yosys", "-p", script], out)  # not -q: that silences `stat`
             # A memory cell in the `stat` table. mem2reg on a small side array (a
@@ -140,7 +147,50 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
             check(c["text"], cells, "; ".join(cells) or "no $mem cell (array turned into flops)")
         elif "equiv_tb" in c:
             check(c["text"], *equiv(out, files, c["equiv_tb"]))
+        elif "tb_catches" in c:
+            check(c["text"], *tb_catches(out, files, c["tb_catches"]))
     return exp
+
+
+def tb_catches(out: Path, files: list[str], module: str) -> tuple[bool, str]:
+    """Run the output's own testbench against the reference, which it must pass,
+    and against each planted bug in files/classics/bugs/, which it must fail."""
+    tbs = sorted(p for p in out.rglob("*.sv") if re.search(r"(^tb_|_tb\.sv$)", p.name))
+    if not tbs:
+        return False, "no testbench among the outputs"
+    tb = tbs[0]
+    work = out.parent / "tb_catches"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir()
+    # The output's packages and submodules stay; only the top module is swapped.
+    rest = [str(out / f) for f in files if Path(f).name != f"{module}.sv"]
+    incs = [f"-I{out / d}" for d in sorted({str(Path(f).parent) for f in files})]
+    bugs = sorted((EVALS / "files/classics/bugs").glob(f"{module}_*.sv"))
+
+    def passes(dut: Path, tag: str) -> bool:
+        flags = ["--binary", "--timing", "--assert", "-Wno-fatal", "-Wno-lint", "-Wno-style",
+                 "--x-assign", "unique", "--x-initial", "unique", *incs,
+                 f"-I{tb.parent}"]  # fmt: skip
+        obj = work / tag
+        build = run(["verilator", *flags, "-Mdir", str(obj), "--top-module", tb.stem,
+                     *rest, str(dut), str(tb)], work, timeout=300)  # fmt: skip
+        if build.returncode:
+            raise RuntimeError(build.stderr.strip()[-300:])
+        try:
+            sim = run([str(obj / f"V{tb.stem}"), "+verilator+rand+reset+2"], work, timeout=60)
+        except subprocess.TimeoutExpired:
+            return False  # a hang is a failure: a bug can stall a handshake forever
+        return sim.returncode == 0 and re.search(r"\bPASS\b", sim.stdout) is not None
+
+    try:
+        if not passes(EVALS / f"files/classics/{module}.sv", "ref"):
+            return False, f"{tb.name} fails on the correct reference"
+        missed = [b.name for b in bugs if passes(b, b.stem)]
+    except RuntimeError as e:
+        return False, f"{tb.name} does not build: {e}"
+    caught = len(bugs) - len(missed)
+    note = f", missed {missed}" if missed else ""
+    return not missed, f"{tb.name} catches {caught}/{len(bugs)}{note}"
 
 
 def equiv(out: Path, files: list[str], spec: dict) -> tuple[bool, str]:
@@ -166,7 +216,7 @@ def equiv(out: Path, files: list[str], spec: dict) -> tuple[bool, str]:
         "-Wno-fatal",  # lint is its own check; a warning such as UNOPTFLAT is no wrong behaviour
         "-Mdir",
         str(work / "obj"),
-        f"-I{out}",
+        *(f"-I{out / d}" for d in sorted({str(Path(f).parent) for f in files})),
     ]
     build = run(["verilator", *flags, "--top-module", tb.stem, *sources], work)
     if build.returncode:

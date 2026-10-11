@@ -521,3 +521,42 @@ the repo with `--plugin-dir`. $12 in total.
   interface kept through the waivers in `SKILL.md`.
 - First run lost: outputs inside the repo are inside the plugin directory,
   where Claude Code refuses writes. The runner now refuses `--out` there.
+
+### M12 — Verification in the loop
+
+Supersedes M9 items 17–20; 21 (`svstyle sim`) is not needed, the step did
+not sprawl.
+
+- [x] `assets/skeleton_tb.sv`: a model beside the DUT, a `step` task that
+  checks then drives at the negedge, the first mismatch, `+seed=N`, one
+  `PASS`/`FAIL` line, non-zero exit on FAIL. Tested: passes on `skeleton.sv`,
+  fails on a wrong output and on a missing reset.
+- [x] `references/testbench-verilator.md`: `tb/<name>_tb.sv`, what a
+  testbench may use, a model written from the spec, the build command
+  (`--assert`, random initial values for unreset flops), no `-D`/`-G`, how to
+  read PASS, FAIL and a fired `ASSERT`.
+- [x] `SKILL.md`: a "Simulate" step after the loop, bounded to one fix and
+  one rerun, and "Done means" grows "the testbench printed PASS". The
+  PostToolUse hook skips `tb/` and `*_tb.sv`.
+- [x] Planted bugs checked in: `evals/files/classics/bugs/`, three per
+  classic for `seq-detect`, `updown-counter`, `fir`, `fxp-add-sat` and
+  `rr-arbiter`, each caught by the grader's own testbench. `grade.py`'s
+  `tb_catches` runs the output's testbench on the reference (must pass) and
+  on each bug (must fail); a hang counts as caught. The grader now also finds
+  RTL in a subdirectory (`rtl/`).
+
+Rerun of the five, with the skill, Opus 5.5, `claude -p` (2026-10-11):
+
+| run | equivalence | own testbench vs planted bugs | $/block | s/block |
+|---|---|---|---|---|
+| 1 (could not run the binary) | 5/5 | 8/15: two testbenches never built or passed, one missed a bug | 0.67 | ~115 |
+| 2 (binary allowed) | 5/5 | 15/15 | 0.65 | 116 |
+
+- Run 1 found a runner bug, not a skill one: the `dontAsk` allowlist let
+  the model build the testbench but not run it, and the two that broke
+  (a mid-run reset race, a `-D` the grader cannot know) were exactly what a
+  run would have caught. `verilogeval.py` now allows `build/*` and
+  `obj_dir/*`; the reference forbids testbench-only defines.
+- Cost per block is up from about $0.30–0.53 in earlier rounds: the
+  testbench is most of the new work.
+

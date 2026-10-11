@@ -8,7 +8,8 @@
       "expected_output": "seq_detect.sv: Moore FSM, overlapping detection, passes svstyle, Verilator -Wall, Yosys; matches the reference cycle for cycle.",
       "files": [],
       "checks": [
-        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/seq_detect_tb.sv", "ref": "files/classics/seq_detect.sv", "module": "seq_detect"}}
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/seq_detect_tb.sv", "ref": "files/classics/seq_detect.sv", "module": "seq_detect"}},
+        {"text": "Its own testbench passes on the reference and catches every planted bug", "tb_catches": "seq_detect"}
       ]
     },
     {
@@ -18,7 +19,8 @@
       "expected_output": "updown_counter.sv: load has priority over enable, wraps, registered output; matches the reference cycle for cycle.",
       "files": [],
       "checks": [
-        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/updown_counter_tb.sv", "ref": "files/classics/updown_counter.sv", "module": "updown_counter"}}
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/updown_counter_tb.sv", "ref": "files/classics/updown_counter.sv", "module": "updown_counter"}},
+        {"text": "Its own testbench passes on the reference and catches every planted bug", "tb_catches": "updown_counter"}
       ]
     },
     {
@@ -28,7 +30,8 @@
       "expected_output": "fir.sv: transposed form, exact full-precision output one cycle after each valid sample; matches the reference whenever valid_o is 1.",
       "files": [],
       "checks": [
-        {"text": "Matches the reference model on every valid output", "equiv_tb": {"tb": "files/classics/fir_tb.sv", "ref": "files/classics/fir.sv", "module": "fir"}}
+        {"text": "Matches the reference model on every valid output", "equiv_tb": {"tb": "files/classics/fir_tb.sv", "ref": "files/classics/fir.sv", "module": "fir"}},
+        {"text": "Its own testbench passes on the reference and catches every planted bug", "tb_catches": "fir"}
       ]
     },
     {
@@ -38,7 +41,8 @@
       "expected_output": "fxp_add_sat.sv: registered saturating signed add with flag; matches the reference cycle for cycle.",
       "files": [],
       "checks": [
-        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/fxp_add_sat_tb.sv", "ref": "files/classics/fxp_add_sat.sv", "module": "fxp_add_sat"}}
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/fxp_add_sat_tb.sv", "ref": "files/classics/fxp_add_sat.sv", "module": "fxp_add_sat"}},
+        {"text": "Its own testbench passes on the reference and catches every planted bug", "tb_catches": "fxp_add_sat"}
       ]
     },
     {
@@ -58,7 +62,8 @@
       "expected_output": "rr_arbiter.sv: combinational one-hot grant, registered rotating priority; matches the reference cycle for cycle.",
       "files": [],
       "checks": [
-        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/rr_arbiter_tb.sv", "ref": "files/classics/rr_arbiter.sv", "module": "rr_arbiter"}}
+        {"text": "Matches the reference model cycle for cycle", "equiv_tb": {"tb": "files/classics/rr_arbiter_tb.sv", "ref": "files/classics/rr_arbiter.sv", "module": "rr_arbiter"}},
+        {"text": "Its own testbench passes on the reference and catches every planted bug", "tb_catches": "rr_arbiter"}
       ]
     },
     {
