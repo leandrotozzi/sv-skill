@@ -673,3 +673,37 @@ the configured frontend. Five classics chosen for the Yosys subset
   case for slang is what it lets the code say, not cost.
 
 **Latest Verible.** The `verible-latest` CI job runs on the next push.
+
+### Synthesis quality and cost (2026-10-11)
+
+**Synthesis is already clean.** `synth -flatten -auto-top` (Yosys 0.69) on
+the latest output of each of the 35 classics: with the skill, 0 warnings and
+0 latches in all 35, and every RAM the prompt asks for inferred as `$mem`
+(fwft-fifo, pkt-drop-fifo, both FIFOs, inferred-ram). Without the skill
+(24 outputs): fir and cordic warn "Replacing memory ... with list of
+registers", the unpacked-flop-array pattern `synth-yosys.md` forbids. Cell
+counts are within a few percent of the baseline. `grade.py` now checks it:
+"Yosys synthesis has no warning and no latch".
+
+**Cost: the testbench, and the environment around it.** Transcripts of six
+classics (fir, uart-rx, async-fifo, axil-regs, sort8, fp32-add) with the
+skill: the RTL was right at the first `check` in every run, and a third of
+the cost went to building the testbench, mostly not for its own bugs:
+
+- `-Mdir build/tb` fails with `Can't write file` when `build/` does not
+  exist (Verilator does not create parents), in 4 of 6 runs; the model
+  then tried `/tmp`, `obj/`, `obj_tb/`, which the allowlist denied. Fixed:
+  `mkdir -p build/tb` in `testbench-verilator.md`, and the template test
+  now runs that document's command block verbatim.
+- 33 denied tool calls: shell variables and `;` chains to read the skill's
+  files, and `cp` out of the plugin directory (protected, so a prompt for a
+  real user too). `SKILL.md` now says to copy templates by read and write.
+  The eval allowlist gained `head`, `tail`, `grep`, `sed`, `rm -rf build*`.
+
+| run | checks | $ total | s total | tb builds | denied |
+|---|---|---|---|---|---|
+| before | 67/67 | 6.71 | 1508 | 37 | 33 |
+| after the mkdir fix | 67/67 | 5.56 | 1244 | 14 | 11 |
+
+The 11 left are mostly the template `cp`, fixed after this run (not yet
+measured).

@@ -1,6 +1,7 @@
 """The skill's templates are what a model copies: they must pass the full check as-is."""
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -107,16 +108,16 @@ def test_templates_pass_full_check_with_only_the_company_placeholder(capsys):
 
 
 def simulate(tmp_path: Path, dut: str) -> subprocess.CompletedProcess:
-    """Build and run the testbench template the way testbench-verilator.md says."""
+    """Build and run the testbench template with the commands testbench-verilator.md gives."""
     (tmp_path / "dut.sv").write_text(dut)
-    build = subprocess.run(
-        ["verilator", "--binary", "--timing", "--assert", "-Wno-fatal", "--x-assign", "unique",
-         "--x-initial", "unique", f"-I{ASSETS}", "--top-module", TB.stem, "dut.sv", str(TB)],
-        cwd=tmp_path, capture_output=True, text=True,
+    doc = (ASSETS.parent / "references" / "testbench-verilator.md").read_text()
+    block = re.search(r"## Build and run\n\n```sh\n(.*?)```", doc, re.S)[1]
+    name = TB.stem.removesuffix("_tb")
+    script = (
+        block.replace("<dir of assert_macros.svh>", str(ASSETS)).replace("<name>", name)
+        .replace("rtl/*.sv", "dut.sv").replace(f"tb/{name}_tb.sv", str(TB))
     )  # fmt: skip
-    assert build.returncode == 0, build.stderr
-    run = [f"obj_dir/V{TB.stem}", "+verilator+rand+reset+2"]
-    return subprocess.run(run, cwd=tmp_path, capture_output=True, text=True)
+    return subprocess.run(["sh", "-ec", script], cwd=tmp_path, capture_output=True, text=True)
 
 
 @needs_tools

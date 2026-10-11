@@ -24,8 +24,11 @@ instead. Any other value: skip both.
 
 Start from the closest template in `assets/` rather than a blank file. Each
 already passes `svstyle check`, so you inherit a correct header, port order,
-reset style and comment layout. `assets/` sits next to this SKILL.md; copy
-from it by absolute path, not one relative to the project:
+reset style and comment layout. `assets/` sits next to this SKILL.md; reach
+it by absolute path, not one relative to the project. To copy a template,
+read it with the file-read tool and write it into the project: a shell `cp`
+out of the skill's directory, a shell variable or a `;` chain each needs a
+permission prompt. Run each shell command on its own.
 
 | Template | Use it for |
 |---|---|

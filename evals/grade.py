@@ -134,6 +134,15 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
     ys = run(["yosys", "-q", "-p", f"{read}; synth -auto-top"], out)
     check("Yosys reads and synthesizes the design", ys.returncode == 0,
           (ys.stderr or ys.stdout).strip()[-400:] or "ok")  # fmt: skip
+    if ys.returncode == 0:
+        # Clean synthesis: no warning (e.g. an unpacked array of flops) and no latch.
+        warns = sorted({ln[:160] for ln in (ys.stdout + ys.stderr).splitlines()
+                        if ln.startswith("Warning:")})  # fmt: skip
+        latch = run(
+            ["yosys", "-q", "-p", f"{read}; synth -auto-top; select -assert-none t:$_DLATCH*"], out
+        )
+        bad = warns + ([] if latch.returncode == 0 else ["a latch was inferred"])
+        check("Yosys synthesis has no warning and no latch", not bad, "\n".join(bad[:6]) or "clean")
 
     # Per-eval checks from evals.json: what this prompt specifically asked for.
     rtl_text = "\n".join((out / f).read_text() for f in files)

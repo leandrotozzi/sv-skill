@@ -35,6 +35,7 @@ TOOLS = [
     "Read", "Write", "Edit", "Glob", "Grep", "Skill",
     "Bash(svstyle *)", "Bash(verilator *)", "Bash(yosys *)", "Bash(iverilog *)",
     "Bash(vvp *)", "Bash(ls *)", "Bash(cat *)", "Bash(cp *)", "Bash(mkdir *)",
+    "Bash(head *)", "Bash(tail *)", "Bash(grep *)", "Bash(sed *)", "Bash(rm -rf build*)",
     "Bash(build/*)", "Bash(./build/*)", "Bash(obj_dir/*)", "Bash(./obj_dir/*)",  # a built testbench
 ]  # fmt: skip
 TIMEOUT = 900  # seconds per claude run

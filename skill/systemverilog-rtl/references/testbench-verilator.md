@@ -41,12 +41,14 @@ support is partial, and none of it is needed here.
 ## Build and run
 
 ```sh
+mkdir -p build/tb
 verilator --binary --timing --assert -Wno-fatal --x-assign unique --x-initial unique \
     -I<dir of assert_macros.svh> -Mdir build/tb --top-module <name>_tb rtl/*.sv tb/<name>_tb.sv
 build/tb/V<name>_tb +verilator+rand+reset+2
 ```
 
-`-Wno-fatal` keeps lint warnings from stopping the build (lint is
+Verilator does not create `build/` for `-Mdir build/tb`: without the
+`mkdir` the build stops at `Can't write file`. `-Wno-fatal` keeps lint warnings from stopping the build (lint is
 `svstyle check`'s job). `--x-initial unique` with `+verilator+rand+reset+2`
 starts every unreset flop at a random value instead of 0, so a design that
 reads one before loading it fails instead of passing by luck. Packages go
