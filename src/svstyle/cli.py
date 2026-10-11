@@ -52,7 +52,7 @@ RULE_ID_RE = re.compile(r"\b[A-Z]{3}-\d{3}\b")
 
 def _render(kind: str, rules: list) -> str:
     if kind == "html":
-        return docgen.render_html(rules)
+        return docgen.render_html(rules, example=(SKILL / "assets" / "skeleton.sv").read_text())
     if kind.startswith("compact"):
         return docgen.render_markdown_compact(rules, kind.partition(":")[2])
     return docgen.render_markdown_full(rules)
