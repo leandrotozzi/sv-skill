@@ -437,3 +437,62 @@ lets wrong RTL through today.
   the 149 Yosys probes) found the SVA macros with `|->`, `unique if`,
   function `output` arguments, block-local `automatic` and struct-typed
   localparams unsupported there; none of it matters for Verilator.
+
+## Ecosystem review of 2026-10-10: release, review workflow, debt
+
+From `docs/superpowers/plans/2026-10-10-ecosystem-review.md`. Done in this
+round: M14, M11 and the engineering debt. Open: M12 (verification in the
+loop, which supersedes M9), M13 (reproducible evals and a VerilogEval v2
+number), M15 (probes in CI and yosys-slang, which supersedes M10) and M16
+(formal spike).
+
+### Engineering debt
+
+- [x] An unexpected exception in a worker exits 4 with
+  `internal error, please report` instead of a traceback (check and fix).
+- [x] A filelist that includes itself, directly or in a cycle, is an error.
+- [x] Yosys reaches an include dir whose path has a space through a symlink
+  (it takes no quoted `-I`); the dir used to be dropped.
+- [x] `.svstyle.toml` is read once per directory per run; Verible, Verilator
+  and Yosys run at once. Explicit UTF-8 on the last two reads without it.
+- [x] Tests for lowercase `-f`, the `select` config key and a hung tool.
+
+### M14 — Skill content
+
+- [x] **Fixed interface.** `SKILL.md` keeps module and port names and the
+  reset style a spec, benchmark or integration target fixes; house style
+  inside; NAM-002/RST-001 waived with a reason. A trailing waiver doubles as
+  the port comment, so such a file checks clean.
+- [x] **Reviewing RTL.** `SKILL.md` reports without editing: `check --synth`,
+  then the review rules by what the code contains, then the design at its
+  edges, then what was not checked; no invented findings.
+- [x] **STR-002 and NAM-010 mechanised** (review rules 31 → 29). STR-002: a
+  `.sv` that defines no design unit is a header. NAM-010: a declared name
+  that is a SystemVerilog keyword (reachable under `` `begin_keywords``;
+  without it the parse error now cites NAM-010). Neither fires on the 196
+  template, fixture and eval files.
+- [x] **Evals 10–12, written, not yet run** (they need M13's runner or the
+  skill-creator workflow). 10: a fixed `TopModule`/`clk`/`reset`/`in`/`out`
+  edge detector, graded by its testbench (catches 3/3 planted bugs) and a
+  port regex. 11: review of `pkt_stats.sv`'s three planted bugs. 12: review
+  of a correct one-clock block, the false-positive control. `grade.py`
+  grades a review from `review.md` and checks the inputs were not edited.
+
+### M11 — Release readiness
+
+- [x] MIT `LICENSE`, `CHANGELOG.md`, package metadata, version from
+  `svstyle/__init__.py`, `pyslang>=11,<12`. `uv build` wheel runs under
+  `uvx` outside the checkout. `svstyle` is free on PyPI.
+- [x] `release.yml`: a `v*` tag builds and publishes with PyPI trusted
+  publishing (configure the publisher on PyPI first), after checking the
+  tag against the version.
+- [x] Claude Code plugin: `.claude-plugin/plugin.json` (skills from
+  `./skill/`) and `marketplace.json`; `claude plugin validate` passes. A
+  PostToolUse hook runs `svstyle check --no-external` on an edited `.sv` and
+  hands a failing result to the model; silent when svstyle is missing.
+- [x] `tooling.md` installs from PyPI; the "two directories above the skill"
+  rule is gone. README: install lines, why-not-Verible table, eval numbers,
+  CI badge, absolute links, licence. `.pre-commit-hooks.yaml`. A Pages job
+  publishes `docs/style-guide.html`.
+- [ ] By hand: make the repo public, enable Pages, add the PyPI trusted
+  publisher, push the `v0.1.0` tag.
