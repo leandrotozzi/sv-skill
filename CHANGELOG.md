@@ -5,6 +5,12 @@
 - LNG-001 no longer reads a closing `` `default_nettype wire`` as a `wire`
   declaration; `fix` replaces that line with `` `resetall`` instead of
   appending one that Verible joined onto it.
+- `check` and `fix` are faster again: `parse` visits the tree once, indexes
+  children instead of iterating them (pyslang's iterator is the slow part),
+  and skips macro/include lookups where they cannot matter; Verible's
+  format check runs files in parallel; startup imports less. On 256 Ibex
+  files `check` 21 s to 9 s and `fix` 30 s to 21 s; on one file `check`
+  0.39 s to 0.32 s. Output unchanged on 538 files.
 - `fix` is about a third faster: a pass reuses the previous pass's parse,
   the last pass neither reformats nor reparses, and the token invariant skips
   the alignment when no token changed. Output unchanged on 173 sample files.

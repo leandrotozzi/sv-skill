@@ -14,11 +14,10 @@ import os
 import re
 import sys
 from collections import Counter
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
-from . import __version__, docgen, external
+from . import __version__, external
 from .checks import (
     PLACEHOLDER,
     ConfigError,
@@ -35,12 +34,18 @@ from .rules import RULES_TOML, RulesError, by_category, keep_rule, load_rules, t
 # and diffed by `rules --check`; never hand-edited.
 REPO = Path(__file__).resolve().parents[2]
 SKILL = REPO / "skill" / "systemverilog-rtl"
-OUTPUTS = {
-    REPO / "docs" / "style-guide.html": "html",
-    SKILL / "references" / "rules.md": "compact:core",
-    **{SKILL / "references" / f: f"compact:{c}" for c, f in docgen.ON_DEMAND.items()},
-    SKILL / "references" / "rules-rationale.md": "full",
-}
+
+
+def _outputs() -> dict[Path, str]:
+    from . import docgen  # only `rules` needs it; imported late to keep startup short
+
+    return {
+        REPO / "docs" / "style-guide.html": "html",
+        SKILL / "references" / "rules.md": "compact:core",
+        **{SKILL / "references" / f: f"compact:{c}" for c, f in docgen.ON_DEMAND.items()},
+        SKILL / "references" / "rules-rationale.md": "full",
+    }
+
 
 # Cross-checked by --check.
 CHECKS_PY = REPO / "src" / "svstyle" / "checks.py"
@@ -51,6 +56,8 @@ RULE_ID_RE = re.compile(r"\b[A-Z]{3}-\d{3}\b")
 
 
 def _render(kind: str, rules: list) -> str:
+    from . import docgen
+
     if kind == "html":
         return docgen.render_html(rules, example=(SKILL / "assets" / "skeleton.sv").read_text())
     if kind.startswith("compact"):
@@ -59,7 +66,7 @@ def _render(kind: str, rules: list) -> str:
 
 
 def _gen(rules: list) -> int:
-    for path, kind in OUTPUTS.items():
+    for path, kind in _outputs().items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(_render(kind, rules), encoding="utf-8")
         print(f"wrote {path.relative_to(REPO)}")
@@ -93,14 +100,14 @@ def _check(rules: list) -> int:
     # 3. Every rule ID cited in SKILL.md and the hand-written references must exist.
     ids = {r.id for r in rules}
     for doc in [SKILL_MD, *sorted((SKILL / "references").glob("*.md"))]:
-        if doc in OUTPUTS:
+        if doc in _outputs():
             continue
         for rid in sorted(set(RULE_ID_RE.findall(doc.read_text(encoding="utf-8")))):
             if rid not in ids:
                 problems.append(f"{doc.name} cites {rid}, which is not in rules.toml")
 
     # 4. Generated files must be up to date.
-    for path, kind in OUTPUTS.items():
+    for path, kind in _outputs().items():
         want = _render(kind, rules)
         if not path.exists():
             problems.append(f"{path.relative_to(REPO)} missing — run `svstyle rules --gen`")
@@ -122,6 +129,8 @@ def _unmapped(rules: list) -> int:
 
 
 def _show(rules: list, rid: str) -> int:
+    from . import docgen
+
     for r in rules:
         if r.id == rid.upper():
             print(docgen.render_markdown_full([r]))
@@ -262,6 +271,8 @@ def _cmd_check(args, rules: list) -> int:
             slang = "yosys-slang" in synths
             tools += (lambda: external.yosys_check(parsed, rules, list(includes), partial, slang),)
         # The tools are separate processes: run them at once, report in order.
+        from concurrent.futures import ThreadPoolExecutor
+
         with ThreadPoolExecutor(len(tools)) as pool:
             runs = [pool.submit(tool) for tool in tools]
         resolved = {str(Path(p).resolve()): t for p, t in texts.items()}
@@ -343,6 +354,8 @@ def _pmap(fn, jobs: list[tuple]) -> list:
     """
     if len(jobs) < 2:
         return [_call(fn, job) for job in jobs]
+    from concurrent.futures import ProcessPoolExecutor  # a single file never needs it
+
     with ProcessPoolExecutor() as pool:
         return list(pool.map(_call, [fn] * len(jobs), jobs))
 
@@ -572,6 +585,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_fix(args, rules)
     if args.id:
         return _show(rules, args.id)
+    from . import docgen
+
     if args.html:
         args.html.write_text(docgen.render_html(rules), encoding="utf-8")
         print(f"wrote {args.html}")

@@ -826,3 +826,42 @@ price of the style; no further cost item is open.
 `synth-yosys.md` was read in 6 of 30 runs although `SKILL.md` says to read
 it whenever the synth tool is Yosys; all 30 synthesised clean, since
 `check --synth` catches the subset.
+
+### Speed, second round (2026-10-11)
+
+Profile after the first round: `parse` dominated, and inside it pyslang's
+`SyntaxNode.__iter__` (about 21 µs a node; indexing `node[i]` is about 3 µs
+for the same children minus empty slots), three full-tree visits besides the
+two recursive walks, `.kind` (a new Python enum on every read), and
+`is_main` twice per token. Then `check` with the external tools spent most of
+its time in Verible's `--verify`, one process per file, in series.
+
+Changes: one visit collects nodes, tokens and kinds; children are indexed;
+macro/directive/include lookups are done once per node, and skipped below a
+node that has none when the file has no macro or `include (only then do
+token offsets nest); `is_main` is `True` outright when no token comes from
+another buffer; the keyword check caches per word instead of lexing every
+name; the file is lexed once for the token checks; `--verify` runs on every
+core; `docgen` and the process pool are imported only when used.
+
+Checked against a snapshot of `parse`, `run_checks` and `fix` on 538 files
+(evals, probes, fixtures, templates, verilog-axis, Ibex) with
+`PYTHONHASHSEED=0`, and the CLI's `check --synth --json` and `fix --diff`
+output on the classics, Ibex and verilog-axis (278 k lines, 17 k findings):
+identical. A first try at skipping the lookups below a clean node also on
+files with macros broke the FSM template: a nested macro's tokens have
+offsets in the `.svh`, so spans do not nest there.
+
+| | before | after |
+|---|---|---|
+| 1 file, `check` | 0.39 s | 0.32 s |
+| 1 file, `fix --diff` | 0.53 s | 0.35 s |
+| 72 classics, `check --no-external` | 1.62 s | 1.06 s |
+| 72 classics, `fix --diff` | 5.52 s | 3.85 s |
+| 256 Ibex, `check` | 21.1 s | 9.2 s |
+| 256 Ibex, `fix --diff` | 30.4 s | 21.0 s |
+
+What is left is mostly not ours: pyslang's import (53 ms of the 0.1 s
+startup), its one tree visit, and Verible's own formatting CPU (about
+180 ms per large Ibex file). A content cache would be the next step for
+repeated runs on a large tree.
