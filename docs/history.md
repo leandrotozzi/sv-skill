@@ -806,3 +806,23 @@ Found trying the gradual-adoption config: `fix` ignored `select`/`ignore`
 (fixed), LNG-001 flagged a closing `` `default_nettype wire``, and the
 `` `resetall`` that `fix` appended was joined onto it by Verible. The
 directive is now replaced by `` `resetall``, which also restores it.
+
+### Where the remaining cost goes (2026-10-11)
+
+The roadmap proposed measuring a "write, one `fix`, one `check`, leave
+SHOULDs" protocol. The transcripts of the 30-problem VerilogEval run after
+"Simulate only what is worth it" ($0.26 per problem with the skill, $0.10
+without) show the model already does that: per run 0.77 `fix`, 0.77 `check`,
+0.4 `Edit`; only 3 of 30 ran `check` twice. Not run.
+
+The floor is what the skill loads, not the loop. Prob003 (`assign one =
+1'b1;`) cost $0.21 in 7 turns with one `check`: the skill and `rules.md`
+(about 11 k tokens) written to the cache, plus the comments the style asks
+for. Extra turns are cache reads and cheap. Cutting the upfront words by
+12 % changed nothing measurable (progressive disclosure, above), so a
+smaller cut will not either. The premium (~2.6x on small problems) is the
+price of the style; no further cost item is open.
+
+`synth-yosys.md` was read in 6 of 30 runs although `SKILL.md` says to read
+it whenever the synth tool is Yosys; all 30 synthesised clean, since
+`check --synth` catches the subset.

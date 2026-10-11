@@ -11,13 +11,6 @@ Open work only. Every number and every "done" or "not doing" is in
       (`release.yml` builds and publishes). Until then `uv tool install svstyle`,
       which the README and `tooling.md` give, does not work.
 
-## Cost
-
-- [ ] With the skill, VerilogEval costs 3.5× per problem for equal pass@1:
-      about 40 % testbench, 40 % reading the skill, 20 % the check/fix loop.
-      Measure a "write, one `fix`, one `check`, leave SHOULDs" protocol with
-      `evals/run.py`; round 11 closed the style with one `fix` in 5/5.
-
 ## svstyle
 
 - [ ] A single comment above two declarations leaves the second with a
