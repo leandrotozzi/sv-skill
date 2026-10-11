@@ -441,8 +441,8 @@ lets wrong RTL through today.
 ## Ecosystem review of 2026-10-10: release, review workflow, debt
 
 From `docs/superpowers/plans/2026-10-10-ecosystem-review.md`. Done in this
-round: M14, M11, M12, M15 and the engineering debt; M13 except the full
-VerilogEval. Open: M16 (formal spike).
+round: M14, M11, M12, M15, M16 (no action) and the engineering debt; M13
+except the full VerilogEval.
 
 ### Engineering debt
 
@@ -605,3 +605,34 @@ Supersedes M10 (items 22–24).
   `external.KNOWN_GOOD_VERIBLE_VERSION`, kept equal to CI's by a test; a
   non-blocking `verible-latest` job runs the `fix` goldens on the newest
   release (v0.0-4296 today), so green there means the pin can move.
+
+### M16 — Formal spike: recorded, no action
+
+Question: can the `ASSERT` macros also run in `sby`, and is it worth it?
+Measured 2026-10-11 on the latest with-skill run of the 43 eval designs
+(151 assertions), Yosys 0.69+212 and sby from OSS CAD Suite 2026-10-07.
+
+- **Expressible: all of them that mean something.** 89 are X checks
+  (`ASSERT_KNOWN`, or `!$isunknown` under `|->`), void in a 2-state model.
+  The other 62: 14 boolean, 39 `|->`, 9 `|=>`, no `##N` or sequences.
+- **But not through `prop`.** Neither frontend reads `assert property`
+  with an implication (`read_verilog -formal` no concurrent form at all,
+  `read_slang` booleans only), and a macro cannot rewrite `a |-> b`: it
+  takes two new macros with the antecedent and consequent apart (`!a || b`
+  same cycle; a one-cycle register for `|=>`), plus an `initial assume` of
+  reset and the same reset-since-last-edge guard as simulation.
+- **Input checks have to be `ASSUME`.** Three designs assert their input
+  protocol (`full_o |-> !wr_en_i`); formal breaks those at step 2.
+- **It runs.** With that conversion, 23/23 designs with a non-X assertion
+  pass BMC at depth 20, 21 prove unbounded (two need strengthening), 6 s
+  in total.
+- **It finds nothing the testbench misses.** The rr-arbiter assertions
+  (one-hot, grant only to a requester, a grant iff a request) hold on all
+  three planted bugs, which are fairness and order bugs; its testbench
+  catches 3/3. The skill writes safety invariants, which buggy designs
+  also satisfy.
+
+Reopen when assertions encode the spec (ordering, fairness, latency), so a
+proof checks something a testbench might not reach. Then the cost is the
+two macros, `ASSUME`, an `assets/formal.sby` and a "Done means" line for
+projects with `sby`.
