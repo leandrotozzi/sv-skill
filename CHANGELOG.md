@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The skill skips the testbench for a small block (one clock, no memory,
+  no protocol, simple logic, under about 40 lines) and says so.
 - The skill loads less up front: reviewing and legacy code moved to
   `references/existing-code.md`, multi-clock guidance to
   `references/multi-clock.md`, and the CDC rules to a generated

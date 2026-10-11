@@ -154,8 +154,14 @@ A clean `check` says the RTL is well formed, not that it does what the spec
 says. Once it is clean, read `references/testbench-verilator.md`, write
 `tb/<name>_tb.sv` from `assets/skeleton_tb.sv` with a model written from the
 spec (not from your RTL), and build and run it once with the command there.
-Skip this only when the user says so, Verilator is missing, or the user
-supplies a testbench (then run theirs); say which.
+
+Skip it for a small block, where a testbench costs more than it finds: one
+clock, no memory, no handshake or bus protocol, no arithmetic beyond
+increment, compare and select, and under about 40 lines of `always` and
+`assign` logic (combinational logic, a register, a counter, a small FSM).
+Also skip it when the user says so or Verilator is missing; run the user's
+testbench when they supply one. Say which, and simulate anyway when the
+user asks.
 
 Keep it bounded: on a FAIL, decide from the spec whether the RTL or the
 model is wrong, fix that, rerun once. Still failing: stop and report it.
@@ -203,10 +209,12 @@ list against the code you wrote:
   `--synth` only if the project synthesises with another tool or Yosys is
   not installed, and say so.
 - No `// TODO: describe` is left: `grep -rn "TODO: describe" rtl/` is empty.
-- The testbench printed `PASS` and no `` `ASSERT`` fired (see "Simulate").
+- The testbench printed `PASS` and no `` `ASSERT`` fired, or the block was
+  small enough to skip it (see "Simulate").
 - The judgement list above has been walked, and anything that departs from
   it carries a DOC-009 comment.
 
 Tell the user what you ran and what it reported, including any SHOULD
 findings you left in place and why, and what the testbench checked (the
-directed cases, how many random cycles, the seed) and what it did not.
+directed cases, how many random cycles, the seed) and what it did not, or
+that you skipped it and why.

@@ -764,3 +764,26 @@ exactly where they apply (async-fifo, uart-rx, evals 3, 7, 13) and nowhere
 else. No measurable cost change: a 12 % cut of the upfront words is ~3 %
 of the cost, below one-run noise. Kept for structure, not cost.
 
+### Simulate only what is worth it (2026-10-11)
+
+Evidence from the full VerilogEval run: the skill's own testbench printed
+FAIL in 52 of 155 runs; in 37 only the testbench was then edited (its model
+or timing was wrong), and of the 6 RTL edits that could be replayed, 5 were
+on RTL that already passed the dataset testbench and one did not fix it. No
+real bug found. So `SKILL.md` now skips the testbench for a small block: one
+clock, no memory, no handshake or bus protocol, no arithmetic beyond
+increment, compare and select, under about 40 lines of logic; it says so,
+and simulates when the user asks. `grade.py`'s `tb_catches` passes with
+"simulation skipped" when there is no testbench.
+
+| set | before $ | after $ | quality |
+|---|---|---|---|
+| VerilogEval subset of 30 | 11.11 | 7.79 (−30 %), 57 → 27 s/problem | pass@1 21 → 23; 0/30 wrote a testbench |
+| seq-detect, updown-counter, rr-arbiter | 1.21 (two of three) | 1.11 for three | all skipped, 12/12 each |
+| fir, fxp-add-sat, uart-rx, axil-regs | 2.92 (three of four) | 3.13 for four | all simulated, planted bugs 3/3 where present |
+
+The cost: rr-arbiter's planted bugs (fairness, order) were caught 3/3 by
+its testbench before and are now unchecked; its RTL is still graded by the
+equivalence testbench. Before numbers are the progressive-disclosure run,
+one run each.
+
