@@ -92,6 +92,73 @@
           "yosys_memory": true
         }
       ]
+    },
+    {
+      "id": 10,
+      "prompt": "Our integration harness instantiates TopModule with exactly these ports: input clk, input reset (synchronous, active-high), input [7:0] in, output [7:0] out. For each bit, out[i] must be 1 in the cycle after in[i] was sampled changing from 0 to 1, and 0 otherwise. Reset clears out and the remembered previous input to 0. Write it in SystemVerilog, TopModule.sv.",
+      "expected_output": "TopModule.sv with the given module and port names and a synchronous active-high reset, house style inside (comments, _q flops), NAM-002/RST-001 waived with a reason; passes svstyle check --synth and the edge-detect testbench.",
+      "files": [],
+      "checks": [
+        {
+          "text": "The given ports are kept exactly: clk, reset, in, out",
+          "present": "(?s)module\\s+TopModule\\s*\\(\\s*input\\s+logic\\s+clk\\b.*input\\s+logic\\s+reset\\b.*input\\s+logic\\s*\\[7:0\\]\\s*in\\b.*output\\s+logic\\s*\\[7:0\\]\\s*out\\b"
+        },
+        {
+          "text": "Matches the reference behaviour cycle for cycle",
+          "equiv_tb": {
+            "tb": "files/edge_detect_tb.sv"
+          }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Review evals/files/pkt_stats.sv before it goes to the design review. Do not change it; write your review to review.md.",
+      "expected_output": "review.md naming the latch on err_o, the 16-to-8-bit truncation of count_o, and the 4-bit level crossing clock domains with a synchroniser per bit (CDC-002); pkt_stats.sv left untouched.",
+      "files": [
+        "evals/files/pkt_stats.sv"
+      ],
+      "checks": [
+        {
+          "text": "Finds the latch on err_o",
+          "report": "(?is)latch.{0,200}err_o|err_o.{0,200}latch"
+        },
+        {
+          "text": "Finds the truncation of the 16-bit count to count_o",
+          "report": "(?is)(truncat|width|16).{0,200}count_o|count_o.{0,200}(truncat|width|16)"
+        },
+        {
+          "text": "Finds the per-bit synchronisation of level (CDC-002)",
+          "report": "(?is)CDC-002|(per[- ]bit|each bit|bit by bit|multi-bit|gray).{0,200}level|level.{0,200}(per[- ]bit|each bit|bit by bit|multi-bit|gray)"
+        },
+        {
+          "text": "pkt_stats.sv is left unchanged",
+          "unchanged": [
+            "files/pkt_stats.sv"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Can you review evals/files/review_ok/sat_counter.sv? Do not change it; write your review to review.md.",
+      "expected_output": "review.md that reports the block as correct with no rule violations: one clock, so no CDC or reset-synchroniser findings; sat_counter.sv left untouched.",
+      "files": [
+        "evals/files/review_ok/sat_counter.sv",
+        "evals/files/review_ok/assert_macros.svh"
+      ],
+      "checks": [
+        {
+          "text": "No clock-domain or reset-synchroniser finding on a one-clock block",
+          "report_absent": "(?i)\\bCDC-\\d{3}\\b|\\bRST-00[23]\\b"
+        },
+        {
+          "text": "sat_counter.sv is left unchanged",
+          "unchanged": [
+            "files/review_ok/sat_counter.sv"
+          ]
+        }
+      ]
     }
   ]
 }

@@ -27,7 +27,39 @@ def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
 
 
+REPORT_CHECKS = ("report", "report_absent", "unchanged")
+NEGATED_RE = re.compile(r"(?i)\b(not|no|n/a)\b|n't\b")
+
+
+def grade_review(out: Path, checks: list[dict]) -> list[dict]:
+    """A review eval: the prompt asks for `review.md` and no edits."""
+    exp = []
+    report = out / "review.md"
+    text = report.read_text() if report.exists() else ""
+    exp.append({"text": "Writes review.md", "passed": bool(text), "evidence": str(report)})
+    for c in checks:
+        if "report" in c:
+            m = re.search(c["report"], text)
+            ok, ev = m, f"found {m.group(0)!r}" if m else f"no match for {c['report']}"
+        elif "report_absent" in c:
+            # A finding asserts; "CDC-001 does not apply" is the report being thorough.
+            hits = [ln for ln in text.splitlines()
+                    if re.search(c["report_absent"], ln) and not NEGATED_RE.search(ln)]  # fmt: skip
+            ok, ev = not hits, f"found {hits[0]!r}" if hits else "absent"
+        else:  # unchanged: an edited copy among the outputs is an edit nobody asked for
+            edited = [
+                f for f in c["unchanged"]
+                if (out / Path(f).name).exists()
+                and (out / Path(f).name).read_text() != (EVALS / f).read_text()
+            ]  # fmt: skip
+            ok, ev = not edited, f"edited: {edited}" if edited else "untouched"
+        exp.append({"text": c["text"], "passed": bool(ok), "evidence": ev[:600]})
+    return exp
+
+
 def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
+    if any(k in c for c in checks for k in REPORT_CHECKS):
+        return grade_review(out, checks)
     # Packages first: Yosys and Verilator need them before their users.
     # Testbenches some runs leave behind are not RTL; grade the design only.
     rtl = [p.name for p in out.glob("*.sv") if not re.search(r"(^tb_|_tb\.sv$)", p.name)]
