@@ -1,4 +1,5 @@
 // expect: WARN
+// slang: OK
 interface bus_if;
   logic [7:0] data;
   logic valid;

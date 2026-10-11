@@ -1,4 +1,5 @@
 // expect: WARN
+// slang: OK
 module multidim_unpacked (input logic [7:0] a, input logic i, input logic j, output logic [7:0] y, output logic ok);
   logic [7:0] m [2][2];
   always_comb begin

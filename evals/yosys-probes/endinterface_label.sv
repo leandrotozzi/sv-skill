@@ -1,4 +1,5 @@
 // expect: ERROR
+// slang: OK
 interface lbl_if;
   logic [7:0] data;
 endinterface : lbl_if

@@ -1,4 +1,5 @@
 // expect: WARN
+// slang: OK
 module unpacked_flops (input logic clk, input logic [7:0] d, output logic [7:0] y);
   logic [7:0] r_q [4];
   always_ff @(posedge clk) begin

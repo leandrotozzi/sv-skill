@@ -30,13 +30,16 @@ select  = ["DOC", "LNG"]   # optional: only these rule IDs/prefixes
 ignore  = ["DOC-005"]      # optional: drop these
 include = ["rtl/inc"]      # optional: `include dirs, relative to this file
 exclude = ["vendor/*"]     # optional: skip these when walking a directory or filelist
-synth   = "yosys"          # optional: the synthesis tool; "yosys" runs Yosys on every check
+synth   = "yosys"          # optional: the synthesis tool; "yosys" or "yosys-slang" runs Yosys on every check
 ```
 
 With it, `fix` writes new headers with that company and replaces the
 `<Company>` placeholder in existing ones. `synth = "yosys"` makes plain
-`check` behave like `check --synth`; any other value names a tool svstyle
-does not run, and tells the skill not to load `synth-yosys.md`. `--select`/`--ignore` on the
+`check` behave like `check --synth`; `synth = "yosys-slang"` does the same
+but reads with the yosys-slang plugin (`read_slang`, which the OSS CAD Suite
+ships), so the skill loads `synth-yosys-slang.md` in place of
+`synth-yosys.md`; any other value names a tool svstyle does not run, and
+tells the skill to load neither. `--select`/`--ignore` on the
 command line replace the file's selection. Without it the placeholder stays and
 DOC-001 reports it as a SHOULD. An unknown key or a wrong type is an error
 (exit 2), so a typo never silently disables the setting.
@@ -64,7 +67,11 @@ svstyle rules [--id ID] [--unmapped]
   combinational loops (SYN-005), conflicting drivers. Yosys reads less
   SystemVerilog than the other tools; a file it cannot read is reported as
   `EXT-YOSYS-read` (MUST): synthesis was not checked, so `check` fails until
-  the code is in the subset Yosys reads (`synth-yosys.md`).
+  the code is in the subset Yosys reads (`synth-yosys.md`). With
+  `synth = "yosys-slang"` the read is `plugin -i slang; read_slang`, which
+  reads far more, but has no black boxes: a module instantiated and not
+  passed is an `EXT-YOSYS-read` too. A Yosys without the plugin fails the
+  same way.
 - A directory stands for every `*.sv` below it; name `.v` files explicitly.
 - `--baseline FILE` reports only findings not recorded in FILE, so existing
   code can adopt the style without fixing everything first: run once with

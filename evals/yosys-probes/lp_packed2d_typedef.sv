@@ -1,4 +1,5 @@
 // expect: WRONG
+// slang: OK
 // note: T[i] on a typedef with two packed dimensions is read as a 1-bit select of the flat vector.
 module lp_packed2d_typedef (input logic [1:0] i, output logic [7:0] y, output logic ok);
   typedef logic [3:0][7:0] tbl_t;

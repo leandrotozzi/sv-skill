@@ -18,8 +18,9 @@ purpose: every rule you break there is a finding you will have to fix later.
 Then check the synthesis tool: the `synth` key in the nearest
 `.svstyle.toml` (no file or no key means `yosys`). If it is `yosys`, also
 read `references/synth-yosys.md`, the SystemVerilog subset Yosys reads;
-code outside it is a parse error and an extra round. Any other value: skip
-that file.
+code outside it is a parse error and an extra round. If it is
+`yosys-slang`, read the much shorter `references/synth-yosys-slang.md`
+instead. Any other value: skip both.
 
 Start from the closest template in `assets/` rather than a blank file. Each
 already passes `svstyle check`, so you inherit a correct header, port order,
@@ -149,8 +150,8 @@ svstyle fix   rtl/*.sv     # Verible formatting + anything insertable
 svstyle check --synth rtl/*.sv  # svstyle + Verible lint + Verilator + Yosys, one report
 ```
 
-With `synth = "yosys"` in `.svstyle.toml`, plain `svstyle check` runs Yosys
-too; with another tool there, drop `--synth`.
+With `synth = "yosys"` or `"yosys-slang"` in `.svstyle.toml`, plain
+`svstyle check` runs Yosys too; with another tool there, drop `--synth`.
 
 Pass every file of the design in one call: Verilator needs the submodules
 to elaborate, and checking a lone file that instantiates others reports

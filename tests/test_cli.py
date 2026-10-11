@@ -1,5 +1,6 @@
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -283,6 +284,30 @@ def test_check_synth_reports_a_combinational_loop(capsys, tmp_path):
     assert "SYN-005" in rules()
     (tmp_path / ".svstyle.toml").write_text('synth = "vivado"\n')
     assert "SYN-005" not in rules()
+
+
+@pytest.mark.skipif(
+    not shutil.which("yosys")
+    or subprocess.run(["yosys", "-q", "-p", "plugin -i slang"], capture_output=True).returncode,
+    reason="yosys-slang plugin missing",
+)
+def test_synth_yosys_slang_reads_with_the_plugin(capsys, tmp_path):
+    p = tmp_path / "m.sv"
+    p.write_text(
+        "module m (\n    input  logic [7:0] a_i,\n    output logic [7:0] y_o\n);\n"
+        "    function automatic logic [7:0] inc(logic [7:0] x);\n        return x + 1;\n"
+        "    endfunction\n    assign y_o = inc(a_i);\nendmodule\n"
+    )
+    rules = lambda: {  # noqa: E731
+        d["rule"]
+        for d in json.loads(_run(capsys, "check", "--json", "--select", "EXT-YOSYS", p)[1])[
+            "diagnostics"
+        ]
+    }
+    (tmp_path / ".svstyle.toml").write_text('synth = "yosys"\n')
+    assert rules() == {"EXT-YOSYS-read"}  # read_verilog has no `return`
+    (tmp_path / ".svstyle.toml").write_text('synth = "yosys-slang"\n')
+    assert rules() == set()
 
 
 def test_non_utf8_file_is_an_error_not_a_crash(capsys, tmp_path):

@@ -251,11 +251,14 @@ def _cmd_check(args, rules: list) -> int:
             lambda: external.verible_lint(parsed, rules),
             lambda: external.verilator_lint(parsed, rules, list(includes)),
         )
-        # `synth = "yosys"` in the project config makes Yosys part of every check.
-        if args.synth or any(c.get("synth") == "yosys" for c in configs.values()):
+        # `synth = "yosys"` (or "yosys-slang") in the project config makes Yosys
+        # part of every check; "yosys-slang" also reads with the slang plugin.
+        synths = {c.get("synth") for c in configs.values()}
+        if args.synth or synths & {"yosys", "yosys-slang"}:
             # A module nobody passed is a black box to Yosys: its outputs look undriven.
             partial = bool(used - defined)
-            tools += (lambda: external.yosys_check(parsed, rules, list(includes), partial),)
+            slang = "yosys-slang" in synths
+            tools += (lambda: external.yosys_check(parsed, rules, list(includes), partial, slang),)
         # The tools are separate processes: run them at once, report in order.
         with ThreadPoolExecutor(len(tools)) as pool:
             runs = [pool.submit(tool) for tool in tools]

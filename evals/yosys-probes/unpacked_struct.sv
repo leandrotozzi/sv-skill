@@ -1,4 +1,5 @@
 // expect: ERROR
+// slang: OK
 module unpacked_struct (input logic [7:0] a, output logic [7:0] y, output logic ok);
   typedef struct { logic [3:0] hi; logic [3:0] lo; } up_t;
   up_t s;

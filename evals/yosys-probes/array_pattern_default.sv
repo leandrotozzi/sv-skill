@@ -1,4 +1,5 @@
 // expect: ERROR
+// slang: OK
 module array_pattern_default (input logic clk, input logic rst_n, input logic [7:0] d, output logic [7:0] y);
   logic [7:0] r_q [2];
   always_ff @(posedge clk or negedge rst_n) begin

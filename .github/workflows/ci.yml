@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       VERIBLE: v0.0-3946-g851d3ff4  # keep in sync with external.KNOWN_GOOD_VERIBLE_VERSION
-      # Verilator and Yosys from a dated OSS CAD Suite build: apt's (5.020 / 0.33) are
-      # years behind what svstyle is developed against (5.052 / 0.66).
+      # Verilator and Yosys from a dated OSS CAD Suite build (5.053 / 0.69, with the
+      # yosys-slang plugin): apt's (5.020 / 0.33) are years behind.
       OSS_CAD: 2026-10-07
     steps:
       - uses: actions/checkout@v4
@@ -38,3 +38,24 @@ jobs:
       - run: uv run ruff format --check src tests evals hooks
       - run: uv run svstyle rules --check
       - run: uv run pytest -n auto
+      # A Yosys bump that changes what a construct does fails here, not in the next eval.
+      - run: sh evals/yosys-probes/run.sh
+      - run: FRONTEND=slang sh evals/yosys-probes/run.sh
+
+  # Non-blocking: does the newest Verible still produce the golden `fix` output?
+  # Green here means the pin in external.KNOWN_GOOD_VERIBLE_VERSION can move.
+  verible-latest:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install the latest Verible
+        run: |
+          tag=$(curl -sSI https://github.com/chipsalliance/verible/releases/latest | sed -n 's|^location: .*/tag/\([^[:space:]]*\).*|\1|p')
+          echo "Verible $tag"
+          curl -sSL "https://github.com/chipsalliance/verible/releases/download/$tag/verible-$tag-linux-static-x86_64.tar.gz" \
+            | tar xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/verible-$tag/bin" >> "$GITHUB_PATH"
+      - run: uv sync --extra dev
+      - run: uv run pytest -n auto tests/test_fix.py

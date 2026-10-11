@@ -1,4 +1,5 @@
 // expect: WARN
+// slang: OK
 module unpacked_array_pattern (input logic [7:0] a, input logic [7:0] b, input logic i, output logic [7:0] y, output logic ok);
   logic [7:0] arr [2];
   assign arr = '{a, b};

@@ -10,6 +10,11 @@
   and `grade.py`'s `tb_catches` runs the output's own testbench against them.
 - `evals/run.py`: run and grade any eval through `claude -p`, with and
   without the skill; `evals/README.md`.
+- `synth = "yosys-slang"` in `.svstyle.toml`: `check` reads with the
+  yosys-slang plugin (`read_slang`), and the skill loads the much shorter
+  `references/synth-yosys-slang.md`.
+- CI runs the 149 Yosys probes on both frontends, and a non-blocking job
+  checks the `fix` goldens against the latest Verible.
 
 ## 0.1.0 — 2026-10-10
 

@@ -2,13 +2,14 @@
 
 Read this when the project synthesises with Yosys: `synth = "yosys"` in the
 nearest `.svstyle.toml`, or no `synth` key at all (Yosys is the default).
-With `synth = "yosys"`, `svstyle check` runs Yosys on every call.
+With `synth = "yosys"`, `svstyle check` runs Yosys on every call. With
+`synth = "yosys-slang"`, read `synth-yosys-slang.md` instead.
 
 Yosys reads a subset of SystemVerilog. Everything below is legal
 SystemVerilog that Verilator and commercial tools accept. Write the
 right-hand form from the start: an error costs a round of check-edit-check,
-and the first table costs a wrong chip. Verified on Yosys 0.66 by one probe
-per row (`evals/yosys-probes/` in the svstyle repository).
+and the first table costs a wrong chip. Verified on Yosys 0.66 and 0.69 by one
+probe per row (`evals/yosys-probes/` in the svstyle repository).
 
 ## Synthesises wrong, with no error
 

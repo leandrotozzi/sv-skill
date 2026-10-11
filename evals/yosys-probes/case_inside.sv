@@ -1,4 +1,5 @@
 // expect: ERROR
+// slang: OK
 module case_inside (input logic [3:0] a, output logic [1:0] y, output logic ok);
   always_comb begin
     case (a) inside

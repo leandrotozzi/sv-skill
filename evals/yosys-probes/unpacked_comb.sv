@@ -1,4 +1,5 @@
 // expect: WARN
+// slang: OK
 module unpacked_comb (input logic [7:0] a, output logic [7:0] y, output logic ok);
   logic [7:0] s [4];
   always_comb begin

@@ -315,6 +315,54 @@ def test_yosys_passes_the_templates():
     assert ext.yosys_check(files, RULES, [str(assets)]) == []
 
 
+def _has_slang() -> bool:
+    if not shutil.which("yosys"):
+        return False
+    res = subprocess.run(["yosys", "-q", "-p", "plugin -i slang"], capture_output=True)
+    return res.returncode == 0
+
+
+needs_slang = pytest.mark.skipif(not _has_slang(), reason="yosys-slang plugin missing")
+
+
+@needs_slang
+def test_yosys_slang_reads_what_read_verilog_cannot(tmp_path):
+    d = tmp_path / "a dir"  # paths reach read_slang through a command file, quoted
+    d.mkdir()
+    (d / "w.svh").write_text("localparam int W = 8;\n")
+    f = d / "m.sv"
+    f.write_text(
+        "module m (\n    input  logic [7:0] a_i,\n    output logic [7:0] y_o\n);\n"
+        '    `include "w.svh"\n'
+        "    function automatic logic [7:0] inc(logic [7:0] x);\n        return x + 1;\n"
+        "    endfunction\n    assign y_o = inc(a_i);\nendmodule\n"
+    )
+    assert {d.rule for d in ext.yosys_check([str(f)], RULES)} == {"EXT-YOSYS-read"}
+    assert ext.yosys_check([str(f)], RULES, slang=True) == []
+
+
+@needs_slang
+def test_yosys_slang_finds_a_loop_and_passes_the_templates(tmp_path):
+    f = tmp_path / "loop.sv"
+    f.write_text(
+        "module loop (\n    input  logic a_i,\n    output logic y_o\n);\n    logic x, y;\n"
+        "    assign x = y ^ a_i;\n    assign y = x;\n    assign y_o = y;\nendmodule\n"
+    )
+    assert "SYN-005" in {d.rule for d in ext.yosys_check([str(f)], RULES, slang=True)}
+    assets = Path(__file__).parents[1] / "skill" / "systemverilog-rtl" / "assets"
+    files = [str(assets / n) for n in ("fsm.sv", "fsm_pkg.sv", "skeleton.sv", "sync_ff.sv")]
+    assert ext.yosys_check(files, RULES, [str(assets)], slang=True) == []
+
+
+@needs_slang
+def test_yosys_slang_missing_submodule_is_not_checked(tmp_path):
+    """slang dropped --ignore-unknown-modules: without the submodule nothing is synthesised."""
+    f = tmp_path / "top.sv"
+    f.write_text("module top (input logic a_i, output logic y_o);\n  sub u_sub (.*);\nendmodule\n")
+    (d,) = ext.yosys_check([str(f)], RULES, partial=True, slang=True)
+    assert (d.line, d.rule, d.severity) == (2, "EXT-YOSYS-read", "MUST")
+
+
 @needs_verible
 @pytest.mark.parametrize(
     "stmt,flagged",

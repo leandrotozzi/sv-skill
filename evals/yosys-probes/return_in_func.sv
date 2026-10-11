@@ -1,4 +1,5 @@
 // expect: ERROR
+// slang: OK
 module return_in_func (input logic [7:0] a, output logic [7:0] y, output logic ok);
   function automatic logic [7:0] f(logic [7:0] x);
     return x + 8'd3;

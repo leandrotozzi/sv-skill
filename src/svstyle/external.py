@@ -246,12 +246,28 @@ YOSYS_ERROR_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+): ERROR: (?P<msg>.*)$"
 
 
 def yosys_check(
-    paths: list[str], rules: list[Rule], include_dirs: Sequence[str] = (), partial: bool = False
+    paths: list[str],
+    rules: list[Rule],
+    include_dirs: Sequence[str] = (),
+    partial: bool = False,
+    slang: bool = False,
 ) -> list[Diag]:
-    """`partial`: a module the files instantiate is not among them (a black box)."""
+    """`partial`: a module the files instantiate is not among them (a black box).
+
+    `slang` reads with the yosys-slang plugin instead of `read_verilog -sv`. It
+    reads far more SystemVerilog, but a missing submodule is a read error there.
+    """
     dirs = dict.fromkeys([*include_dirs, *(str(Path(p).parent) for p in paths)])
     paths = packages_first(paths)
     with tempfile.TemporaryDirectory(prefix="svstyle") as tmp:
+        if slang:
+            # read_slang takes no quoted argument; a command file does.
+            cmd = Path(tmp) / "read.f"
+            lines = [f'-I "{d}"' for d in dirs] + [f'"{p}"' for p in paths]
+            cmd.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            read = f"plugin -i slang; read_slang -f {cmd}"
+            res = _run("yosys", ["-q", "-p", f"{read}; hierarchy; proc; check"])
+            return _yosys_diags(res, rules, paths[0], partial)
         # Files are quoted, but Yosys takes no quoted -I: a dir with a space is
         # reached through a symlink whose path has none.
         incs = []
@@ -263,13 +279,17 @@ def yosys_check(
             incs.append(f"-I{d}")
         read = "read_verilog -sv " + " ".join([*incs, *(f'"{p}"' for p in paths)])
         res = _run("yosys", ["-q", "-p", f"{read}; hierarchy; proc; check"])
+    return _yosys_diags(res, rules, paths[0], partial)
+
+
+def _yosys_diags(res, rules: list[Rule], first: str, partial: bool) -> list[Diag]:
     out = res.stdout + res.stderr
-    diags = parse_yosys(out, rules, paths[0], partial)
+    diags = parse_yosys(out, rules, first, partial)
     if res.returncode != 0 and not any(d.rule == "EXT-YOSYS-read" for d in diags):
         # Failed without saying where: synthesis was not checked, so do not pass.
         why = next((ln for ln in out.splitlines() if "ERROR" in ln), f"yosys exit {res.returncode}")
         msg = f"Yosys failed; synthesis was not checked: {why}"
-        diags.append(Diag(paths[0], 1, 1, "EXT-YOSYS-read", "MUST", msg))
+        diags.append(Diag(first, 1, 1, "EXT-YOSYS-read", "MUST", msg))
     return diags
 
 

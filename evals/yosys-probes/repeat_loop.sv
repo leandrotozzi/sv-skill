@@ -1,4 +1,5 @@
 // expect: OK
+// slang: ERROR
 module repeat_loop (input logic [7:0] a, output logic [7:0] y, output logic ok);
   always_comb begin
     y = a;

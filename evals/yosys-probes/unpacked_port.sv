@@ -1,4 +1,5 @@
 // expect: ERROR
+// slang: OK
 module unpacked_port_sub (input logic [7:0] a [2], output logic [7:0] y);
   assign y = a[0] + a[1];
 endmodule

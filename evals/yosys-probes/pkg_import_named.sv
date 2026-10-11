@@ -1,4 +1,5 @@
 // expect: ERROR
+// slang: OK
 package pk;
   typedef enum logic [1:0] {A, B, C} st_e;
   typedef struct packed { logic [3:0] hi; logic [3:0] lo; } pair_t;

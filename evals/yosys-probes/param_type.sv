@@ -1,4 +1,5 @@
 // expect: ERROR
+// slang: OK
 module param_type_sub #(parameter type T = logic [7:0]) (input T a, output T y);
   assign y = ~a;
 endmodule

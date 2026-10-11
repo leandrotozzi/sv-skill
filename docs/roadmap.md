@@ -441,10 +441,8 @@ lets wrong RTL through today.
 ## Ecosystem review of 2026-10-10: release, review workflow, debt
 
 From `docs/superpowers/plans/2026-10-10-ecosystem-review.md`. Done in this
-round: M14, M11 and the engineering debt. Open: M12 (verification in the
-loop, which supersedes M9), M13 (reproducible evals and a VerilogEval v2
-number), M15 (probes in CI and yosys-slang, which supersedes M10) and M16
-(formal spike).
+round: M14, M11, M12, M15 and the engineering debt; M13 except the full
+VerilogEval. Open: M16 (formal spike).
 
 ### Engineering debt
 
@@ -585,3 +583,25 @@ Evals 11 and 12 do not separate the configs: the baseline finds the three
 bugs and invents no CDC finding either. They stay as regression checks for
 the review workflow; a discriminating review eval needs subtler bugs.
 
+### M15 — Tools: probes in CI, yosys-slang, pins
+
+Supersedes M10 (items 22–24).
+
+- [x] **Probes on CI's tools.** Yosys 0.69+212 and Verilator 5.053 (OSS CAD
+  Suite 2026-10-07): all 149 behave as on 0.66. `run.sh` exits non-zero on a
+  FAIL and runs in CI on both frontends.
+- [x] **yosys-slang probe** (`FRONTEND=slang`, a `// slang:` line where the
+  result differs): 46 ERROR and 6 WRONG rows become OK (56 of the 59 new OKs
+  proved with `sat`). Lost: constant `repeat` and a non-constant module-level
+  initializer (the second was silently wrong before). Still out: `do`/`while`,
+  non-constant `repeat`, enum and array methods; `unique`/`priority case`
+  with no `default` still drops the default.
+- [x] **Adopted, opt-in.** `synth = "yosys-slang"`: `check` reads with
+  `read_slang` through a command file (it takes no quoted path), and the
+  skill loads `synth-yosys-slang.md` (4 rows) in place of `synth-yosys.md`
+  (49). The default stays the built-in frontend: Homebrew's Yosys has no
+  plugin. slang has no black boxes, so a module not passed is a read error.
+- [x] **Pins.** `pyslang>=11,<12` (from M11). The Verible version stays in
+  `external.KNOWN_GOOD_VERIBLE_VERSION`, kept equal to CI's by a test; a
+  non-blocking `verible-latest` job runs the `fix` goldens on the newest
+  release (v0.0-4296 today), so green there means the pin can move.

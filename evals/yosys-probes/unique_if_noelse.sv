@@ -1,4 +1,5 @@
 // expect: WRONG
+// slang: OK
 // note: unique if without else: Yosys drops the preceding default, simulation keeps it.
 module unique_if_noelse (input logic [1:0] a, output logic [3:0] y, output logic ok);
   always_comb begin

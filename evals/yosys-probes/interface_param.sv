@@ -1,4 +1,5 @@
 // expect: WARN
+// slang: OK
 interface pbus_if #(parameter int W = 8);
   logic [W-1:0] data;
 endinterface

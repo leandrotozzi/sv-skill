@@ -1,7 +1,9 @@
 # Yosys 0.66 SystemVerilog support (synthesizable subset)
 
 - Yosys 0.66 (git sha1 7f8fdfd8, the v0.66 tag 86f2ddeb plus an empty merge), built-in frontend `read_verilog -sv`.
-- Date: 2026-10-06.
+- Date: 2026-10-06. Rerun on 2026-10-11 with Yosys 0.69+212 (git sha1 6f53afa5d) and
+  Verilator 5.053 from OSS CAD Suite 2026-10-07, the build CI uses: all 149 unchanged.
+  CI now runs both frontends on every push, so a Yosys bump that changes a row fails the build.
 - Probes: 148 minimal files plus one control file, one construct per file, in this
   directory. Rerun them with `sh evals/yosys-probes/run.sh`, or
   `YOSYS=/path/to/yosys sh evals/yosys-probes/run.sh`.
@@ -9,8 +11,31 @@
   - `run.sh` runs `read_verilog -sv NAME.sv; synth -flatten -top NAME`.
   - If the file has an `ok` output (the construct compared with a plain Verilog-2005 reference), `run.sh` also runs `sat -prove ok 1` on the synthesised netlist. WRONG means the proof fails.
   - `run.sh` prints PASS when Yosys still behaves as recorded, and FAIL when the behaviour changed.
-  - It also lints every file with Verilator 5.052 (all 149 lint clean), so each construct is legal SV.
+  - It also lints every file with Verilator (5.052 and 5.053: all 149 lint clean), so each construct is legal SV.
   - `zz_control_wrong.sv` must report WRONG. That proves the sat check catches a bad netlist.
+  - `FRONTEND=slang sh evals/yosys-probes/run.sh` reads with the yosys-slang plugin
+    (`plugin -i slang; read_slang`). A second line `// slang: X` is the expectation
+    there, where it differs.
+
+## yosys-slang
+
+Same 149 probes, Yosys 0.69+212 with the slang plugin from OSS CAD Suite 2026-10-07
+(2026-10-11). The skill's summary is `references/synth-yosys-slang.md`; `synth =
+"yosys-slang"` in `.svstyle.toml` makes `svstyle check` read this way.
+
+| built-in → slang | probes | which |
+|---|---|---|
+| ERROR → OK | 46 | every probed row of "Does not parse" below, except those in the last line |
+| WARN → OK | 7 | interfaces, unpacked arrays, `real` to `int` |
+| WRONG → OK | 6 | typedef'd 2-D arrays, arrays of structs, `unique if` with no `else` |
+| ERROR → WARN | 1 | `static_init_in_always` (slang asks for an explicit `static`) |
+| OK → ERROR | 2 | `repeat_loop` (constant `repeat`), `module_var_init` (non-constant module-level initializer; built-in silently made it continuous) |
+| unchanged, not OK | 8 | `do_while`, `repeat_nonconst`, `enum_next`, `enum_name`, `array_reduction_method` (ERROR); `unique_case_nodefault`, `priority_case_nodefault`, the control (WRONG) |
+
+Of the 59 constructs that become OK, 56 have an `ok` output and are proved with `sat`;
+`array_pattern_default`, `lp_unpacked_param_array` and `unpacked_flops` only synthesise.
+A module instantiated but not read is an error in slang (`--ignore-unknown-modules` is
+gone), so `check --synth` must get every file of the design.
 - Evidence key:
   - **P** = confirmed by probe on 0.66.
   - **S** = source only.
