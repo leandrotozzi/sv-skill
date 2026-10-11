@@ -159,6 +159,38 @@
           ]
         }
       ]
+    },
+    {
+      "id": 13,
+      "prompt": "Please review evals/files/review_subtle/level_monitor.sv before tape-out. Do not change it; write your review to review.md.",
+      "expected_output": "review.md naming the four bugs that lint and svstyle miss: corrected_q holds a two's-complement value but is unsigned, so the magnitude compare is wrong (LNG-018); the one-cycle over_q pulse crosses from 200 MHz to 25 MHz through a two-flop synchroniser and is lost (CDC-005); active is combinational logic driving a crossing (CDC-004); the pad reset is used raw in both domains with no reset synchroniser (RST-002/RST-003). level_monitor.sv left untouched.",
+      "files": [
+        "evals/files/review_subtle/level_monitor.sv"
+      ],
+      "checks": [
+        {
+          "text": "Finds the unsigned two's-complement compare (LNG-018)",
+          "report": "(?is)LNG-018|(unsigned|signed|signedness).{0,250}(corrected|compar|thresh)|(corrected|thresh).{0,250}(unsigned|signedness|not signed|declared signed)"
+        },
+        {
+          "text": "Finds the one-cycle pulse lost crossing to the slower clock (CDC-005)",
+          "report": "(?is)CDC-005|(pulse|one[- ]cycle|single[- ]cycle|narrow|5 ns).{0,300}(lost|miss|drop|handshake|toggle|stretch)|(lost|miss|drop).{0,200}(pulse|event)"
+        },
+        {
+          "text": "Finds combinational logic driving a crossing (CDC-004)",
+          "report": "(?is)CDC-004|(combinational|glitch).{0,300}(cross|synchroni[sz]er|active_meta)|active\\b.{0,300}(combinational|glitch|not registered|unregistered)"
+        },
+        {
+          "text": "Finds the pad reset released without a synchroniser (RST-002/RST-003)",
+          "report": "(?is)RST-00[23]|reset synchroni[sz]|(deassert|de-assert|release|removal|recovery).{0,250}(reset).{0,150}(synchron|metastab|asynchron)|(rst_ni).{0,250}(synchroni[sz]|metastab|recovery|removal)"
+        },
+        {
+          "text": "level_monitor.sv is left unchanged",
+          "unchanged": [
+            "files/review_subtle/level_monitor.sv"
+          ]
+        }
+      ]
     }
   ]
 }

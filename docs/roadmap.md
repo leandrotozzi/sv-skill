@@ -636,3 +636,40 @@ Reopen when assertions encode the spec (ordering, fairness, latency), so a
 proof checks something a testbench might not reach. Then the cost is the
 two macros, `ASSUME`, an `assets/formal.sby` and a "Done means" line for
 projects with `sby`.
+
+### Follow-ups of 2026-10-11
+
+Opus 5.5, `claude -p`, one run each, tools from OSS CAD Suite 2026-10-07;
+$11 in total.
+
+**Eval 13, a review the tools cannot help with.** `level_monitor.sv` passes
+`svstyle check --synth` and Verilator `-Wall` clean, and carries four bugs
+backed by review rules: an unsigned two's-complement compare (LNG-018), a
+one-cycle pulse crossing 200 to 25 MHz through two flops (CDC-005), a
+combinational signal into a synchroniser (CDC-004) and a pad reset used raw
+in both domains (RST-002). Both configs find all four (6/6), the baseline
+for $0.26, the skill for $0.48; the baseline also flags three real issues
+not planted (bypass does not gate counting, the 12-bit bias add wraps,
+`bias_i` has no clock domain). Evals 11 and 12 rerun: 5/5 and 3/3 in both
+configs again. Reading: at this model, review is not where the skill adds
+value; the three evals stay as regression checks, and no further review
+eval is planned.
+
+**`synth = "yosys-slang"` measured.** `run.py --synth NAME` writes the key
+to each run's `.svstyle.toml`; the grader's own Yosys check now reads with
+the configured frontend. Five classics chosen for the Yosys subset
+(fir, cordic, alu-pkg, sort8, systolic-mm), with the skill:
+
+| synth | checks passed | $ total | s total | slang-only constructs in the RTL |
+|---|---|---|---|---|
+| yosys | 47/51 | 4.81 | 1031 | 0 |
+| yosys-slang | 51/51 | 4.29 | 886 | `return` ×7, `inside` ×4, `'{...}` ×4, unpacked arrays, `import` |
+
+- The skill follows the config: under slang it writes the SystemVerilog
+  the built-in subset forbids, and all of it checks and synthesises.
+- The 4 lost checks are one cordic run that left a scratch `consts.sv`
+  (a `real` constant generator) in its output; its `cordic.sv` is clean.
+- 11 % cheaper and 14 % faster at n=5, one run each: within noise. The
+  case for slang is what it lets the code say, not cost.
+
+**Latest Verible.** The `verible-latest` CI job runs on the next push.

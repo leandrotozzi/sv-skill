@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from svstyle.checks import waivers
+from svstyle.checks import load_config, waivers
 
 EVALS = Path(__file__).parent
 CHECKS = {
@@ -129,6 +129,8 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
 
     quoted = " ".join(f'"{f}"' for f in files)  # a path with a space
     read = f"read_verilog -sv {' '.join(incs)} {quoted}"
+    if load_config(out / "x.sv").get("synth") == "yosys-slang":  # the project's frontend
+        read = f"plugin -i slang; read_slang {' '.join(incs)} {' '.join(files)}"
     ys = run(["yosys", "-q", "-p", f"{read}; synth -auto-top"], out)
     check("Yosys reads and synthesizes the design", ys.returncode == 0,
           (ys.stderr or ys.stdout).strip()[-400:] or "ok")  # fmt: skip

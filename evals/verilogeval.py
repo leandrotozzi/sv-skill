@@ -83,7 +83,7 @@ def grade_refs(dataset: Path, work: Path) -> int:
 
 def generate(prompt: str, work: Path, skill: bool, model: str, budget: float) -> dict:
     cmd = ["claude", "-p", prompt, "--model", model, "--output-format", "json",
-           "--setting-sources", "project", "--no-session-persistence",
+           "--setting-sources", "project",
            "--permission-mode", "dontAsk", "--allowedTools", *TOOLS,
            "--max-budget-usd", str(budget)]  # fmt: skip
     if skill:
@@ -98,6 +98,10 @@ def generate(prompt: str, work: Path, skill: bool, model: str, budget: float) ->
     except json.JSONDecodeError:
         doc = {"error": res.stderr[-300:]}
     (work / "claude.json").write_text(json.dumps(doc, indent=1))
+    # The session's transcript, kept beside the result while the skill is being tuned.
+    if sid := doc.get("session_id"):
+        for t in (Path.home() / ".claude" / "projects").glob(f"*/{sid}.jsonl"):
+            shutil.copy(t, work / "transcript.jsonl")
     return {"cost": doc.get("total_cost_usd", 0.0), "turns": doc.get("num_turns", 0),
             "seconds": round(time.time() - t0)}  # fmt: skip
 

@@ -2,6 +2,7 @@
 
     uv run python evals/run.py classics --ids 101,105 --runs 3
     uv run python evals/run.py evals --ids 10,11,12 --configs with_skill
+    uv run python evals/run.py classics --ids 104 --configs with_skill --synth yosys-slang
 
 Each run starts in an empty directory outside the repo, as in verilogeval.py:
 `--setting-sources project`, the skill added with `--plugin-dir` for
@@ -24,7 +25,9 @@ import verilogeval
 REPO = verilogeval.REPO
 
 
-def one(e: dict, cfg: str, n: int, out: Path, model: str, budget: float) -> dict:
+def one(
+    e: dict, cfg: str, n: int, out: Path, model: str, budget: float, synth: str | None = None
+) -> dict:
     name = e.get("name", str(e["id"]))
     d = out / f"eval-{name}"
     run = d / cfg / f"run-{n}"
@@ -34,6 +37,8 @@ def one(e: dict, cfg: str, n: int, out: Path, model: str, budget: float) -> dict
     (d / "eval_metadata.json").write_text(
         json.dumps({"eval_id": e["id"], "eval_name": name, "prompt": e["prompt"]}, indent=1)
     )
+    if synth:  # what a project says in its config; the skill and the grader both read it
+        (work / ".svstyle.toml").write_text(f'synth = "{synth}"\n')
     for f in e.get("files", []):  # the prompt names them relative to the repo root
         (work / f).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO / f, work / f)
@@ -72,6 +77,7 @@ def main() -> int:
     ap.add_argument("--model", default="claude-opus-5-5")
     ap.add_argument("--budget", type=float, default=4.0, help="USD cap per run")
     ap.add_argument("--jobs", type=int, default=4)
+    ap.add_argument("--synth", help='write `synth = "SYNTH"` to each run\'s .svstyle.toml')
     args = ap.parse_args()
     if args.out.resolve().is_relative_to(REPO):
         ap.error("--out must be outside the repository")
@@ -82,7 +88,7 @@ def main() -> int:
             for n in range(1, args.runs + 1)]  # fmt: skip
     out = args.out.resolve()
     with ThreadPoolExecutor(args.jobs) as pool:
-        rows = list(pool.map(lambda j: one(*j, out, args.model, args.budget), jobs))
+        rows = list(pool.map(lambda j: one(*j, out, args.model, args.budget, args.synth), jobs))
     (out / "results.json").write_text(json.dumps(rows, indent=1))
     md = table(rows, args.model)
     (out / "results.md").write_text(md)

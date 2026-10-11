@@ -2,7 +2,7 @@
 
 | File | What |
 |---|---|
-| `evals.json` | skill evals 1–12: prompts, input files, per-eval checks |
+| `evals.json` | skill evals 1–13: prompts, input files, per-eval checks |
 | `classics.json` | 35 classic blocks (101–), each graded against a reference by `files/classics/<name>_tb.sv` |
 | `files/classics/bugs/` | planted-bug variants of five classics; `tb_catches` runs the output's own testbench on them |
 | `run.py` | runs evals through `claude -p`, with and without the skill, grades, prints a table |
@@ -27,11 +27,17 @@ directory. Input files are copied to the path the prompt names.
 
 ```
 OUT/eval-<name>/eval_metadata.json
-OUT/eval-<name>/<config>/run-N/outputs/       what the model wrote
+OUT/eval-<name>/<config>/run-N/outputs/       what the model wrote, plus claude.json
+                                              (result, cost) and transcript.jsonl
 OUT/eval-<name>/<config>/run-N/grading.json   every check, with evidence
 OUT/eval-<name>/<config>/run-N/timing.json    cost (USD), turns, seconds
 OUT/results.md                                one row per eval and config
 ```
+
+`--synth yosys-slang` writes that key to each run's `.svstyle.toml`, as a
+project would: the skill loads `synth-yosys-slang.md`, and both `svstyle` and
+the grader's own Yosys check read with `read_slang` (put a Yosys with the
+plugin, e.g. the OSS CAD Suite's, first on `PATH`).
 
 `grade.py DIR` also grades a skill-creator iteration (`<config>/outputs`
 moved to `run-1/outputs`).
