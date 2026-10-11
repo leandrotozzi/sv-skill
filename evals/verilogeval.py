@@ -22,6 +22,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -106,7 +107,14 @@ def grade(dataset: Path, prob: str, out: Path) -> dict:
         defines = (p for p in out.glob("*.sv") if re.search(r"module\s+TopModule\b", p.read_text()))
         dut = next(defines, dut)
     if not dut.exists():
-        return {"pass": False, "why": "no TopModule", "svstyle": False, "verilator": False}
+        return {
+            "pass": False,
+            "why": "no TopModule",
+            "svstyle": False,
+            "must": 0,
+            "verilator": False,
+            "verilator_first": "",
+        }
     sim = out / "grade"
     sim.mkdir(exist_ok=True)
     passed, why = simulate(dataset, prob, dut, sim)
@@ -156,9 +164,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("cmd", choices=["run", "grade-refs"])
     ap.add_argument("--dataset", type=Path, required=True, help="a verilog-eval checkout")
-    ap.add_argument(
-        "--out", type=Path, default=REPO / "skill/systemverilog-rtl-workspace/verilogeval"
-    )
+    # Outside the repo: inside it, the runs would pick up its project settings and
+    # CLAUDE.md, and Claude Code refuses writes into the plugin directory.
+    ap.add_argument("--out", type=Path, default=Path(tempfile.gettempdir()) / "verilogeval")
     ap.add_argument("--subset", type=int, help="every k-th problem, this many")
     ap.add_argument("--ids", help="comma-separated problem name prefixes, e.g. Prob001,Prob050")
     ap.add_argument("--configs", default="without_skill,with_skill")
@@ -167,6 +175,8 @@ def main() -> int:
     ap.add_argument("--jobs", type=int, default=4)
     args = ap.parse_args()
     dataset = args.dataset.resolve()
+    if args.out.resolve().is_relative_to(REPO):
+        ap.error("--out must be outside the repository")
     args.out.mkdir(parents=True, exist_ok=True)
     if args.cmd == "grade-refs":
         return grade_refs(dataset, args.out / "refs")
