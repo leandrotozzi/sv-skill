@@ -55,8 +55,8 @@ def simulate(dataset: Path, prob: str, dut: Path, work: Path) -> tuple[bool, str
     sim = work / "sim"
     srcs = [str(dut), str(tb), str(d / f"{prob}_ref.sv")]
     # -I: the DUT may include a header beside it (the skill's assert_macros.svh).
-    build = subprocess.run([*IVERILOG, f"-I{dut.parent}", "-o", str(sim), *srcs], capture_output=True, text=True,
-                           cwd=work)  # fmt: skip
+    build = subprocess.run([*IVERILOG, f"-I{dut.parent}", "-o", str(sim), *srcs],
+                           capture_output=True, text=True, cwd=work)  # fmt: skip
     if build.returncode:
         return False, "does not build: " + build.stderr.strip()[-300:]
     try:
