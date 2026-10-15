@@ -64,6 +64,17 @@ def test_check_json_envelope(capsys, sv):
     assert (d["path"], d["line"], d["rule"], d["fixable"]) == (str(p), 18, "DOC-004", True)
 
 
+def test_check_github_annotations(capsys, sv):
+    p = sv(CLEAN.replace("ACME Corp", "<Company>").replace("  // First-stage register", ""))
+    code, out, _ = _run(capsys, "check", "--no-external", "--github", p)
+    lines = out.splitlines()
+    assert code == 1 and lines[-1] == "2 findings (MUST 1, SHOULD 1)"
+    must = next(x for x in lines if "DOC-004" in x)
+    assert must.startswith(f"::error file={p},line=18,col=")
+    assert ",title=DOC-004::" in must and must.endswith("[fix available]")
+    assert any(x.startswith("::warning ") and "title=DOC-001" in x for x in lines)
+
+
 def test_check_select_and_ignore(capsys, sv):
     p = sv(
         CLEAN.replace("  // First-stage register", "").replace("    // Capture the payload.\n", "")

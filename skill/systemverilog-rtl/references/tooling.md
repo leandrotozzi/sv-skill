@@ -47,7 +47,7 @@ DOC-001 reports it as a SHOULD. An unknown key or a wrong type is an error
 ## Commands
 
 ```sh
-svstyle check [FILES|DIRS] [-f LIST] [-F LIST] [-I DIR]... [--json] [--no-external]
+svstyle check [FILES|DIRS] [-f LIST] [-F LIST] [-I DIR]... [--json|--github] [--no-external]
               [--synth] [--select IDS] [--ignore IDS] [--baseline FILE [--write-baseline]]
 svstyle fix   [FILES|DIRS] [-f LIST] [-F LIST] [-I DIR]... [--json] [--diff]
 svstyle rules [--id ID] [--unmapped]
@@ -83,6 +83,8 @@ svstyle rules [--id ID] [--unmapped]
   working directory, `-F` paths to the list. Other options are skipped.
 - `fix --diff` prints the change instead of writing it, and exits 1 when
   any file would change, so it can gate CI.
+- `check --github` prints each finding as a GitHub Actions annotation
+  (MUST an error, SHOULD a warning), shown on the pull request's diff.
 - `rules --id PRT-003` prints one rule in full; `--unmapped` lists the rules
   that need human judgement.
 

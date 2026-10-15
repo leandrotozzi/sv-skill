@@ -1218,6 +1218,9 @@ CLI_CI = """
   hooks:
     - id: svstyle-check   # and/or svstyle-fix
 
+# in a GitHub Actions step: findings annotate the pull request's diff
+svstyle check rtl/ --github
+
 # adopt the style on existing code: only new findings fail
 svstyle check rtl/ --baseline .svstyle-baseline --write-baseline
 svstyle check rtl/ --baseline .svstyle-baseline

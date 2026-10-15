@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `check --github` prints findings as GitHub Actions annotations, so they show
+  on the pull request's diff (MUST an error, SHOULD a warning).
 - pyslang 12 is supported (`pyslang>=11,<13`): the whole suite passes on it.
 - Verible `v0.0-4296` is accepted beside `v0.0-3946`: neither warns of drift,
   and CI runs the whole suite on both.

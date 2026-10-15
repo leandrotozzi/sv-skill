@@ -211,13 +211,30 @@ def _report(
         return code
     for d in diags:
         fix = " [fix available]" if d.fixable else ""
-        print(f"{d.path}:{d.line}:{d.col}: {d.rule} {d.message}{fix}")
+        if getattr(args, "github", False):
+            print(_annotation(d, fix))
+        else:
+            print(f"{d.path}:{d.line}:{d.col}: {d.rule} {d.message}{fix}")
     for e in errors:
         print(f"error: {e}", file=sys.stderr)
     counts = ", ".join(f"{k} {v}" for k, v in summary.items() if v)
     unchecked = f"; {len(errors)} error(s), see above" if errors else ""
     print(f"{len(diags)} findings" + (f" ({counts})" if counts else "") + unchecked)
     return code
+
+
+GITHUB_LEVEL = {"MUST": "error", "SHOULD": "warning", "MAY": "notice"}
+
+
+def _annotation(d, fix: str) -> str:
+    """A GitHub Actions workflow command, shown on the PR diff at the line."""
+
+    def esc(s: str, prop: bool = False) -> str:
+        s = s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        return s.replace(":", "%3A").replace(",", "%2C") if prop else s
+
+    where = f"file={esc(d.path, True)},line={d.line},col={d.col},title={d.rule}"
+    return f"::{GITHUB_LEVEL[d.severity]} {where}::{esc(d.message + fix)}"
 
 
 def _cmd_check(args, rules: list) -> int:
@@ -539,7 +556,9 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("check", help="report style violations (svstyle, Verible, Verilator)")
     _add_inputs(p)
-    p.add_argument("--json", action="store_true", help="machine-readable output")
+    out = p.add_mutually_exclusive_group()
+    out.add_argument("--json", action="store_true", help="machine-readable output")
+    out.add_argument("--github", action="store_true", help="GitHub Actions annotations")
     p.add_argument("--no-external", action="store_true", help="skip Verible and Verilator")
     p.add_argument("--synth", action="store_true", help="also run Yosys: loops, drivers")
     p.add_argument("--select", metavar="IDS", help="only these rule IDs/prefixes, comma-separated")

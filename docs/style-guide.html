@@ -771,6 +771,9 @@ silently disables a setting.</p>
   hooks:
     - id: svstyle-check   <span class="cm"># and/or svstyle-fix</span>
 
+<span class="cm"># in a GitHub Actions step: findings annotate the pull request&#x27;s diff</span>
+svstyle check rtl/ --github
+
 <span class="cm"># adopt the style on existing code: only new findings fail</span>
 svstyle check rtl/ --baseline .svstyle-baseline --write-baseline
 svstyle check rtl/ --baseline .svstyle-baseline</pre></div>
