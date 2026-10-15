@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The skill simulates a small block that promises fairness or ordering (an
+  arbiter, a scheduler) instead of skipping its testbench, and never writes
+  one comment above a group of declarations.
+- `ASSERT`'s reset-pulse guard is tested on `##n` properties too; the macro
+  comment no longer says they are exposed.
 - LNG-001 no longer reads a closing `` `default_nettype wire`` as a `wire`
   declaration; `fix` replaces that line with `` `resetall`` instead of
   appending one that Verible joined onto it.

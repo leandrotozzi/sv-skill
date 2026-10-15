@@ -865,3 +865,27 @@ What is left is mostly not ours: pyslang's import (53 ms of the 0.1 s
 startup), its one tree visit, and Verible's own formatting CPU (about
 180 ms per large Ibex file). A content cache would be the next step for
 repeated runs on a large tree.
+
+### Small open items (2026-10-15)
+
+- **`ASSERT` across a reset pulse, `##n`: already covered.** Verilator 5.052
+  drops every attempt still running at the edge where `name_rst_q` is seen,
+  not only one-cycle ones: `c_q == 2 |-> ##3 c_q == 5` started at the edge
+  before a pulse no longer fires, and a wrong `##3` after the pulse still
+  does. Without `name_rst_q` the same property fires. The test now covers
+  `##3`; the macro comment no longer says longer properties are exposed.
+- **rr-arbiter unchecked: the testbench skip now excludes it.** A small
+  block with a promise over many cycles (fairness, ordering: an arbiter, a
+  scheduler) is simulated. Not rerun: it costs the rr-arbiter run back
+  (about $0.40) for the 3/3 planted-bug catches it had before.
+- **One comment above two declarations: prevented, not fixed.** `fix`
+  still gives the comment to the first and `TODO: describe` to the rest;
+  only the author can write the second. `SKILL.md` now says never to write
+  a group comment and to declare related signals in one statement or
+  comment each.
+- **Verible `v0.0-4296`: passes, pin stays.** In Docker (linux x86_64) the
+  whole suite passes on it except the pin test (Verilator and Yosys tests
+  skipped there); the lint rule set is the same 61 rules, and the only
+  default change, `generate-label-prefix` taking a `style_regex`, keeps the
+  old `g_`/`gen_` default. Every macOS build after 3946 is still arm64-only,
+  so the pin moves with the dev machine (Spec follow-ups, 2026-09-28).
