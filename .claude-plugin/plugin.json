@@ -1,6 +1,6 @@
 {
   "name": "systemverilog-rtl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Write, review and fix synthesizable SystemVerilog RTL in a lowRISC-derived house style, checked by svstyle",
   "author": { "name": "Leandro Tozzi" },
   "homepage": "https://github.com/leandrotozzi/sv-skill",

@@ -194,7 +194,7 @@ With [pre-commit](https://pre-commit.com):
 
 ```yaml
 - repo: https://github.com/leandrotozzi/sv-skill
-  rev: v0.1.0
+  rev: v0.1.1
   hooks:
     - id: svstyle-check   # and/or svstyle-fix
 ```

@@ -807,7 +807,7 @@ logic pad_io;  // svstyle: waive LNG-001 bidirectional pad
 CLI_CI = """
 # .pre-commit-config.yaml
 - repo: https://github.com/leandrotozzi/sv-skill
-  rev: v0.1.0
+  rev: v0.1.1
   hooks:
     - id: svstyle-check   # and/or svstyle-fix
 

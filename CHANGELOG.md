@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 — 2026-10-15
 
 - `check --github` prints findings as GitHub Actions annotations, so they show
   on the pull request's diff (MUST an error, SHOULD a warning).
