@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- pyslang 12 is supported (`pyslang>=11,<13`): the whole suite passes on it.
 - Verible `v0.0-4296` is accepted beside `v0.0-3946`: neither warns of drift,
   and CI runs the whole suite on both.
 - `check --synth` with yosys-slang reports a read error on its line, not

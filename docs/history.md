@@ -929,10 +929,14 @@ Not done: halving the upfront load would save about $0.045 a session, 17 %
 of the worst case, and needs a quality rerun of the classics; the 12 % cut
 above changed nothing measurable.
 
-### Two Verible versions (2026-10-15)
+### Verible and pyslang versions (2026-10-15)
 
 - **The pin is a set.** `KNOWN_GOOD_VERIBLE_VERSIONS` holds `v0.0-3946`
   (the newest x86_64 macOS build) and `v0.0-4296` (the newest release,
   already passing the suite, see "Small open items"). CI runs the whole
   test job on both; an arm64 or Linux user on 4296 no longer sees the
   drift warning.
+- **pyslang 12 supported.** The whole suite passes on 12.0.0 (nanobind)
+  with every tool installed, so the bound is `>=11,<13`. The lock stays on
+  11; a non-blocking `pyslang-latest` CI job runs the suite on the newest
+  release and says when the bound can move.

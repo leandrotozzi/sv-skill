@@ -66,3 +66,16 @@ jobs:
           echo "$RUNNER_TEMP/verible-$tag/bin" >> "$GITHUB_PATH"
       - run: uv sync --extra dev
       - run: uv run pytest -n auto tests/test_fix.py
+
+  # Non-blocking: does the newest pyslang, past the pyproject bound, still pass?
+  # Green here means the upper bound can move.
+  pyslang-latest:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --extra dev
+      - run: uv pip install --upgrade pyslang
+      - run: uv run --no-sync python -c "import pyslang; print(pyslang.__version__)"
+      - run: uv run --no-sync pytest -n auto

@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = [
-    "pyslang>=11,<12",  # v12 moved to nanobind; untested
+    "pyslang>=11,<13",  # pyslang-latest in CI says when the bound can move
 ]
 
 [project.urls]
