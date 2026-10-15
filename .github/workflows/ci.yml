@@ -7,8 +7,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every version in external.KNOWN_GOOD_VERIBLE_VERSIONS.
+        verible:
+          - v0.0-3946-g851d3ff4
+          - v0.0-4296-g0f262651
     env:
-      VERIBLE: v0.0-3946-g851d3ff4  # keep in sync with external.KNOWN_GOOD_VERIBLE_VERSION
+      VERIBLE: ${{ matrix.verible }}
       # Verilator and Yosys from a dated OSS CAD Suite build (5.053 / 0.69, with the
       # yosys-slang plugin): apt's (5.020 / 0.33) are years behind.
       OSS_CAD: 2026-10-07
@@ -43,7 +50,7 @@ jobs:
       - run: FRONTEND=slang sh evals/yosys-probes/run.sh
 
   # Non-blocking: does the newest Verible still produce the golden `fix` output?
-  # Green here means the pin in external.KNOWN_GOOD_VERIBLE_VERSION can move.
+  # Green here means it can join external.KNOWN_GOOD_VERIBLE_VERSIONS.
   verible-latest:
     runs-on: ubuntu-24.04
     continue-on-error: true

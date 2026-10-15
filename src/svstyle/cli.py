@@ -156,10 +156,10 @@ def _warn_verible_drift() -> None:
         found = external.verible_version()
     except external.ToolMissing:
         return
-    if found != external.KNOWN_GOOD_VERIBLE_VERSION:
+    if found not in external.KNOWN_GOOD_VERIBLE_VERSIONS:
         print(
-            f"warning: Verible {found}; svstyle is pinned to "
-            f"{external.KNOWN_GOOD_VERIBLE_VERSION}, alignment may drift",
+            f"warning: Verible {found}; svstyle is tested with "
+            f"{', '.join(external.KNOWN_GOOD_VERIBLE_VERSIONS)}, alignment may drift",
             file=sys.stderr,
         )
 

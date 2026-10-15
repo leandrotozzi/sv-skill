@@ -21,7 +21,7 @@
 # ===========================================================================
 # DOC -- comments and file header. This family is svstyle's reason to exist:
 # no open-source SystemVerilog tool enforces any of it (verified against all
-# 61 rules of verible-verilog-lint v0.0-3946).
+# 61 rules of verible-verilog-lint v0.0-3946 and v0.0-4296).
 #
 # lowRISC does NOT mandate per-port or per-declaration comments -- it mandates
 # a comment on exactly one construct (FSM case arms) and prefers that the name

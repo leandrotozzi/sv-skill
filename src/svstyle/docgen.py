@@ -8,7 +8,7 @@ the files are regenerated with `svstyle rules --gen`.
 import html
 import re
 
-from .external import KNOWN_GOOD_VERIBLE_VERSION
+from .external import KNOWN_GOOD_VERIBLE_VERSIONS
 from .rules import CATEGORIES, Rule, by_category
 
 SEV_COLOR = {"MUST": "red", "SHOULD": "orange", "MAY": "blue"}
@@ -871,6 +871,10 @@ TOOL_INFO = {
 }
 
 
+def _verible() -> str:
+    return " or ".join(f"<code>{v}</code>" for v in KNOWN_GOOD_VERIBLE_VERSIONS)
+
+
 def _tools(rules: list[Rule], by_id: dict) -> str:
     total = len(rules) or 1
     counts = {t: sum(1 for r in rules if r.tool == t) for t in TOOL_INFO}
@@ -889,7 +893,7 @@ def _tools(rules: list[Rule], by_id: dict) -> str:
     for t, (kind, what, run, get) in TOOL_INFO.items():
         owned = [r.id for r in rules if r.tool == t]
         backs = [r.id for r in rules if any(a == t for a, _ in r.also)]
-        get = get.replace("{verible}", f"<code>{KNOWN_GOOD_VERIBLE_VERSION}</code>")
+        get = get.replace("{verible}", _verible())
         rows = f"<dt>runs</dt><dd>{run}</dd><dt>get it</dt><dd>{get}</dd>"
         if owned:
             rows += f"<dt>owns {len(owned)}</dt><dd>{_chips(owned, by_id)}</dd>"
@@ -927,7 +931,7 @@ QUICKSTART = """
  <div class="card step"><h4>Install the checker</h4>
   <p>The CLI the skill runs. Then the external tools, which are used when present.</p>
   {cli}
-  <p class="small">Verible <code>{verible}</code> (pinned) for formatting and lint, Verilator 5,
+  <p class="small">Verible {verible} (tested versions) for formatting and lint, Verilator 5,
   and Yosys. The <a href="https://github.com/YosysHQ/oss-cad-suite-build">OSS CAD Suite</a>
   ships Verilator, Yosys and the yosys-slang plugin in one download.</p></div>
  <div class="card step"><h4>Configure the project (optional)</h4>
@@ -1294,7 +1298,7 @@ def render_html(rules: list[Rule], company: str = "", example: str = "") -> str:
             ".svstyle.toml",
             "toml",
         ),
-        verible=KNOWN_GOOD_VERIBLE_VERSION,
+        verible=_verible(),
     )
 
     flow = "".join(

@@ -14,8 +14,8 @@ Working on svstyle itself: `uv tool install --editable <checkout>` puts the
 checkout's version on PATH.
 
 External tools are used when present: `verible-verilog-format` and
-`verible-verilog-lint` (pinned to `v0.0-3946-g851d3ff4`; another version
-warns that alignment may drift) and `verilator`. `check` skips a missing tool
+`verible-verilog-lint` (tested with `v0.0-3946-g851d3ff4` and
+`v0.0-4296-g0f262651`; another version warns that alignment may drift) and `verilator`. `check` skips a missing tool
 with a warning; `fix` refuses without Verible, because its output would not
 be idempotent.
 

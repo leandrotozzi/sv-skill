@@ -1,5 +1,5 @@
 # Verible formatter flags - lowRISC-aligned SystemVerilog RTL house style.
-# Verified against verible-verilog-format v0.0-3946-g851d3ff4.
+# Verified against verible-verilog-format v0.0-3946-g851d3ff4 and v0.0-4296-g0f262651.
 
 # --- base geometry ---
 --indentation_spaces=4

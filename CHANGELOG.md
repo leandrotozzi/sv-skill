@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verible `v0.0-4296` is accepted beside `v0.0-3946`: neither warns of drift,
+  and CI runs the whole suite on both.
 - `check --synth` with yosys-slang reports a read error on its line, not
   line 1: the slang run no longer passes `-q`, which hid slang's diagnostics.
 - The README gives the skill's cost as a fixed part per session plus a

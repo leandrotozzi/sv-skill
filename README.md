@@ -185,7 +185,7 @@ uvx svstyle check rtl/         # or run it once without installing
 ```
 
 External tools used when present: `verible-verilog-format` / `verible-verilog-lint`
-(pinned `v0.0-3946`), `verilator`, and `yosys` for `--synth`.
+(`v0.0-3946` or `v0.0-4296`), `verilator`, and `yosys` for `--synth`.
 `svstyle check --no-external` skips them; `fix` needs Verible. Where nothing
 can be installed (claude.ai, the API), the skill still writes to the rules
 and says that nothing was checked.

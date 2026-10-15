@@ -1,7 +1,7 @@
 # Verible lint config - lowRISC-aligned SystemVerilog RTL house style.
-# Verified against verible-verilog-lint v0.0-3946-g851d3ff4.
+# Verified against verible-verilog-lint v0.0-3946-g851d3ff4 and v0.0-4296-g0f262651.
 # NOTE: this file is a DELTA on --ruleset (default "default"), not a replacement.
-# All 61 rules of this build are listed explicitly so the result is hermetic.
+# All 61 rules of both builds are listed explicitly so the result is hermetic.
 
 # --- combinational / sequential logic ---
 always-comb

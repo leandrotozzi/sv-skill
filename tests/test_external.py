@@ -168,7 +168,7 @@ def test_missing_tool_raises(monkeypatch):
 
 @needs_verible
 def test_installed_verible_matches_pin():
-    assert ext.verible_version() == ext.KNOWN_GOOD_VERIBLE_VERSION
+    assert ext.verible_version() in ext.KNOWN_GOOD_VERIBLE_VERSIONS
 
 
 @needs_verible
@@ -245,9 +245,10 @@ def test_format_failure_message_is_short(monkeypatch):
     assert len(str(exc.value)) < 300 and "converge" in str(exc.value)
 
 
-def test_ci_pins_the_same_verible_as_the_code():
+def test_ci_tests_every_verible_the_code_accepts():
     ci = (Path(__file__).parents[1] / ".github" / "workflows" / "ci.yml").read_text()
-    assert f"VERIBLE: {ext.KNOWN_GOOD_VERIBLE_VERSION}" in ci
+    for v in ext.KNOWN_GOOD_VERIBLE_VERSIONS:
+        assert f"- {v}" in ci
 
 
 @needs_verilator

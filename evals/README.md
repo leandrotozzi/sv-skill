@@ -48,7 +48,7 @@ Results depend on these; record them with any number you publish.
 
 | Tool | Local | CI (OSS CAD Suite 2026-10-07) |
 |---|---|---|
-| Verible | v0.0-3946 (pinned) | v0.0-3946 |
+| Verible | v0.0-3946 | v0.0-3946 and v0.0-4296 |
 | Verilator | 5.052 | 5.053 |
 | Yosys | 0.66 | 0.69 |
 | Icarus Verilog | 13.0 (VerilogEval only; see `verilogeval.py`) | — |

@@ -928,3 +928,11 @@ problem per session, is its worst case. The README now gives both numbers
 Not done: halving the upfront load would save about $0.045 a session, 17 %
 of the worst case, and needs a quality rerun of the classics; the 12 % cut
 above changed nothing measurable.
+
+### Two Verible versions (2026-10-15)
+
+- **The pin is a set.** `KNOWN_GOOD_VERIBLE_VERSIONS` holds `v0.0-3946`
+  (the newest x86_64 macOS build) and `v0.0-4296` (the newest release,
+  already passing the suite, see "Small open items"). CI runs the whole
+  test job on both; an arm64 or Linux user on 4296 no longer sees the
+  drift warning.

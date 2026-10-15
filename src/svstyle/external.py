@@ -19,7 +19,9 @@ from .rules import Diag, Rule, tool_index
 
 # A new Verible can shift alignment by a column, which breaks `fix`
 # idempotency on files formatted by the old one. Drift warns, never fails.
-KNOWN_GOOD_VERIBLE_VERSION = "v0.0-3946-g851d3ff4"
+# Each version here passes the whole suite in CI; 3946 is the newest with an
+# x86_64 macOS build, 4296 the newest release.
+KNOWN_GOOD_VERIBLE_VERSIONS = ("v0.0-3946-g851d3ff4", "v0.0-4296-g0f262651")
 
 DATA = Path(__file__).parent / "data"
 FORMAT_FLAGS = DATA / "verible-format.flags"
