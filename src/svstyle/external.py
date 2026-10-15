@@ -248,7 +248,10 @@ YOSYS_WARNINGS = {
     "used but has no driver": "no-driver",
 }
 YOSYS_SRC_RE = re.compile(r"source: (?P<path>.+?):(?P<line>\d+)\.(?P<col>\d+)")
-YOSYS_ERROR_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+): ERROR: (?P<msg>.*)$")
+# Yosys: `f.sv:2: ERROR: msg`; yosys-slang: `f.sv:2:3: error: msg`.
+YOSYS_ERROR_RE = re.compile(
+    r"^(?P<path>.+?):(?P<line>\d+):(?:\d+:)? (?:ERROR|error): (?P<msg>.*)$"
+)
 
 
 def yosys_check(
@@ -272,7 +275,8 @@ def yosys_check(
             lines = [f'-I "{d}"' for d in dirs] + [f'"{p}"' for p in paths]
             cmd.write_text("\n".join(lines) + "\n", encoding="utf-8")
             read = f"plugin -i slang; read_slang -f {cmd}"
-            res = _run("yosys", ["-q", "-p", f"{read}; hierarchy; proc; check"])
+            # No -q: newer yosys-slang logs its `file:line:col: error:` lines, which -q hides.
+            res = _run("yosys", ["-p", f"{read}; hierarchy; proc; check"])
             return _yosys_diags(res, rules, paths[0], partial)
         # Files are quoted, but Yosys takes no quoted -I: a dir with a space is
         # reached through a symlink whose path has none.
