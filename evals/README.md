@@ -34,6 +34,14 @@ OUT/eval-<name>/<config>/run-N/timing.json    cost (USD), turns, seconds
 OUT/results.md                                one row per eval and config
 ```
 
+`grading.json` also holds `metrics`: `depth`, the cells on the longest
+flop-to-flop path of the flattened design (`ltp -noff`), and `transistors`
+(`stat -tech cmos`). They are numbers, not checks. `results.md` gives their
+median over the runs whose RTL matches the reference, and with_skill over
+without_skill per eval and as a geomean, marked a regression above 1.25 for
+one eval or 1.10 overall. Why this metric and not STA:
+[`docs/research/timing-metric.md`](../docs/research/timing-metric.md).
+
 `--synth yosys-slang` writes that key to each run's `.svstyle.toml`, as a
 project would: the skill loads `synth-yosys-slang.md`, and both `svstyle` and
 the grader's own Yosys check read with `read_slang` (put a Yosys with the

@@ -940,3 +940,19 @@ above changed nothing measurable.
   with every tool installed, so the bound is `>=11,<13`. The lock stays on
   11; a non-blocking `pyslang-latest` CI job runs the suite on the newest
   release and says when the bound can move.
+
+### Logic depth in the grader (2026-10-15)
+
+- **Research first** (`docs/research/timing-metric.md`): the LLM-for-RTL
+  papers that score PPA use STA with a PDK, as ratios to a reference and a
+  geomean; none counts levels. Yosys `sta` and `abc -D` need a timing
+  library, so the cheap stand-in is `ltp -noff` on the flattened design
+  plus `stat -tech cmos`: deterministic, about 1 s a classic, and it ranks
+  like ABC's AIG levels. An `if/else if` chain over a one-hot select is
+  9 levels against 4 for `unique case`; equivalent rewrites move it ~7 %.
+- **Done:** `grade.metrics()` writes `depth` and `transistors` to
+  `grading.json`; `run.py`'s table gives the medians over correct runs and
+  the with/without ratios, a regression above 1.25 per eval or 1.10 as a
+  geomean. Not measured on real runs yet (roadmap).
+- **Not done:** the ratio to the classics' reference RTL; add it if the
+  with/without ratio ever needs an anchor.

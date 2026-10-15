@@ -57,9 +57,8 @@ def grade_review(out: Path, checks: list[dict]) -> list[dict]:
     return exp
 
 
-def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
-    if any(k in c for c in checks for k in REPORT_CHECKS):
-        return grade_review(out, checks)
+def design(out: Path) -> tuple[list[str], list[str], str]:
+    """The output's RTL files, its include flags and the Yosys command that reads them."""
     # Packages first: Yosys and Verilator need them before their users.
     # Testbenches some runs leave behind are not RTL; grade the design only.
     # Anywhere below the outputs (some runs use rtl/), but not a build directory.
@@ -70,6 +69,34 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
     ]  # fmt: skip
     files = sorted(rtl, key=lambda n: (not n.endswith("_pkg.sv"), Path(n).name))
     incs = [f"-I{out / d}" for d in sorted({str(Path(f).parent) for f in files})]
+    quoted = " ".join(f'"{f}"' for f in files)  # a path with a space
+    read = f"read_verilog -sv {' '.join(incs)} {quoted}"
+    if load_config(out / "x.sv").get("synth") == "yosys-slang":  # the project's frontend
+        read = f"plugin -i slang; read_slang {' '.join(incs)} {' '.join(files)}"
+    return files, incs, read
+
+
+def metrics(out: Path) -> dict:
+    """Logic depth and size of the flattened design, numbers rather than a check: there
+    is no right depth, only one to compare (docs/research/timing-metric.md). `ltp`
+    counts cells on the longest flop-to-flop path, unit delay; `stat -tech cmos`
+    estimates transistors. Empty when the design does not synthesise."""
+    files, _, read = design(out)
+    if not files:
+        return {}
+    # Not -q: that silences `ltp` and `stat`. Flattened, or `ltp` sees one module.
+    ys = run(["yosys", "-p", f"{read}; synth -flatten -auto-top; ltp -noff; stat -tech cmos"], out)
+    depth = re.findall(r"Longest topological path in \S+ \(length=(\d+)\)", ys.stdout)
+    tr = re.search(r"Estimated number of transistors:\s+(\d+)", ys.stdout)
+    if ys.returncode or not depth or not tr:
+        return {}
+    return {"depth": int(depth[-1]), "transistors": int(tr.group(1))}
+
+
+def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
+    if any(k in c for c in checks for k in REPORT_CHECKS):
+        return grade_review(out, checks)
+    files, incs, read = design(out)
     exp = []
 
     def check(text: str, passed: bool, evidence: str) -> None:
@@ -127,10 +154,6 @@ def grade(out: Path, checks: list[dict] = ()) -> list[dict]:
     ]  # fmt: skip
     check("verilator --lint-only -Wall is clean", not warns, "\n".join(warns[:8]) or "clean")
 
-    quoted = " ".join(f'"{f}"' for f in files)  # a path with a space
-    read = f"read_verilog -sv {' '.join(incs)} {quoted}"
-    if load_config(out / "x.sv").get("synth") == "yosys-slang":  # the project's frontend
-        read = f"plugin -i slang; read_slang {' '.join(incs)} {' '.join(files)}"
     ys = run(["yosys", "-q", "-p", f"{read}; synth -auto-top"], out)
     check("Yosys reads and synthesizes the design", ys.returncode == 0,
           (ys.stderr or ys.stdout).strip()[-400:] or "ok")  # fmt: skip
@@ -251,6 +274,7 @@ def main(iteration: Path) -> None:
             passed = sum(e["passed"] for e in exp)
             (run_dir / "grading.json").write_text(json.dumps({
                 "expectations": exp,
+                "metrics": metrics(run_dir / "outputs"),
                 "summary": {"passed": passed, "failed": len(exp) - passed, "total": len(exp),
                             "pass_rate": round(passed / len(exp), 2)},
             }, indent=2))  # fmt: skip

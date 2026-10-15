@@ -13,7 +13,9 @@ OUT/results.md is the table.
 
 import argparse
 import json
+import math
 import shutil
+import statistics
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -46,24 +48,64 @@ def one(
     (run / "timing.json").write_text(json.dumps(timing))
     exp = grade.grade(work, e.get("checks", []))
     passed = sum(x["passed"] for x in exp)
+    size = grade.metrics(work)
+    # Depth is compared only on correct RTL: a broken block is not shallow.
+    tb = {c["text"] for c in e.get("checks", []) if "equiv_tb" in c}
+    correct = all(x["passed"] for x in exp if x["text"] in tb)
     (run / "grading.json").write_text(json.dumps({
         "expectations": exp,
+        "metrics": size,
         "summary": {"passed": passed, "failed": len(exp) - passed, "total": len(exp)},
     }, indent=2))  # fmt: skip
     print(f"{name}/{cfg}/run-{n}: {passed}/{len(exp)}, ${timing['cost']:.2f}", flush=True)
-    return {"eval": name, "config": cfg, "run": n, "passed": passed, "total": len(exp), **timing}
+    return {"eval": name, "config": cfg, "run": n, "passed": passed, "total": len(exp),
+            "correct": correct, **size, **timing}  # fmt: skip
+
+
+METRICS = ("depth", "transistors")
+
+
+def median(rows: list[dict], key: str) -> float | None:
+    """Over the runs whose RTL is correct; None when there is none."""
+    vals = [r[key] for r in rows if r.get("correct") and key in r]
+    return statistics.median(vals) if vals else None
 
 
 def table(rows: list[dict], model: str) -> str:
     out = [f"{model}, {time.strftime('%Y-%m-%d')}\n",
-           "| eval | config | checks passed | $/run | s/run |",
-           "|---|---|---|---|---|"]  # fmt: skip
+           "| eval | config | checks passed | depth | transistors | $/run | s/run |",
+           "|---|---|---|---|---|---|---|"]  # fmt: skip
     for key in sorted({(r["eval"], r["config"]) for r in rows}):
         rs = [r for r in rows if (r["eval"], r["config"]) == key]
         p, t = sum(r["passed"] for r in rs), sum(r["total"] for r in rs)
         cost, secs = sum(r["cost"] for r in rs) / len(rs), sum(r["seconds"] for r in rs) / len(rs)
-        out.append(f"| {key[0]} | {key[1]} | {p}/{t} | {cost:.2f} | {secs:.0f} |")
-    return "\n".join(out) + "\n"
+        size = " | ".join(f"{m:g}" if (m := median(rs, k)) is not None else "–" for k in METRICS)
+        out.append(f"| {key[0]} | {key[1]} | {p}/{t} | {size} | {cost:.2f} | {secs:.0f} |")
+    return "\n".join(out) + "\n" + ratios(rows)
+
+
+def ratios(rows: list[dict]) -> str:
+    """with_skill over without_skill, per eval and as a geomean. Above 1.10 overall or
+    1.25 for one eval is past the ~7% noise of an equivalent rewrite."""
+    out, logs = [], {k: [] for k in METRICS}
+    for ev in sorted({r["eval"] for r in rows}):
+        cells = []
+        for k in METRICS:
+            w, wo = (median([r for r in rows if r["eval"] == ev and r["config"] == c], k)
+                     for c in ("with_skill", "without_skill"))  # fmt: skip
+            if not w or not wo:
+                cells.append("–")
+                continue
+            logs[k].append(math.log(w / wo))
+            cells.append(f"{w / wo:.2f}" + (" **regression**" if w / wo > 1.25 else ""))
+        out.append(f"| {ev} | " + " | ".join(cells) + " |")
+    if not any(logs.values()):
+        return ""
+    geo = [math.exp(statistics.fmean(v)) if v else None for v in logs.values()]
+    cells = [f"{g:.2f}" + (" **regression**" if g > 1.10 else "") if g else "–" for g in geo]
+    head = ["\nWith skill / without, median of correct runs:\n",
+            "| eval | depth | transistors |", "|---|---|---|"]  # fmt: skip
+    return "\n".join([*head, *out, "| geomean | " + " | ".join(cells) + " |"]) + "\n"
 
 
 def main() -> int:
