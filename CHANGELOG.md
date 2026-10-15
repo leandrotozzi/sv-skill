@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 (2026-10-15)
 
 - The skill simulates a small block that promises fairness or ordering (an
   arbiter, a scheduler) instead of skipping its testbench, and never writes
