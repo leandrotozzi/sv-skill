@@ -1,8 +1,7 @@
 # Roadmap
 
 Open work only. Every number and every "done" or "not doing" is in
-[`history.md`](history.md); design specs and implementation plans are in
-`docs/superpowers/`.
+[`history.md`](history.md).
 
 ## Release (by hand)
 

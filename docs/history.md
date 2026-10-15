@@ -448,8 +448,7 @@ Done as M15.
 
 ## Ecosystem review of 2026-10-10: release, review workflow, debt
 
-From `docs/superpowers/plans/2026-10-10-ecosystem-review.md`. Done in this
-round: M14, M11, M12, M15, M16 (no action) and the engineering debt; M13
+Done in this round: M14, M11, M12, M15, M16 (no action) and the engineering debt; M13
 except the full VerilogEval.
 
 ### Engineering debt
