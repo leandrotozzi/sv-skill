@@ -956,3 +956,8 @@ above changed nothing measurable.
   geomean. Not measured on real runs yet (roadmap).
 - **Not done:** the ratio to the classics' reference RTL; add it if the
   with/without ratio ever needs an anchor.
+- **No silent holes.** The builtin reader rejects 8 of the 36 classics, so
+  a run it cannot read would have dropped out of the ratios unseen.
+  `metrics()` now always reads with yosys-slang (all 35 classic references
+  measure), returns the error when Yosys still gives no number, and
+  `results.md` lists every RTL run left out with its reason.

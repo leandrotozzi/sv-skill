@@ -80,16 +80,23 @@ def metrics(out: Path) -> dict:
     """Logic depth and size of the flattened design, numbers rather than a check: there
     is no right depth, only one to compare (docs/research/timing-metric.md). `ltp`
     counts cells on the longest flop-to-flop path, unit delay; `stat -tech cmos`
-    estimates transistors. Empty when the design does not synthesise."""
-    files, _, read = design(out)
+    estimates transistors. `{"error": why}` when RTL gives no number; empty when
+    there is no RTL to measure (a review eval).
+
+    Always read with yosys-slang, whatever the project's frontend: the builtin
+    reader rejects valid code (8 of the 36 classics), which would leave holes in
+    the comparison, and one reader for both sides keeps the numbers comparable."""
+    files, incs, _ = design(out)
     if not files:
         return {}
+    read = f"plugin -i slang; read_slang {' '.join(incs)} {' '.join(files)}"
     # Not -q: that silences `ltp` and `stat`. Flattened, or `ltp` sees one module.
     ys = run(["yosys", "-p", f"{read}; synth -flatten -auto-top; ltp -noff; stat -tech cmos"], out)
     depth = re.findall(r"Longest topological path in \S+ \(length=(\d+)\)", ys.stdout)
     tr = re.search(r"Estimated number of transistors:\s+(\d+)", ys.stdout)
     if ys.returncode or not depth or not tr:
-        return {}
+        why = [ln for ln in (ys.stderr + ys.stdout).splitlines() if "ERROR" in ln or "error" in ln]
+        return {"error": (why[-1] if why else f"yosys exit {ys.returncode}").strip()[:200]}
     return {"depth": int(depth[-1]), "transistors": int(tr.group(1))}
 
 
@@ -272,9 +279,12 @@ def main(iteration: Path) -> None:
         for run_dir in sorted(cfg.glob("run-*")):
             exp = grade(run_dir / "outputs", checks)
             passed = sum(e["passed"] for e in exp)
+            size = metrics(run_dir / "outputs")
+            if "error" in size:
+                print(f"warning: {run_dir.relative_to(iteration)}: no depth: {size['error']}")
             (run_dir / "grading.json").write_text(json.dumps({
                 "expectations": exp,
-                "metrics": metrics(run_dir / "outputs"),
+                "metrics": size,
                 "summary": {"passed": passed, "failed": len(exp) - passed, "total": len(exp),
                             "pass_rate": round(passed / len(exp), 2)},
             }, indent=2))  # fmt: skip

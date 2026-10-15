@@ -39,7 +39,10 @@ flop-to-flop path of the flattened design (`ltp -noff`), and `transistors`
 (`stat -tech cmos`). They are numbers, not checks. `results.md` gives their
 median over the runs whose RTL matches the reference, and with_skill over
 without_skill per eval and as a geomean, marked a regression above 1.25 for
-one eval or 1.10 overall. Why this metric and not STA:
+one eval or 1.10 overall. The metric always reads with yosys-slang, so a
+Yosys with the plugin must be on `PATH`. Every RTL run left out of the ratios
+is listed under the table with its reason (a read error, a failing
+testbench), and `run.py` warns as it happens. Why this metric and not STA:
 [`docs/research/timing-metric.md`](../docs/research/timing-metric.md).
 
 `--synth yosys-slang` writes that key to each run's `.svstyle.toml`, as a

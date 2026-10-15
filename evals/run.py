@@ -49,6 +49,8 @@ def one(
     exp = grade.grade(work, e.get("checks", []))
     passed = sum(x["passed"] for x in exp)
     size = grade.metrics(work)
+    if "error" in size:
+        print(f"warning: {name}/{cfg}/run-{n}: no depth: {size['error']}", flush=True)
     # Depth is compared only on correct RTL: a broken block is not shallow.
     tb = {c["text"] for c in e.get("checks", []) if "equiv_tb" in c}
     correct = all(x["passed"] for x in exp if x["text"] in tb)
@@ -59,7 +61,8 @@ def one(
     }, indent=2))  # fmt: skip
     print(f"{name}/{cfg}/run-{n}: {passed}/{len(exp)}, ${timing['cost']:.2f}", flush=True)
     return {"eval": name, "config": cfg, "run": n, "passed": passed, "total": len(exp),
-            "correct": correct, **size, **timing}  # fmt: skip
+            "correct": correct, "has_rtl": bool(size), "depth_error": size.get("error"),
+            **{k: size[k] for k in METRICS if k in size}, **timing}  # fmt: skip
 
 
 METRICS = ("depth", "transistors")
@@ -99,13 +102,26 @@ def ratios(rows: list[dict]) -> str:
             logs[k].append(math.log(w / wo))
             cells.append(f"{w / wo:.2f}" + (" **regression**" if w / wo > 1.25 else ""))
         out.append(f"| {ev} | " + " | ".join(cells) + " |")
+    gaps = holes(rows)
     if not any(logs.values()):
-        return ""
+        return gaps
     geo = [math.exp(statistics.fmean(v)) if v else None for v in logs.values()]
     cells = [f"{g:.2f}" + (" **regression**" if g > 1.10 else "") if g else "–" for g in geo]
     head = ["\nWith skill / without, median of correct runs:\n",
             "| eval | depth | transistors |", "|---|---|---|"]  # fmt: skip
-    return "\n".join([*head, *out, "| geomean | " + " | ".join(cells) + " |"]) + "\n"
+    return "\n".join([*head, *out, "| geomean | " + " | ".join(cells) + " |"]) + "\n" + gaps
+
+
+def holes(rows: list[dict]) -> str:
+    """Every RTL run the ratios leave out, and why: a hole is never silent."""
+    out = []
+    for r in sorted(rows, key=lambda r: (r["eval"], r["config"], r["run"])):
+        if not r.get("has_rtl"):
+            continue
+        why = r.get("depth_error") or ("" if r.get("correct") else "fails its testbench")
+        if why:
+            out.append(f"- {r['eval']}/{r['config']}/run-{r['run']}: {why}")
+    return "\nLeft out of depth and transistors:\n\n" + "\n".join(out) + "\n" if out else ""
 
 
 def main() -> int:
