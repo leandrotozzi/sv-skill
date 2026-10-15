@@ -36,6 +36,10 @@ What the skill buys is style and clean synthesis, not more correct RTL:
 | VerilogEval v2, cost per problem | $0.10 | $0.35 |
 | Classic blocks, Yosys synthesis with no warning and no latch | 22/24 | 35/35 |
 
+The two synthesis rows count different sets (24 classics were run without
+the skill, 35 with it), and the two misses are not bugs: fir and cordic
+keep a memory as a list of flops instead of inferring a RAM.
+
 On 25 of those classics, three runs each, RTL written with the skill was
 functionally correct 74/75 against self-checking testbenches. The Yosys
 subset in the skill is backed by 149 one-construct probes proved with `sat`,
