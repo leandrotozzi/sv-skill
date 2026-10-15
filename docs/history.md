@@ -961,3 +961,20 @@ above changed nothing measurable.
   `metrics()` now always reads with yosys-slang (all 35 classic references
   measure), returns the error when Yosys still gives no number, and
   `results.md` lists every RTL run left out with its reason.
+
+### Logic depth, pilot (2026-10-15)
+
+- **Five classics, three runs each** (rr-arbiter, lzc, secded, sort8,
+  barrel-shift; claude-opus-5-5, Yosys 0.66 with yosys-slang): every run
+  correct, none left out. With skill over without: transistors 0.96 as a
+  geomean, depth 1.12, all of it from secded (1.64); the other four sit at
+  1.00-1.07, about 1.02 without secded.
+- **secded is bimodal, not the skill.** Both configs write depth 10-11 or
+  17-18; with skill drew the deep one 2 of 3 times, without 1 of 3, and the
+  median followed. The deep form derives `single_err` from the 64 column
+  compares; `^syndrome` (Hsiao columns have odd weight) takes the same run
+  from 18 to 11. A balanced syndrome XOR changes 18 to 17 only. The skill
+  says nothing about SECDED or syndromes.
+- **Not done:** the full 35-classic run, about $115 at three runs (the
+  pilot cost $0.55 a run) or $190 at five, which a bimodal eval needs.
+  No evidence the skill hurts timing, so nothing goes into the skill.
