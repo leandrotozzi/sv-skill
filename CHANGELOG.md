@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.1.0 (2026-10-15)
+## 0.1.0 — 2026-10-15
+
+First release.
 
 - The skill simulates a small block that promises fairness or ordering (an
   arbiter, a scheduler) instead of skipping its testbench, and never writes
@@ -43,10 +45,6 @@
   `references/synth-yosys-slang.md`.
 - CI runs the 149 Yosys probes on both frontends, and a non-blocking job
   checks the `fix` goldens against the latest Verible.
-
-## 0.1.0 — 2026-10-10
-
-First release.
 
 - `rules.toml`: 82 rules in 12 categories, the single source for the CLI, the
   skill's rule references and `docs/style-guide.html`; `svstyle rules --check`
