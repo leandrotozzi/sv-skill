@@ -33,10 +33,17 @@ What the skill buys is style and clean synthesis, not more correct RTL:
 |---|---|---|
 | VerilogEval v2, pass@1 (155 problems, adjudicated) | 149 | 147, equal after review |
 | VerilogEval v2, `svstyle check` clean | 0 | 155 |
-| VerilogEval v2, cost per problem | $0.10 | $0.35 |
+| VerilogEval v2, cost, one problem per session | $0.09 | $0.26 |
+| Same model, four problems in one session | $0.28 | $0.52 |
 | Classic blocks, Yosys synthesis with no warning and no latch | 22/24 | 35/35 |
 
-The two synthesis rows count different sets (24 classics were run without
+The cost is mostly fixed per session: loading the skill and its rule list
+(about 11 k tokens, written once to the prompt cache) is about $0.12, and
+each further module adds about $0.06 for its header, comments and the
+`fix`/`check` round. One trivial problem per session, as VerilogEval runs
+it, is the worst case.
+
+The synthesis row counts different sets (24 classics were run without
 the skill, 35 with it), and the two misses are not bugs: fir and cordic
 keep a memory as a list of flops instead of inferring a RAM.
 

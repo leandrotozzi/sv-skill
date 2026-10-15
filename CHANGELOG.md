@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `check --synth` with yosys-slang reports a read error on its line, not
+  line 1: the slang run no longer passes `-q`, which hid slang's diagnostics.
+- The README gives the skill's cost as a fixed part per session plus a
+  part per module, measured both ways.
+
 ## 0.1.0 — 2026-10-15
 
 First release.

@@ -894,3 +894,37 @@ repeated runs on a large tree.
   yosys-slang prints only "Design elaboration failed", so every read error
   landed on line 1. The slang call drops `-q` and the parser takes slang's
   `file:line:col: error:` lines too.
+
+### What the cost is made of (2026-10-15)
+
+VerilogEval subset of 12, Opus 5.5, one run each, Claude Code 2.1.300.
+`claude -p` writes the prompt cache with a 1 h TTL, at $8/M, twice the
+input price.
+
+| config | $/problem | cache write | cache read | output | turns | pass@1 |
+|---|---|---|---|---|---|---|
+| without skill | 0.088 | 8.5 k tok, $0.068 | $0.007 | $0.013 | 2.1 | 9/12 |
+| with skill | 0.261 | 22.8 k tok, $0.182 | $0.034 | $0.044 | 9.4 | 8/12 |
+
+Of the $0.17 premium, 66 % is cache writes (`SKILL.md` and `rules.md`, about
+11 k tokens, written once a session), 18 % output (the header and comments
+the style asks for), 16 % cache reads (seven more turns: Skill, `rules.md`,
+a template, `fix`, `check`). The one pass@1 loss is Prob067, which iverilog
+does not build.
+
+Four of those problems (043, 079, 104, 140) asked in one session instead:
+
+| config | four sessions | one session |
+|---|---|---|
+| without skill | $0.37 | $0.28 |
+| with skill | $1.10 (2.9x) | $0.52 (1.85x) |
+
+Same outcome as separately: with the skill all four `svstyle` clean, 104
+fails in both configs, 140 fails on iverilog's enum cast. So the premium is
+about $0.12 per session plus $0.06 per module; VerilogEval, one trivial
+problem per session, is its worst case. The README now gives both numbers
+(its $0.35 predated "Simulate only what is worth it").
+
+Not done: halving the upfront load would save about $0.045 a session, 17 %
+of the worst case, and needs a quality rerun of the classics; the 12 % cut
+above changed nothing measurable.
