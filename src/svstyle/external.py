@@ -249,9 +249,7 @@ YOSYS_WARNINGS = {
 }
 YOSYS_SRC_RE = re.compile(r"source: (?P<path>.+?):(?P<line>\d+)\.(?P<col>\d+)")
 # Yosys: `f.sv:2: ERROR: msg`; yosys-slang: `f.sv:2:3: error: msg`.
-YOSYS_ERROR_RE = re.compile(
-    r"^(?P<path>.+?):(?P<line>\d+):(?:\d+:)? (?:ERROR|error): (?P<msg>.*)$"
-)
+YOSYS_ERROR_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+):(?:\d+:)? (?:ERROR|error): (?P<msg>.*)$")
 
 
 def yosys_check(
