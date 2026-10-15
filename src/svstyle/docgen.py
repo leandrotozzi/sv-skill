@@ -1008,8 +1008,9 @@ FLOW = [
         "A clean check means well formed, not correct. A self-checking Verilator testbench in "
         "<code>tb/&lt;name&gt;_tb.sv</code> compares the outputs, every cycle, against a model "
         "written from the spec, never from the RTL.",
-        "Skipped for small blocks: one clock, no memory or protocol, simple arithmetic, under ~40 "
-        "lines of logic. On a FAIL: decide from the spec which side is wrong, fix, rerun once.",
+        "Skipped for small blocks: one clock, no memory or protocol, simple arithmetic, no "
+        "fairness or ordering promise, under ~40 lines of logic. On a FAIL: decide from the "
+        "spec which side is wrong, fix, rerun once.",
     ),
     (
         "07",

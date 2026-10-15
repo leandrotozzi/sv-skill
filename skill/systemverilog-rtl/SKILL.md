@@ -87,8 +87,11 @@ is missing -- it is not a comment. So write every comment yourself, as you go:
   what the signal means, when it is valid, what it is relative to. Not its
   type or direction -- the declaration already says that. One comment per
   declaration, at its end; `svstyle fix` moves a lone comment written on the
-  line above to the end when it fits. Only a declaration that spans several
-  lines, or whose comment would not fit within 100 columns, keeps it above.
+  line above to the end when it fits. Never one comment above a group of
+  declarations: `fix` gives it to the first and leaves `TODO: describe` on
+  the rest. Declare related signals in one statement (`logic a_q, a_d;`) or
+  comment each. Only a declaration that spans several lines, or whose
+  comment would not fit within 100 columns, keeps it above.
 - **No temporary with bits you never read** (LNG-017). Round or truncate in
   one expression, cast to the result width: `y = W'((x + Half) >>> Frac);`
   rather than `x_round = x + Half; y = x_round[...];`, whose dropped bits are
@@ -169,7 +172,8 @@ spec (not from your RTL), and build and run it once with the command there.
 
 Skip it for a small block, where a testbench costs more than it finds: one
 clock, no memory, no handshake or bus protocol, no arithmetic beyond
-increment, compare and select, and under about 40 lines of `always` and
+increment, compare and select, no promise over many cycles such as fairness
+or ordering (an arbiter, a scheduler), and under about 40 lines of `always` and
 `assign` logic (combinational logic, a register, a counter, a small FSM).
 Also skip it when the user says so or Verilator is missing; run the user's
 testbench when they supply one. Say which, and simulate anyway when the
