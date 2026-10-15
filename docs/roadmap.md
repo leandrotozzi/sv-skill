@@ -3,13 +3,6 @@
 Open work only. Every number and every "done" or "not doing" is in
 [`history.md`](history.md).
 
-## Release (by hand)
-
-- [ ] Make the repo public and enable Pages (the `pages` job fails until then).
-- [ ] Add the PyPI trusted publisher, then push the `v0.1.0` tag
-      (`release.yml` builds and publishes). Until then `uv tool install svstyle`,
-      which the README and `tooling.md` give, does not work.
-
 ## svstyle
 
 - [ ] Verible stays on `v0.0-3946`, the newest with an x86_64 macOS build.

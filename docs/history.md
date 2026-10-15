@@ -888,3 +888,9 @@ repeated runs on a large tree.
   default change, `generate-label-prefix` taking a `style_regex`, keeps the
   old `g_`/`gen_` default. Every macOS build after 3946 is still arm64-only,
   so the pin moves with the dev machine (Spec follow-ups, 2026-09-28).
+- **Released.** The repo is public, Pages serves the style guide, and the
+  `v0.1.0` tag published `svstyle` 0.1.0 to PyPI through `release.yml`.
+- **yosys-slang read errors kept their line.** Under `-q`, Yosys 0.66 with
+  yosys-slang prints only "Design elaboration failed", so every read error
+  landed on line 1. The slang call drops `-q` and the parser takes slang's
+  `file:line:col: error:` lines too.
