@@ -13,9 +13,9 @@
 
 // Concurrent assertion, clocked on clk and disabled while rst_n is low or
 // unknown. Verilator samples `disable iff` only at clock edges, so a reset
-// pulse between two edges would fail an `a |=> b` started before it: name_rst_q
-// remembers a reset since the last edge and disables that check too. Longer
-// properties (`##2` and up) are still not covered across such a pulse.
+// pulse between two edges would fail an `a |=> b` or `a |-> ##n b` started
+// before it: name_rst_q remembers a reset since the last edge and disables
+// every attempt still running at that edge.
 `define ASSERT(name, prop, clk = clk_i, rst_n = rst_ni) \
     /* verilator lint_off SYNCASYNCNET */ \
     logic name``_rst_q; \

@@ -50,10 +50,13 @@ def test_templates_lint_clean_with_assertions_enabled():
 PULSE_TB = """`include "assert_macros.svh"
 module t;
     logic clk_i = 0, rst_ni = 0, v_q;
+    logic [3:0] c_q;
     always #5 clk_i = ~clk_i;
     always_ff @(posedge clk_i or negedge rst_ni)
         if (!rst_ni) v_q <= 1'b0; else v_q <= ($time < DROP);
-    `ASSERT(Hold_A, v_q |=> v_q)
+    always_ff @(posedge clk_i or negedge rst_ni)
+        if (!rst_ni) c_q <= '0; else c_q <= c_q + 1;
+    `ASSERT(Hold_A, PROP)
     initial begin
         #12 rst_ni = 1;
         #30 rst_ni = 0;  // a pulse between the edges at 35 and 45
@@ -66,11 +69,20 @@ endmodule
 
 
 @needs_tools
-@pytest.mark.parametrize(("drop", "fires"), [(1000, False), (60, True)])
-def test_assert_survives_a_reset_pulse_between_edges(tmp_path, drop, fires):
+@pytest.mark.parametrize(
+    ("prop", "drop", "fires"),
+    [
+        ("v_q |=> v_q", 1000, False),
+        ("v_q |=> v_q", 60, True),
+        ("c_q == 2 |-> ##3 c_q == 5", 1000, False),  # started at 35, cut at 42
+        ("c_q == 2 |-> ##3 c_q == 6", 1000, True),  # wrong after the pulse too
+    ],
+)
+def test_assert_survives_a_reset_pulse_between_edges(tmp_path, prop, drop, fires):
     """Verilator samples `disable iff` only at edges; the macro must still skip
-    the check a short reset cut short, yet catch a real drop after it."""
-    (tmp_path / "t.sv").write_text(PULSE_TB.replace("DROP", str(drop)))
+    the check a short reset cut short, one cycle or several, yet catch a real
+    failure after it."""
+    (tmp_path / "t.sv").write_text(PULSE_TB.replace("PROP", prop).replace("DROP", str(drop)))
     build = subprocess.run(
         ["verilator", "--binary", "--timing", "-Wno-fatal", "-Wno-lint", "-Wno-style",
          f"-I{ASSETS}", "--top-module", "t", "t.sv"],
